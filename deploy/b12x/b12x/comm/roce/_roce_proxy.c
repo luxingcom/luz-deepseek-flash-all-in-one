@@ -75,6 +75,13 @@ typedef struct {
     int rank;
     int n_hca;
     int gid_index;
+    /* W-E (net-rebuild comms-fix window, 2026-10-15): fabric semantics and the
+     * flow's DSCP marker.  B12X_ROCE_TOPOLOGY=switched records that every peer
+     * is directly reachable on both rails (no ring, no 2-hop assumption), and
+     * B12X_ROCE_TRAFFIC_CLASS feeds grh.traffic_class below.  Both fields stay
+     * zero when the keys are absent, i.e. byte-identical legacy behaviour. */
+    int traffic_class;
+    int switched_fabric;
     roce_hca_t hca[ROCE_MAX_HCAS];
     uint8_t *region;
     size_t region_bytes;
@@ -247,6 +254,35 @@ roce_ctx_t *roce_create(int world, int rank, const char *const *hca_names, int n
     c->rank = rank;
     c->n_hca = n_hca;
     c->gid_index = gid_index;
+    /* W-E: fabric topology + traffic class.  Optional and fail-closed:
+     * - B12X_ROCE_TOPOLOGY unset/empty = non-switched (backwards compatible);
+     *   anything outside {ring, switched} aborts instead of degrading silently.
+     * - B12X_ROCE_TRAFFIC_CLASS falls back to NCCL_IB_TC so a deployment that
+     *   only marks NCCL still marks the RoCE flow; malformed values abort.
+     * This is the port of the switched-fabric hunks from the ring proxy: the
+     * flat one-shot runtime has no opposite-rank hop and no flow-label 16383
+     * trick, so the two topology hunks that key on those have no object here. */
+    const char *topology = getenv("B12X_ROCE_TOPOLOGY");
+    if (topology != NULL && topology[0] != '\0' &&
+        strcmp(topology, "ring") != 0 && strcmp(topology, "switched") != 0) {
+        snprintf(err, err_len, "B12X_ROCE_TOPOLOGY must be ring or switched");
+        free(c);
+        return NULL;
+    }
+    c->switched_fabric = topology != NULL && strcmp(topology, "switched") == 0;
+    const char *tc_text = getenv("B12X_ROCE_TRAFFIC_CLASS");
+    if (tc_text == NULL || tc_text[0] == '\0') tc_text = getenv("NCCL_IB_TC");
+    if (tc_text != NULL && tc_text[0] != '\0') {
+        char *end = NULL;
+        errno = 0;
+        long tc = strtol(tc_text, &end, 10);
+        if (errno || end == tc_text || *end != '\0' || tc < 0 || tc > 255) {
+            snprintf(err, err_len, "RoCE traffic class must be an integer in [0,255]");
+            free(c);
+            return NULL;
+        }
+        c->traffic_class = (int)tc;
+    }
     c->region = region;
     c->region_bytes = region_bytes;
     c->slot_bytes = slot_bytes;
@@ -302,7 +338,12 @@ static int connect_qp(roce_ctx_t *c, int h, int p, const roce_blob_t *peer) {
     memcpy(rtr.ah_attr.grh.dgid.raw, peer->gid[h], 16);
     rtr.ah_attr.grh.sgid_index = (uint8_t)c->gid_index;
     rtr.ah_attr.grh.hop_limit = 64;
-    rtr.ah_attr.grh.traffic_class = 0;
+    /* W-E: mark the RoCE flow with the configured traffic class (DSCP source).
+     * Hardcoded 0 here made the revived RoCE all-reduce ride prio0 unprotected
+     * while NCCL rode prio3 - the silent trap the comms fix closes. */
+    rtr.ah_attr.grh.traffic_class = (uint8_t)c->traffic_class;
+    /* Flat/one-shot path: no opposite-rank hop, so the ring proxy's flow-label
+     * 16383 hardware-forwarding trick has no object and stays zero. */
     rtr.ah_attr.grh.flow_label = 0;
     int rc = ibv_modify_qp(hca->qp[p], &rtr,
                            IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU | IBV_QP_DEST_QPN |

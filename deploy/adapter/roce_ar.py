@@ -72,6 +72,16 @@ def _flag(name):
     return os.environ.get(name, "0").strip() == "1"
 
 
+
+def _roce_module_name():
+    # Switch topology has direct reachability between every peer on both rails.
+    # Keep the original RoCE arm, safety hooks, graph lifecycle and health checks;
+    # select the image's existing, independently qualified one-shot runtime.
+    if _flag('LUZ_SWITCH_ROCE_FLAT'):
+        return 'b12x.comm.roce'
+    return 'b12x.comm.roce_ring' if _flag('DSV41_ROCE_RING') else 'b12x.comm.roce'
+
+
 def gates_on():
     """Both import-time gates (DSV41_ROCE_RING, SGLANG_ROCE_ALLREDUCE) set to 1."""
     return _flag("DSV41_ROCE_RING") and _flag("SGLANG_ROCE_ALLREDUCE")
@@ -184,11 +194,7 @@ def install(module):
 
         if self.world_size not in (4, 8) or isinstance(self.group, StatelessProcessGroup):
             raise RuntimeError("RoCEnante route needs the TP4/TP8 Gloo exchange group")
-        mod_name = (
-            "b12x.comm.roce_ring"
-            if os.environ.get("DSV41_ROCE_RING", "0") == "1"
-            else "b12x.comm.roce"
-        )
+        mod_name = _roce_module_name()
         roce_mod = importlib.import_module(mod_name)
         max_size = int(os.environ.get("SGLANG_ROCE_MAX_SIZE", str(512 * 1024)))
         self.roce = roce_mod.AllReduce.from_exchange_group(
@@ -244,7 +250,7 @@ def install(module):
     module.roce_ar_stats = stats
     _pynccl_module = module
     _banner(
-        f"armed pynccl face: ring={'roce_ring' if _flag('DSV41_ROCE_RING') else 'roce'} "
+        f"armed pynccl face: backend={_roce_module_name().rsplit('.', 1)[-1]} "
         f"max_size={os.environ.get('SGLANG_ROCE_MAX_SIZE', str(512 * 1024))} "
         f"hca={os.environ.get('B12X_ROCE_HCA', '(auto)')} "
         f"peer_maps={'set' if os.environ.get('B12X_ROCE_PEER_HCA_MAPS') else '(auto)'} "
