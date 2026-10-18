@@ -134,7 +134,8 @@ load/校验/身份核对细则=包内 `README-DIST.md`。GitHub Releases=发布�
 docs/        定版成果：report(终版性能报告+TOOLS31 烘焙结果)/runbook(OPS-MANUAL)/registry(FORM-REGISTRY)/
              quality(RELEASE-QUALITY 含 T2-VL 注记行)/research(FL6+红带+VL-NATIVE 三档：RESULT/
              WINCARD/SGVISION 调查)/DEPLOY-GUIDE(含 §9 VL 面部署)/
-             ACKNOWLEDGEMENTS(定版 110 条：上游谱系/社区同行/官方资产/外部对照/工具田野)
+             ACKNOWLEDGEMENTS(定版 110 条：上游谱系/社区同行/官方资产/外部对照/工具田野)/
+             deploy/DEADLOCK-MITIGATION-AND-FORENSICS-20261018(0.3.2 死锁规避+py-spy 取证包)
 deploy/      服务面全集：env(两形+VL 四臂)/bin(r3 链+VL 双臂 boot+冒烟量具)/adapter(现役件)/
              overlay(o12c1-prod 29 件+v4vl-79cafec0 复原树 28 件)/
              nccl(ring-only 库+ncclpin)/b12x(计算树)/kit(guard/instruments)/models.d(权重注册卡)/sentinel
