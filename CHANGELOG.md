@@ -3,19 +3,26 @@
 > 提炼自战役仓 git log（`luz-0.3.0-r1`（2026-10-05，32c6acd）之后 632 commits）
 > 与总卡/定稿报告。逐项档锚见 `docs/` 各分档。
 
-## 0.3.2 死锁修复（2026-10-18，验收中）
+## 0.3.2 死锁修复（2026-10-18，修复体验证毕；code 型性能回归呈裁，产线暂留 1017 形）
 
 > 43h 长稳调度死锁（2026-10-16 站点甲；四机同点 `v41_indexer/scoring.py:164` 宿主同步
 > 等待，集合通信从未发起）修复线。最小修复集=上游 `520d6d0`（#41659，含 fc2795b）回移植：
 > prefill/decode 索引器数据构造改整批 host-lengths 构形+async_h2d，消除步级隐含宿主同步。
 
-1. **修复镜像**：`dsv41-sglang-optimized:0.3.2-r032`（内网 registry；digest
-   `sha256:bd281e6f…631f5`；15 件 +1347/−313；adapter 同批原子切换律——9 件接口迁移
-   按 XCHECK §4）。
-2. **验收读数**：G1-G5 全绿后回填（**待 r032b 重烘窗**——G1 单元门拦出依赖闭包漏项
-   `candidate_block_mask`，镜像不可用级，生产零部署；详见战役档 S-FIX-W0-20261018）。
-   A 侧基准=MS1017 在役列（DE c1 四型 129.30/80.33/146.64/125.48；PR 六档
-   5323.4…5351.5）。
+1. **修复镜像**：`dsv41-sglang-optimized:0.3.2-r032b`（内网 registry；digest
+   `sha256:1e2ca8e3…99ec4`；16 件 +1359/−313=r032 15 件+`candidate_block.py` 闭包补件；
+   adapter 同批原子切换律——9 件按 XCHECK §4 迁移，W0 形散失后重建版五面验证在档
+   `logs/S-FIX-W0B-20261018/adapter-rebuild/`）。
+2. **验收读数（S-FIX-W0B-20261018 窗实测，A 侧基准=MS1017 在役列）**：修复验证面全绿
+   ——G1 单元 122 passed/0 failed；G5 直证步级隐含宿主同步 20→0（py-spy 996 样本 0 帧）；
+   warm 门 6271.0（+1.4% 带内）；四查 15/15；needle 3/3；GSM8K 98.0%（196/200，err=0，
+   与 MS1017 同值）；PR 六档全带内；DE c1 四型 prose 79.48/structured 145.3/json 124.74
+   均带内（−1.1%/−0.9%/−0.6%）；44 项 RoCE parity A/B 双面 44/44+对拍零差。**但 code 型
+   DE 120.45（−6.8%）出带**——复 A 靴归因（1017 现役形复读 128.44=−0.7% 带中，
+   accept_len 佐证 5.33 vs 5.58/5.65）=**修复面回归非环境漂移**（与 XCHECK §5 风险
+   「write_selection 去排序=输出级等价非位级」同向）⇒ **产线留 1017 现役形，r032b
+   在库零部署**；死锁修复本体判绿，code 型性能回归呈裁（候选方向=候选序位级保持形
+   回移植）。A0 第 1 采无升级触发（prose −1.1%，分型 accept 全 ≥2.8 门槛）。
 3. **站点规避+取证包随包**：`docs/deploy/DEADLOCK-MITIGATION-AND-FORENSICS-20261018.md`
    ——修复到位前「复现即重启」口径+升级前窗口建议+py-spy dump/record/top 三件套用法
    （`scoring.py:164` vs `ncclCommInit*` 判别）+`/proc/<pid>/task/*/stack` 与环网
