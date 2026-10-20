@@ -172,3 +172,27 @@ CHANGELOG/重建包 README 的同步改动。**方法**：`verify.sh` 全量自�
 
 **结论：公开升级面清洁门 PASS**。新增面零真凭据、零未掩码用户名、零临时件；
 示例命令使用 `<repo>`/`<home>` 占位，不依赖部署机私有路径。
+
+---
+
+## 0.3.2 环网可用面回补清洁门（2026-10-20，公开升级面之后）
+
+**受检面**：新增 `tools/bench/qeval.py`/`qeval_tasks.py`/`gsm8k_dsv41.py`/
+`README.md`、`docs/RING-0.3.2-COMPAT.md`，以及 `tools/needle_probe.py`、
+UPGRADE/README/CHANGELOG/`verify.sh` 的同步改动。**方法**：工具自检 +
+独立 PII/密钥/链接/语法复扫；不改历史读数、不动产线。
+
+| # | 检查 | 结果 |
+|---|---|---|
+| S11 | 新增量具语法 | `py_compile` 4 件全绿 |
+| S12 | qeval 判别力 | `--selftest` **15/15**（含 401 不作质量红、全失败不出分） |
+| S13 | needle 自检 | `SELFCHECK PASS`（含 r1 600k 边界档构造与坏端点红） |
+| S14 | 真实家目录 / 私钥 / sudo 口令 | **0 命中**；gsm8k/qeval 输出目录改为 `~/bench-results`、`~/qeval-results`，题源/API key 参数化 |
+| S15 | 相对链接（新增/改动 5 档） | **0 坏链**（switch 分支差异档改为 GitHub 分支链接，避免 main 缺档） |
+| S16 | 重建包自验 | `verify.sh` **RECON-KIT PASS**（含新增 7b 量具段） |
+| S17 | kit MANIFEST 一致性 | 69/69 PASS（仅 `verify.sh` 重钉） |
+| S18 | 形态纪律 | 新增档明确环网/交换机边界；W-E C 层与 flat one-shot 标为交换机专属，未混入环网路径 |
+
+**结论：环网可用面回补清洁门 PASS**。新增件零真凭据、零未掩码用户名、
+零临时件；环网边界档明确标注“环网 + r032c”尚缺的 boot profile，未作未经验证的
+升级承诺。

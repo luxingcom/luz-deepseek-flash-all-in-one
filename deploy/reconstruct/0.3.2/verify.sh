@@ -158,11 +158,36 @@ for f in pack_engram.py pack_all.sh distribute.sh verify_engram.py verify_remote
   need "$KIT/weights/engram-tools/$f"
 done
 
+echo "== 7b. public bench/quality tools =="
+for f in tools/bench/qeval.py tools/bench/qeval_tasks.py tools/bench/gsm8k_dsv41.py \
+         tools/bench/README.md tools/needle_probe.py; do
+  need "$REPO/$f"
+done
+if python3 -m py_compile "$REPO/tools/bench/qeval.py" "$REPO/tools/bench/qeval_tasks.py" \
+      "$REPO/tools/bench/gsm8k_dsv41.py" "$REPO/tools/needle_probe.py" 2>/dev/null; then
+  pass "bench/quality tools py_compile"
+else
+  bad "bench/quality tools py_compile"
+fi
+if python3 "$REPO/tools/bench/qeval.py" --selftest 2>/dev/null | grep -q 'selftest 15/15'; then
+  pass "qeval selftest 15/15"
+else
+  bad "qeval selftest != 15/15"
+fi
+if python3 "$REPO/tools/needle_probe.py" --selfcheck 2>/dev/null | grep -q 'SELFCHECK PASS'; then
+  pass "needle selfcheck PASS"
+else
+  bad "needle selfcheck"
+fi
+
 echo "== 8. secret/PII scan =="
 HITS=$(grep -rInE 'BEGIN (RSA|OPENSSH|EC|DSA) PRIVATE|/home/[a-z][a-z0-9]{5,}([/[:space:]]|$)|password[[:space:]]*=|sudo -S' "$KIT" --exclude=verify.sh 2>/dev/null || true)
 TOP_HITS=$(grep -InE 'BEGIN (RSA|OPENSSH|EC|DSA) PRIVATE|/home/[a-z][a-z0-9]{5,}([/[:space:]]|$)|password[[:space:]]*=|sudo -S' \
   "$REPO/UPGRADE-0.3.2.md" "$REPO/deploy/env/CBX1A-CERTM-spec1.env" \
-  "$REPO/deploy/adapter/0.3.2-MANIFEST.md5" "$REPO/deploy/adapter/0.3.2-ASSEMBLY.md" 2>/dev/null || true)
+  "$REPO/deploy/adapter/0.3.2-MANIFEST.md5" "$REPO/deploy/adapter/0.3.2-ASSEMBLY.md" \
+  "$REPO/docs/RING-0.3.2-COMPAT.md" "$REPO/tools/bench/README.md" \
+  "$REPO/tools/bench/qeval.py" "$REPO/tools/bench/gsm8k_dsv41.py" \
+  "$REPO/tools/needle_probe.py" 2>/dev/null || true)
 if [[ -z "$HITS" && -z "$TOP_HITS" ]]; then pass "no private-key/sudo-token/user-home hits"; else
   bad "secret/PII hits:"; printf '%s\n%s\n' "$HITS" "$TOP_HITS" | head -20
 fi

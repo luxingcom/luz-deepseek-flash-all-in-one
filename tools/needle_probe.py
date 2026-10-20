@@ -40,6 +40,10 @@ bench/ 仓内无现成 needle 件（已 ls+find 核实 2026-09-30），故按任
 默认档 = 8K/32K/64K/128K 阶梯（G1 同源）；R1 形加档（262144/599040 等）需 --form r1。
 水位门缺省 8000M（G1 靴前 MemAvailable≥8G 同源；R1 引擎稳态 head 17-19G 不再误挡，
 NEEDLE_WATER_M 可覆盖）。
+随形校准律：水位线必须按靴形显式校准后开跑——长上下文/大缓存 idle 形
+（MemAvailable 约 6.9-7.5G）设 NEEDLE_WATER_M=6000 档，常规产线形保持缺省 8000。
+有效水位线恒记入输出 JSON 的 water_m 字段（窗档判读凭据）；SKIP 行 reason 带实测值
+与线值，可直接对表，不要凭残留内存推断。
 """
 import argparse
 import os
@@ -276,6 +280,7 @@ def main():
         rows.append(probe(a.base, a.model, s, f"{seed}-{s}", a.depth))
     # gate 语义：任一 FAIL → False；全 SKIP → False（无证据不得放行）；其余 True
     out = {"seed": seed, "base": a.base, "form": form, "form_limit": limit,
+           "water_m": WATER_M,
            "rows": rows,
            "n_pass": sum(1 for r in rows if r["status"] == "PASS"),
            "n_fail": sum(1 for r in rows if r["status"] == "FAIL"),
