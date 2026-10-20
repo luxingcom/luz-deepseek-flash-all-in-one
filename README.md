@@ -1,12 +1,12 @@
 # LuZ-deepseek-flash-all-in-one
 
 **LuZ-0.3.2（2026-10-20 定版）** —— DeepSeek-V4.1-Flash @ **4×NVIDIA DGX Spark（GB10，SM121）TP4
-内部 RoCE 环网**全栈优化一体化交付（基于 SGLang 上游 `main-79cafec0` 的自有
+双 rail RoCE（0.3.2 现役=交换机 flat 形；环网为 0.3.1 历史形）**全栈优化一体化交付（基于 SGLang 上游 `main-79cafec0` 的自有
 优化层，许可注记见 [NOTICE](NOTICE) / [LICENSE](LICENSE)）。
 
 > **0.3.2 定版档**：[release note 正典](docs/release/0.3.2-RELEASE-NOTE.md) ·
 > [系列 CHANGELOG](CHANGELOG.md) · [发布索引](docs/release/README.md) ·
-> [重建包](deploy/reconstruct/0.3.2/README.md)。
+> [重建包](deploy/reconstruct/0.3.2/README.md) · **[升级指南](UPGRADE-0.3.2.md)**。
 > 现役形=CBX1A 56 键 env + SPEC6 九参 + IMAGE `0.3.2-r032c`
 > （digest `sha256:47f6d91a…ffc4`）。0.3.1 为前代定版（tag `v0.3.1`），
 > 其读数在下方保留为历史基线。
@@ -17,7 +17,7 @@
 |---|---|---|---|
 | **0.3.0** | 2026-10-05 | R1 检查点封存：36 键 env `b7e318e0`+sitecustomize 七件 `91adc83d`+池 9.6M 基线（tag 前基线） | [CHANGELOG](CHANGELOG.md) |
 | **0.3.1** | 2026-10-13 定型 / 10-14 发布 | FL6 召回修复转正（51 键）+VL 双臂+网关链；交付镜像 `0.3.1-r3` | tag [`v0.3.1`](https://github.com/luxingcom/luz-deepseek-flash-all-in-one/releases/tag/v0.3.1) · [CHANGELOG](CHANGELOG.md) |
-| **0.3.2** | 2026-10-20 | 净线重建→死锁修复（`520d6d0`+r032c 位级保持形）→五目标执行链→收官转正；池 84 件三态处置 | tag `v0.3.2` · [RELEASE-NOTE](docs/release/0.3.2-RELEASE-NOTE.md) · [重建包](deploy/reconstruct/0.3.2/README.md) |
+| **0.3.2** | 2026-10-20 | 净线重建→死锁修复（`520d6d0`+r032c 位级保持形）→五目标执行链→收官转正；池 84 件三态处置 | tag `v0.3.2` · [RELEASE-NOTE](docs/release/0.3.2-RELEASE-NOTE.md) · [重建包](deploy/reconstruct/0.3.2/README.md) · [升级指南](UPGRADE-0.3.2.md) |
 
 ---
 
@@ -149,10 +149,14 @@ load/校验/身份核对细则=包内 `README-DIST.md`。GitHub Releases=发布�
 
 **形三元组**=env 键面（`deploy/env/`）+SPEC serve 九参（`deploy/SPEC6-SERVE-REF.md`）
 +adapter/overlay 面（`deploy/adapter/`、`deploy/overlay/`）——三件齐一才可 boot。
-**0.3.2 现役形**=env **CBX1A 56 键**（`0729e18d`）+SPEC6 九参+
-adapter **`b58e49ff`**（89 件）+overlay backend `a1e7c3b5`+IMAGE `0.3.2-r032c`。
+**0.3.2 现役形**=env **CBX1A 56 键**（`0729e18d`，公开位
+`deploy/env/CBX1A-CERTM-spec1.env`）+SPEC6 九参+adapter **`b58e49ff`**（89 件记录；
+0.3.1 基底 + reconstruct 覆盖后 87 个运行时件，装配账
+`deploy/adapter/0.3.2-MANIFEST.md5`）+overlay backend `a1e7c3b5`+IMAGE `0.3.2-r032c`。
 **精确重建包**=`deploy/reconstruct/0.3.2/`（CBX1A env、adapter 13+4 件、r032c
 16 件补丁+构建配方、1017 权重/engram 台账；自验 `verify.sh` 期望 `RECON-KIT PASS`）。
+**升级与复现**=**[UPGRADE-0.3.2.md](UPGRADE-0.3.2.md)**（0.3.1 基底+混合快照的逐步
+升级、性能复现判据、回退与排障）。
 **boot 四查**=health 200/printenv 四机逐字/横幅直读/面指纹四机全等；另加
 **起栈接线闸门** `tools/serve_flags_gate.sh`（issue #4 采纳件：从运行进程
 argv 断言 A8/A9 两旗标，只读 fail-closed）。从零部署全流程见
@@ -179,9 +183,10 @@ argv 断言 A8/A9 两旗标，只读 fail-closed）。从零部署全流程见
 > 本仓通信栈=该仓硬件转发层+NCCL 层 + 本仓 `deploy/nccl/`（ring-only 库+ncclpin 在役件）。
 >
 > **分支**：[`switch-fabric`](https://github.com/luxingcom/luz-deepseek-flash-all-in-one/tree/switch-fabric)
-> —— 交换机方案适配（双 rail 交换机拓扑下的 RoCE flat/one-shot 运行时、C 层 fabric
-> 语义键、交换机形态 env 样本）；差异档见其 `deploy/SWITCH-FABRIC.md`。`main` 保持
-> 环网方案形态，两方案差异件互不污染。
+> —— 0.3.2 交换机分支差异档（双 rail 交换机拓扑下的 RoCE flat/one-shot 运行时、
+> C 层 fabric 语义键、WG53 历史样本）；差异档见其 `deploy/SWITCH-FABRIC.md`。
+> 0.3.2 的 switched flat 运行时与 CBX1A env 已并入 main 的 reconstruct 包；
+> 环网（4 口 CX-7 hairpin）为 0.3.1 及更早历史形。两形不可混拼。
 
 ```
 docs/        定版成果：release(0.3.2 RELEASE-NOTE+发布索引)/report(0.3.1 终版报告+TOOLS31 烘焙结果)/
@@ -189,16 +194,17 @@ docs/        定版成果：release(0.3.2 RELEASE-NOTE+发布索引)/report(0.3.
              VL-NATIVE 三档)/DEPLOY-GUIDE(含 §9 VL 面部署)/
              ACKNOWLEDGEMENTS(定版 111 条：上游谱系/社区同行/官方资产/外部对照/工具田野)/
              deploy/DEADLOCK-MITIGATION-AND-FORENSICS-20261018(0.3.2 死锁规避+py-spy 取证包)
-deploy/      服务面全集：env(0.3.1 两形+VL 四臂)/bin(r3 链+VL 双臂 boot+冒烟量具)/
+deploy/      服务面全集：env(0.3.1 历史形+CBX1A 现役+VL 四臂)/bin(r3 链+VL 双臂 boot+冒烟量具)/
              reconstruct/0.3.2(现役形逐文件重建包：env/adapter/overlay/b12x/image/weights/boot)/
-             adapter(0.3.1 快照)/overlay(o12c1-prod 29 件+v4vl-79cafec0 复原树 28 件)/
+             adapter(0.3.1 基底+0.3.2 装配账)/overlay(o12c1-prod 29 件+v4vl-79cafec0 复原树 28 件)/
              nccl(ring-only 库+ncclpin)/b12x(计算树)/kit(guard/instruments)/models.d(权重注册卡)/sentinel
 tools/       全树工具：packages(五包+_lib+_bake；gateway 含 VL 车道两件)/boot-with-slotlock/census 面板族/
              judge/boot_sentinel/量具与门禁脚本/serve_flags_gate(issue #4 起栈接线闸门)/patches/运维件
 tests/       fl6-recall(双臂 6 测)/unit(b12x/row_store/serve_flags_gate)/whitebox(14 件矩阵)
 ```
 
-CHANGELOG（0.3.0→0.3.2 定版）· SCAN-REPORT（密钥扫描+0.3.2 tag 清洁门）· NOTICE/LICENSE（许可）
+CHANGELOG（0.3.0→0.3.2 定版）· SCAN-REPORT（密钥扫描+0.3.2 tag 清洁门）· NOTICE/LICENSE（许可）·
+[UPGRADE-0.3.2](UPGRADE-0.3.2.md)（0.3.1→0.3.2 升级/性能复现/回退）
 
 ---
 

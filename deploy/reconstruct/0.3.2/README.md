@@ -5,7 +5,9 @@
 >
 > 本包补的是 `v0.3.2` tag 时公开仓尚未归位的**现役增量件**。版本叙事与性能读数
 > 见 [docs/release/0.3.2-RELEASE-NOTE.md](../../../docs/release/0.3.2-RELEASE-NOTE.md)；
-> 本包只回答“怎么逐字节重建”。
+> 本包只回答“怎么逐字节重建”。现役 env 与 adapter 装配面已同时公开在顶层
+> （`deploy/env/CBX1A-CERTM-spec1.env`、`deploy/adapter/0.3.2-MANIFEST.md5`）；
+> 逐步升级/性能复现/回退见 [UPGRADE-0.3.2.md](../../../UPGRADE-0.3.2.md)。
 
 ## 0. 结论：缺什么，本包补什么
 
@@ -19,8 +21,8 @@
 | 权重 | `models.d` 的 0.3.0 卡（476G 旧面） | **1017 84 文件 SHA256SUMS** + NFS/秩映射 + engram 8 分片哈希与生成工具 |
 | boot | 已公开，但 md5 与产线不同（脱敏+快照头） | 差异说明与还原命令；参面九参/RUN-ARGS 逐字 |
 
-**仍需外部提供、且不应进 Git 的两项**：基座镜像（48.6GB，70 层）与
-V4.1-Flash-1017 权重（476G）/ engram 分片（约 189G）。本包给出它们的身份指纹、
+**仍需外部提供、且不应进 Git 的三项**：基座镜像（48.6GB，70 层）、
+V4.1-Flash-1017 权重（476G）、engram 分片（约 189G）。本包给出它们的身份指纹、
 下载后校验清单与重新生成 engram 的完整工具链。
 
 ## 1. 目标指纹（验收基线）
@@ -81,9 +83,11 @@ rsync -a <repo>/deploy/adapter/ <home>/migrate-assets/dsv41/adapter/
 cp -a <repo>/deploy/reconstruct/0.3.2/adapter/files/. <home>/migrate-assets/dsv41/adapter/
 ```
 
-验收：12 个代码件 md5 与 `adapter/production-md5.txt` 全等；`build_repack_cuda.sh`
-仅第 6 行注释路径脱敏（产线 cd6c7707，公开件不同，见 `adapter/NOTES.md`）。装载缝
-仍是 `sitecustomize.py`=**beb131ab**；R1 件 `kv_fp4.py`=**75062432**。
+验收：13 件替换件中 12 个代码件 md5 与 `adapter/production-md5-exact.txt` 全等；
+`build_repack_cuda.sh` 仅第 6 行注释路径脱敏（产线 cd6c7707，公开件不同，见
+`adapter/NOTES.md`）。整树装配后 87 件可用
+`deploy/adapter/0.3.2-MANIFEST.md5` 一次验收。装载缝仍是
+`sitecustomize.py`=**beb131ab**；R1 件 `kv_fp4.py`=**75062432**。
 
 ### 2.3 overlay
 

@@ -1,11 +1,16 @@
-# DEPLOY-GUIDE — 从零部署指南（4×DGX Spark GB10 TP4 RoCE 环网）
+# DEPLOY-GUIDE — 从零部署指南（4×DGX Spark GB10 TP4 双 rail RoCE）
 
 > 目标：在四台 DGX Spark（GB10）上从零复原 LuZ 生产栈。
-> **0.3.2 定版注记（2026-10-20）**：0.3.2 现役形已完整公开到
-> [`deploy/reconstruct/0.3.2/`](../deploy/reconstruct/0.3.2/README.md)——CBX1A 56 键
-> env、adapter 13+4 件、overlay/b12x 增量、r032c 16 件镜像补丁+构建配方、1017 权重
-> 与 engram 分片台账。本文 §1-§9 的 0.3.1 数值保留为历史基线；**现役值以 §0 表 +
-> reconstruct 包为准**。0.3.2 全量差异见
+> **0.3.2 定版注记（2026-10-20）**：0.3.2 现役形已完整公开——现役 env=
+> [`deploy/env/CBX1A-CERTM-spec1.env`](../deploy/env/CBX1A-CERTM-spec1.env)
+> （56 键/`0729e18d`），其余增量在
+> [`deploy/reconstruct/0.3.2/`](../deploy/reconstruct/0.3.2/README.md)（adapter
+> 13+4 件、overlay/b12x、r032c 16 件镜像补丁+构建配方、1017 权重与 engram 台账）。
+> adapter 终态=0.3.1 基底+覆盖，装配账=
+> [`deploy/adapter/0.3.2-MANIFEST.md5`](../deploy/adapter/0.3.2-MANIFEST.md5)。
+> 本文 §1-§9 的 0.3.1 数值保留为历史基线；**现役值以 §0 表 + reconstruct 包为准**。
+> 逐步升级/性能复现/回退=
+> **[UPGRADE-0.3.2.md](../UPGRADE-0.3.2.md)**；0.3.2 全量差异见
 > [release/0.3.2-RELEASE-NOTE.md](release/0.3.2-RELEASE-NOTE.md)。
 > 规程法源=`docs/runbook/OPS-MANUAL-031.md`（boot/复原/回退三章）；形权威表=
 > `docs/registry/FORM-REGISTRY-031.md`（三形三元组+部署面指纹）。
@@ -14,14 +19,15 @@
 
 | 件 | 现役值 | 重建材料 |
 |---|---|---|
-| env | **CBX1A 56 键** / `0729e18d` | `deploy/reconstruct/0.3.2/env/` + 逐级链 |
-| adapter | 活件指纹 `b58e49ff`；装载缝 `sitecustomize.py`=`beb131ab`、R1 `kv_fp4.py`=`75062432` | 13+4 件全文 + 补丁 |
+| env | **CBX1A 56 键** / `0729e18d` | [`deploy/env/CBX1A-CERTM-spec1.env`](../deploy/env/CBX1A-CERTM-spec1.env) + `reconstruct/0.3.2/env/` 逐级链 |
+| adapter | 活件指纹 `b58e49ff`；装载缝 `sitecustomize.py`=`beb131ab`、R1 `kv_fp4.py`=`75062432` | 0.3.1 基底 + 13+4 件覆盖；装配账 `deploy/adapter/0.3.2-MANIFEST.md5`（87 件） |
 | overlay | `deepseek_v4_backend.py`=`a1e7c3b5` | 全文 + 补丁 |
 | b12x | `roce_oneshot.py`=`035c860c`、`_allgather_cute.py`=`7253717a`、`_roce_proxy.c`=`23646e89` | 3 件全文 + 补丁 |
 | IMAGE | `0.3.2-r032c` / `sha256:47f6d91a…e2ffc4` / 71 层 | 16 件全文 + `79cafec0→f9d89b02` 补丁 + 构建脚本 |
 | 权重 | `DeepSeek-V4.1-Flash-1017` / 84 文件 / 510,311,045,870 B | 84 行 SHA256SUMS + NFS/秩映射 |
 | engram | 8 分片 / 202,758,065,168 B | 分片哈希 + `pack_engram.py`/打包/分发/校验工具 |
 | boot | `r3-boot-arm.sh` 产线 `20f22bc6`；公开件 `9ac6e113`（脱敏头） | 公开 boot + `reconstruct/.../boot/RUN-ARGS.md` |
+| 升级 | 0.3.1→0.3.2 逐步命令/性能复现/回退 | **[UPGRADE-0.3.2.md](../UPGRADE-0.3.2.md)** |
 
 重建顺序、逐件命令、脱敏差异与自验：`bash deploy/reconstruct/0.3.2/verify.sh`
 （期望 `RECON-KIT PASS`）。基座镜像与权重/engram 本体不分发，包内给身份指纹与
@@ -32,7 +38,7 @@
 | 项 | 要求 |
 |---|---|
 | 节点 | 4× NVIDIA DGX Spark（GB10，SM121，ARM aarch64，UMA 架构） |
-| 拓扑 | TP4；内部 RoCE 环网（每机 4 口 HCA：rocep1s0f0/f1 + roceP2p1s0f0/f1；逐秩 PEER_HCA 映射表内嵌于 `deploy/bin/r3-boot-arm.sh` NODES 表） |
+| 拓扑 | TP4；**0.3.2 现役=双 rail 以太交换机**，每机 2 口 HCA 部署对 `rocep1s0f0,roceP2p1s0f1`，`B12X_ROCE_TOPOLOGY=switched`+`LUZ_SWITCH_ROCE_FLAT=1`+`TC=106`；NCCL 用同一部署对 + `NCCL_IB_TC=106`。4 口 CX-7 hairpin 环网=0.3.1 及更早历史形，两形不可混拼 |
 | 角色 | rank0=head dgxspark01（192.168.0.201）；rank1=dgxspark02（.202）；rank2=dgxspark04（.204）；rank3=dgxspark03（.203）〔net-rebuild-20261015 管理段重编址〕 |
 
 ## 2. 系统依赖（版本锚——系统级件不随仓分发，逐项对版）
@@ -100,8 +106,8 @@ engram 分片（**宿主生成物，约 189G，不随仓分发**）：`~/dsv41-e
 | `deploy/bin/` | `~/migrate-assets/bin/` | r3-boot-arm.sh 部署链（0.3.2 产线 md5 **20f22bc6**；公开件 9ac6e113=脱敏头）+gate 四件+stop/watchdog |
 | `deploy/reconstruct/0.3.2/` | 按包内 README 分段落位 | **0.3.2 现役增量全件**：CBX1A env、adapter 13+4、overlay/b12x、r032c 16 件、1017/engram 台账 |
 | `deploy/bin/boot_mvl41_native.sh`+`boot_mvl40exp_r2.sh`+`vl_smoke_gv1.py` | `~/luz030-opt-campaign/dev/vl-native/`（战役位；或任意可写位+`CAMP=` 覆写） | VL-NATIVE 窗执行件（2026-10-13 全绿收录）：V4.1 原生视觉臂 boot+V4.0exp overlay 复原臂 boot+G-V1/G-V5 冒烟量具（knapcio 双形状 1024/1024 SAT 断言）；用法=§9 |
-| `deploy/adapter/` | `~/migrate-assets/dsv41/adapter/` | 供给面整面快照 **83 件/约 3.0M**（B1 收录 2026-10-13：顶层 68+fi_r1/ 6+lib/ 1+overlay/ 3+tests/ 5；sitecustomize 55b1e412 装载缝+闭包 48 件+留役休眠件+`.so`/json/构建源；排除 `*.bak*` 39+变体 1+EP1 陈旧清单 2——收录口径与排除名单逐件=`deploy/adapter/README.md`，逐件 md5=`deploy/adapter/MANIFEST.md5`） |
-| `deploy/env/` | `~/migrate-assets/dsv41/env/` | 0.3.2 现役=CBX1A 56 键（`reconstruct/0.3.2/env/`）；仓内 0.3.1 两形+**VL 四臂形**为历史/回退样本（VL41N-SPEC0/K6/K6CG 三级阶梯+VL40EXP-R2-C24T；详=§9） |
+| `deploy/adapter/` | `~/migrate-assets/dsv41/adapter/` | **0.3.1 基底 83 件/约 3.0M**（=0.3.2 装配基底；B1 收录 2026-10-13：顶层 68+fi_r1/ 6+lib/ 1+overlay/ 3+tests/ 5；sitecustomize 55b1e412 装载缝+闭包 48 件+留役休眠件+`.so`/json/构建源；排除 `*.bak*` 39+变体 1+EP1 陈旧清单 2）。0.3.2 终态=基底+`reconstruct/0.3.2/adapter/files/` 覆盖，装配后 **87 个运行时件**；逐件账=`deploy/adapter/0.3.2-MANIFEST.md5`，步骤=`deploy/adapter/0.3.2-ASSEMBLY.md` |
+| `deploy/env/` | `~/migrate-assets/dsv41/env/` | **0.3.2 现役=`CBX1A-CERTM-spec1.env`（56 键/0729e18d）**；E16B2/E16B1/FB54 逐级链在 `reconstruct/0.3.2/env/`；仓内另有 0.3.1 两形+**VL 四臂形**历史/回退样本（VL41N-SPEC0/K6/K6CG 三级阶梯+VL40EXP-R2-C24T；详=§9） |
 | `deploy/overlay/o12c1-prod/` | `~/migrate-assets/v4vl/sglang-overlay.o12c1-prod/`（=`SGLANG_OVERLAY_DIR`） | 29 件=28 活件影子挂载+1 映射表（scheduler 5b6fe2a3 等；boot 链挂载计数断言==28——r3-boot-arm.sh `ov_n` 门；目录 29 件含 overlay-map.tsv 自身） |
 | `deploy/overlay/v4vl-79cafec0/` | `~/migrate-assets/vl-native/sglang-overlay.v4vl-79cafec0/` | **VL 专用 overlay 复原树 28 件**（V4.0exp 臂供给面；内容指纹 cbf986df×4 机全等——VL-NATIVE S5 整树复原律；boot_mvl40exp_r2.sh 内嵌 OV_MAP 平铺键→容器路径映射+28 件 fail-closed 计数断言；与 o12c1-prod 零交叠） |
 | `deploy/nccl/nccl-ringonly/`+`ncclpin.so` | `~/migrate-assets/nccl-ringonly/`+`~/migrate-assets/ncclpin.so` | ring-only NCCL 2.30.7+pin 件（只读挂载 /opt） |
@@ -118,7 +124,7 @@ engram 分片（**宿主生成物，约 189G，不随仓分发**）：`~/dsv41-e
 
 | 形 | 件/md5 | 适用 |
 |---|---|---|
-| **CBX1A 56 键（0.3.2 现役）** | `deploy/reconstruct/0.3.2/env/CBX1A-CERTM-spec1.env` / **0729e18d** | 0.3.2 终态（WCBOOT74 复役形）：E16B2 键面 + `DSV41_CERT_HEAD_M=6,12,…,48` |
+| **CBX1A 56 键（0.3.2 现役）** | `deploy/env/CBX1A-CERTM-spec1.env` / **0729e18d**（与 `reconstruct/0.3.2/env/` 同名件逐字节相同） | 0.3.2 终态（WCBOOT74 复役形）：E16B2 键面 + `DSV41_CERT_HEAD_M=6,12,…,48` |
 | **E16B2 56 键（一级回退）** | `reconstruct/0.3.2/env/PROD-E16B2-spec1.env` / 5877fcb0 | 摘 CERT M 八元即回此形 |
 | **E16B1 54 键** | `reconstruct/0.3.2/env/PROD-E16B1-spec1.env` / d55baa00 | RoCE 聚合尺寸翻倍形 |
 | **FB54 54 键** | `reconstruct/0.3.2/env/PROD-FB54-spec1.env` / ad635762 | D12 三键/交换机面初形 |
@@ -132,6 +138,9 @@ serve 参=**SPEC6 九参**（六参基座 + A8 `--tool-call-parser deepseekv41` 
 §一 L3；48/47/45 键件在 `tools/packages/cfgmgmt/payload/env/`）。0.3.2 的新回退链=
 **CBX1A→E16B2→E16B1→FB54→51 键**（`reconstruct/0.3.2/env/ENV-CHAIN.md` 逐级键差）。
 adapter 装载缝在 0.3.2 为 **beb131ab**（A6）；0.3.1 的 55b1e412 仅作历史对照。
+adapter 终态装配与 87 件逐件账见 `deploy/adapter/0.3.2-ASSEMBLY.md` /
+`deploy/adapter/0.3.2-MANIFEST.md5`；完整升级流程见
+[UPGRADE-0.3.2.md](../UPGRADE-0.3.2.md)。
 
 ## 7. boot 与四查
 
@@ -149,7 +158,8 @@ adapter 装载缝在 0.3.2 为 **beb131ab**（A6）；0.3.1 的 55b1e412 仅作�
 ## 8. 验收门（定型形合格判据）
 
 > 0.3.2 现役沿用本门判据；性能读数更新为 release note 主表（PR 七档/DE 五档），
-> 池/断言/质量/水位门不变。
+> 池/断言/质量/水位门不变。逐步验收/性能复现命令与参考值见
+> [UPGRADE-0.3.2.md](../UPGRADE-0.3.2.md) §9-§10。
 
 | 门 | 判据 |
 |---|---|

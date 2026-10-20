@@ -36,6 +36,17 @@ check_env "$KIT/env/CBX1A-CERTM-spec1.env" 56 0729e18d "CBX1A"
 grep -q '^DSV41_CERT_HEAD_M=6,12,18,24,30,36,42,48$' "$KIT/env/CBX1A-CERTM-spec1.env" \
   && pass "CBX1A cert M eight-value line" || bad "CBX1A cert M line"
 
+echo "== 1b. top-level current env =="
+TOP_ENV="$REPO/deploy/env/CBX1A-CERTM-spec1.env"
+if [[ -f "$TOP_ENV" ]]; then
+  check_env "$TOP_ENV" 56 0729e18d "top-level CBX1A"
+  cmp -s "$TOP_ENV" "$KIT/env/CBX1A-CERTM-spec1.env" \
+    && pass "top-level CBX1A = kit CBX1A (byte-exact)" \
+    || bad "top-level CBX1A differs from kit CBX1A"
+else
+  bad "missing top-level deploy/env/CBX1A-CERTM-spec1.env"
+fi
+
 echo "== 2. adapter 13+4 =="
 for f in build_repack_cuda.sh indexer_hoist.py kv_fp4.py p12_assertion_graph_gather.py \
          reference_impl.py replicated_split.py roce_ar.py seam_mount.py selection_dump.py \
@@ -52,6 +63,24 @@ fi
 expect_md5 "$KIT/adapter/files/sitecustomize.py" beb131ab "sitecustomize (A6)"
 expect_md5 "$KIT/adapter/files/kv_fp4.py" 75062432 "kv_fp4 (R1)"
 expect_md5 "$KIT/adapter/files/replicated_split.py" 7d6f79b0 "replicated_split (E16B2)"
+
+echo "== 2b. adapter 0.3.2 assembled tree (87 runtime files) =="
+MAN032="$REPO/deploy/adapter/0.3.2-MANIFEST.md5"
+if [[ -f "$MAN032" ]]; then
+  [[ "$(grep -vE '^(#|$)' "$MAN032" | wc -l)" -eq 87 ]] \
+    && pass "0.3.2 adapter manifest rows = 87" || bad "0.3.2 adapter manifest rows != 87"
+  TMPA=$(mktemp -d "${TMPDIR:-/tmp}/recon-adapter-XXXXXX") || exit 1
+  cp -a "$REPO/deploy/adapter/." "$TMPA/"
+  cp -a "$KIT/adapter/files/." "$TMPA/"
+  if ( cd "$TMPA" && md5sum -c "$MAN032" >/dev/null 2>&1 ); then
+    pass "adapter assembly 87/87 md5"
+  else
+    bad "adapter assembly md5 mismatch (run md5sum -c in assembled tree)"
+  fi
+  rm -rf "$TMPA"
+else
+  bad "missing deploy/adapter/0.3.2-MANIFEST.md5"
+fi
 
 echo "== 3. overlay =="
 expect_md5 "$KIT/overlay/deepseek_v4_backend.py" a1e7c3b5 "overlay backend"
@@ -119,8 +148,11 @@ done
 
 echo "== 8. secret/PII scan =="
 HITS=$(grep -rInE 'BEGIN (RSA|OPENSSH|EC|DSA) PRIVATE|/home/[a-z][a-z0-9]{5,}([/[:space:]]|$)|password[[:space:]]*=|sudo -S' "$KIT" --exclude=verify.sh 2>/dev/null || true)
-if [[ -z "$HITS" ]]; then pass "no private-key/sudo-token/user-home hits"; else
-  bad "secret/PII hits:"; printf '%s\n' "$HITS" | head -20
+TOP_HITS=$(grep -InE 'BEGIN (RSA|OPENSSH|EC|DSA) PRIVATE|/home/[a-z][a-z0-9]{5,}([/[:space:]]|$)|password[[:space:]]*=|sudo -S' \
+  "$REPO/UPGRADE-0.3.2.md" "$REPO/deploy/env/CBX1A-CERTM-spec1.env" \
+  "$REPO/deploy/adapter/0.3.2-MANIFEST.md5" "$REPO/deploy/adapter/0.3.2-ASSEMBLY.md" 2>/dev/null || true)
+if [[ -z "$HITS" && -z "$TOP_HITS" ]]; then pass "no private-key/sudo-token/user-home hits"; else
+  bad "secret/PII hits:"; printf '%s\n%s\n' "$HITS" "$TOP_HITS" | head -20
 fi
 
 echo "== 9. negative self-test =="

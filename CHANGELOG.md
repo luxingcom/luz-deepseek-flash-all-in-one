@@ -81,6 +81,29 @@
 8. **边界**：基座镜像（48.6GB）、1017 权重（476G）、engram（189G）属外部大件，
    不分发；包内给身份指纹与校验清单。
 
+## 0.3.2 公开升级面（2026-10-20；tag `v0.3.2-recon` 后）
+
+> 用户裁定：0.3.2 现役 env（CBX1A 56 键）与 adapter 终态（`b58e49ff`）可公开；
+> 公开仓以 **0.3.1 基底 + 混合快照 + 升级补丁/文档** 承接；`switch-fabric`
+> 分支增量批准（远端头 `84b6732` 起点，不重写历史）。零产线触、零历史读数改动。
+
+1. **现役 env 公开位**：`deploy/env/CBX1A-CERTM-spec1.env`（56 键/`0729e18d`，
+   与 reconstruct 包内同名件逐字节相同）；deploy/README 状态表补 0.3.2 行与
+   回退链 CBX1A→E16B2→E16B1→FB54→0.3.1 51 键。
+2. **adapter 终态装配账**：`deploy/adapter/0.3.2-MANIFEST.md5`（87 个运行时件；
+   86/87 与产线逐字节相同，`build_repack_cuda.sh` 仅注释家目录脱敏）+
+   `deploy/adapter/0.3.2-ASSEMBLY.md`（基底+覆盖、落位、备份、绑定律、回退）。
+3. **升级文档**：新增根档 `UPGRADE-0.3.2.md`——0.3.1→0.3.2 逐步升级、boot 门、
+   PR 七档/DE 五档/质量门的复现命令与参考值、回退与排障；README、DEPLOY-GUIDE、
+   SPEC6、release note §七/§八、发布索引同步指向。
+4. **网络形态校正**：0.3.2 现役=双 rail 交换机（2 口 HCA 部署对 +
+   `B12X_ROCE_TOPOLOGY=switched`/`LUZ_SWITCH_ROCE_FLAT=1`/TC106）；环网 4 口
+   CX-7 标注为 0.3.1 历史形，两形不可混拼。
+5. **switch-fabric 分支**：以 main 0.3.2 为基座合并并更新差异档（WG53 53 键
+   历史样本保留；CBX1A 56 键为 0.3.2 交换机现役形）；远端快进，不 force。
+6. **验证**：`verify.sh` 仍 `RECON-KIT PASS`；adapter 装配 `md5sum -c` 87/87；
+   新增面密钥/PII 扫描与链接检查见 `SCAN-REPORT.md`。
+
 ## 0.3.2 死锁修复（2026-10-18 修复体验证毕 → 10-20 r032c 位级保持形终态转正在役）
 
 > 43h 长稳调度死锁（2026-10-16 站点甲；四机同点 `v41_indexer/scoring.py:164` 宿主同步

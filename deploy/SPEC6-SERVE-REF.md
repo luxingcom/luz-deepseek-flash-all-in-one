@@ -2,7 +2,9 @@
 
 > **0.3.2 定版注记（2026-10-20）**：九参谱为 0.3.2 终态在役形（boot
 > `r3-boot-arm.sh` `20f22bc6`）；本文档的 50 键引用为 0.3.1 键面历史锚，
-> 0.3.2 现役 env=CBX1A 56 键（`deploy/reconstruct/0.3.2/env/`，md5 `0729e18d`）。
+> 0.3.2 现役 env=CBX1A 56 键（公开位
+> [`deploy/env/CBX1A-CERTM-spec1.env`](env/CBX1A-CERTM-spec1.env)，md5 `0729e18d`）。
+> 升级与性能复现判据见 [`UPGRADE-0.3.2.md`](../UPGRADE-0.3.2.md)。
 > 起栈接线有效性由 [`tools/serve_flags_gate.sh`](../tools/serve_flags_gate.sh)
 > 从运行进程 argv 直证（issue #4 采纳件）。
 

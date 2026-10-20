@@ -10,9 +10,9 @@
 |---|---|---|---|
 | **0.3.0** | 2026-10-05 | R1 检查点基线（36 键 env `b7e318e0`、sitecustomize 七件 `91adc83d`、池 9.6M） | 无独立 release note；基线记录见 CHANGELOG |
 | **0.3.1** | 2026-10-13 定型 / 2026-10-14 发布 | FL6 召回修复转正（51 键）+VL 双臂+网关链；交付镜像 `0.3.1-r3` | tag [`v0.3.1`](https://github.com/luxingcom/luz-deepseek-flash-all-in-one/releases/tag/v0.3.1)（GitHub Release 发布说明+渠道汇总） |
-| **0.3.2** | 2026-10-20 | 净线重建→死锁修复（`520d6d0`+r032c 位级保持形）→五目标执行链→收官转正；池 84 件三态处置；重建包补齐 | [0.3.2-RELEASE-NOTE.md](0.3.2-RELEASE-NOTE.md) + GitHub Release `v0.3.2`；重建面 tag `v0.3.2-recon` |
+| **0.3.2** | 2026-10-20 | 净线重建→死锁修复（`520d6d0`+r032c 位级保持形）→五目标执行链→收官转正；池 84 件三态处置；重建包补齐 | [0.3.2-RELEASE-NOTE.md](0.3.2-RELEASE-NOTE.md) + GitHub Release `v0.3.2`；重建面 tag `v0.3.2-recon`；[升级指南](../../UPGRADE-0.3.2.md) |
 
-## 0.3.2 发布面四层
+## 0.3.2 发布面五层
 
 1. **GitHub Release `v0.3.2`**：版本叙事/变更集/性能终态/硬守门/已知局限/回退面
    （正文=[0.3.2-RELEASE-NOTE.md](0.3.2-RELEASE-NOTE.md)）。
@@ -22,6 +22,10 @@
 4. **重建包**：tag `v0.3.2-recon` → [`deploy/reconstruct/0.3.2/`](../../deploy/reconstruct/0.3.2/README.md)
    ——r032c 16 件+构建配方、A6/R1/E16B2/CBX1A 增量、1017 权重/engram 台账；
    `verify.sh` 自验期望 `RECON-KIT PASS`。
+5. **升级面**：[`UPGRADE-0.3.2.md`](../../UPGRADE-0.3.2.md)——0.3.1 基底+混合快照
+   的逐步升级、性能复现命令与参考值、回退/排障；现役 env 公开位
+   `deploy/env/CBX1A-CERTM-spec1.env`，adapter 装配账
+   `deploy/adapter/0.3.2-MANIFEST.md5`。
 
 ## 系列纪律
 

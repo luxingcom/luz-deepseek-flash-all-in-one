@@ -146,3 +146,29 @@ tag `v0.3.2` 指向记录本节的收尾 commit）。**方法**：`git archive` 
 
 **结论：重建包清洁门 PASS**。包内零真凭据、零未掩码用户名、零临时件；唯一人工
 差异=`build_repack_cuda.sh` 注释路径脱敏（运行逻辑零改，还原后 md5=cd6c7707）。
+
+---
+
+## 0.3.2 公开升级面清洁门（2026-10-20，`v0.3.2-recon` 之后）
+
+**受检面**：现役 env 公开位 `deploy/env/CBX1A-CERTM-spec1.env`、adapter 0.3.2
+装配账 `deploy/adapter/0.3.2-MANIFEST.md5`/`0.3.2-ASSEMBLY.md`、根档
+`UPGRADE-0.3.2.md`，以及 README/DEPLOY-GUIDE/SPEC6/release note/发布索引/
+CHANGELOG/重建包 README 的同步改动。**方法**：`verify.sh` 全量自验 + 独立
+密钥/PII/链接/语法复扫；不改历史读数。
+
+| # | 检查 | 结果 |
+|---|---|---|
+| S1 | 重建包 `MANIFEST.md5` | **69/69 PASS**（MANIFEST 自身不计） |
+| S2 | `verify.sh` 全量 | **RECON-KIT PASS**（新增顶层 env 同一性 + adapter 87 件装配 md5） |
+| S3 | 顶层现役 env | 56 键 / md5 **0729e18d**；与 kit 内同名件 `cmp` 逐字节相同 |
+| S4 | adapter 装配 | 87 行账；assembled `md5sum -c` **87/87**；86/87 与产线逐字节相同，`build_repack_cuda.sh` 仅注释家目录脱敏 |
+| S5 | 私钥块 / token / sudo 口令 / 未掩码家目录 | **0 真值**（仅政策掩码 `liux***ya` 与 `verify.sh` 自身模式行） |
+| S6 | shell 语法 | `verify.sh` `bash -n` **0 fail** |
+| S7 | 相对文档链接（10 份改动档） | **0 坏链**（修 1 处 `0.3.2-ASSEMBLY.md` 根档相对深度） |
+| S8 | 临时/构建残留 | `*.pyc`/`__pycache__`/`*.rej`/`*.orig` **0**（清 `tools/__pycache__`） |
+| S9 | 文档口径一致性 | README/DEPLOY-GUIDE/SPEC6/release note/发布索引/CHANGELOG 均指向 `UPGRADE-0.3.2.md`、顶层 CBX1A env 与 adapter 装配账；无“待呈裁”现役件表述（历史沿革注记保留） |
+| S10 | 网络形态一致性 | README/DEPLOY-GUIDE/release note 统一为“0.3.2=双 rail 交换机 2 口；环网=0.3.1 历史形”；env 的 switched/flat 键与 boot NCCL 段一致 |
+
+**结论：公开升级面清洁门 PASS**。新增面零真凭据、零未掩码用户名、零临时件；
+示例命令使用 `<repo>`/`<home>` 占位，不依赖部署机私有路径。
