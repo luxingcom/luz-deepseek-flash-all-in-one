@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+# ── 交付仓快照注记（2026-10-20 参面全同步；非活件）────────────────────────────
+# 本件=产线现役形快照镜像（GH-PUSH 遗留-2 兑现）：源形 md5=20f22bc63c63b47ea4a1a0edbafec3b7
+# （四机 ~/migrate-assets/bin/ 同体；cfgmgmt 包锚=FINGERPRINT 5ebac6ca〔第十五滚〕boot-chain.md5
+#  r3-boot-arm 行同钉；0.3.2 终态五件套成员，IMAGE 指针=0.3.2-r032c）。参面=NCCL 部署双 rail 对
+# rocep1s0f0,roceP2p1s0f1+NCCL_IB_TC=106（TOS/PEER_HCA 退役）+环网补丁链全链退役（RETIRED 注记）+
+# SERVER_ARGS 九参（含 A8 --tool-call-parser deepseekv41/A9 --enable-cache-report/--sleep-on-idle）
+# +D15 五门断言段在役。与源形唯一差异=用户名路径掩码（/home/liux***ya/，三处；源形为实值）。
+# 快照律：本仓件不随产线滚动自动更新——后续产线滚动须另开同步窗重钉本注记指纹。
 # r3-boot.sh — R3 梯级：main-79cafec0 引擎 + fabric 资产 + adapter pread engram
 #
 # 谱系：U1 v1-v8 教训全携（doc92 §五/§六、doc94）——
@@ -9,35 +17,52 @@
 # 硬门：起栈前四机对称 drop_caches + UMA 总账（MemAvailable ≥ 100G）；生产容器守卫。
 set -euo pipefail
 
-IMAGE="192.168.0.202:5000/lmsysorg/sglang:main-79cafec0"
+IMAGE="192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c"
 HEAD_IP="192.168.0.201"
-# net-rebuild-20261015 镜像同步：管理段重编址三处通道址→192.168.0.201-204（IMAGE/HEAD_IP/WORKERS；
-# 语义参数零动；本镜像 vs 产线现役形的参面差〔NCCL 面/A8/A9/环网补丁链退役〕留后续交付同步窗）。
+# net-rebuild-20261015: 管理段重编址→192.168.0.201-204（IMAGE registry 源/HEAD_IP/WORKERS 三处通道址改新；
+# 语义参数零动；registry 同一容器换址，:5000 实测 200。golden MANIFEST.image 同批重锚。）
+# net-rebuild-wc-20261015（W-C sglang 起机窗，法源=NCCL 结果档 §S4.2/§S4.3+ADDENDUM §十）：
+#   ① NCCL_IB_HCA 4 口裸列→部署双 rail 对 rocep1s0f0,roceP2p1s0f1；新增 NCCL_IB_TC=106；NCCL_IB_TOS=46 退役；
+#   ② NCCL_IB_PEER_HCA per-rank 注入退役（键在在役二进制零命中=惰性+用户令弃用变通）；
+#   ③ SERVER_ARGS 增 A8/A9 两参（--tool-call-parser deepseekv41 连写+--enable-cache-report）。
+#   回退=旧件 .bak-pre-wc 回拷（一键回退指令见 W-C 结果档 §回退）。
+# net-rebuild-wc-20261015 复靴段（R1 环网补丁链退役；呈裁①即席授权；单变量=仅此一项）：
+#   ① 首靴红根因=环网 fork（ncclpin+ringonly；内含「RING-ONLY rank×设备重映射」需 4 设备空间）
+#      与部署双 rail 2 口对硬冲突（WCBOOT44 四秩 vNic 越界实证）⇒ 本滚全链退役：
+#      3 条 mount+LD_PRELOAD 行+资产门两处（行内 RETIRED 注记史留）；
+#      补丁件本体（~/migrate-assets/ncclpin.so、nccl-ringonly/）零删除封存原位；
+#   ② stock pip NCCL 2.30.7 接管（W-B 12 臂同 2 口形全绿载体）；suggested-3 #4/#5
+#      （NCCL_ALGO=RING/NCHANNELS）按授权不落（保持）；
+#   ③ 回退=旧件 r3-boot-arm.sh.bak-pre-reboot（06b25aac）回拷。
 DIST_PORT="20000"
 API_PORT="${API_PORT:-8898}"   # doc102：测试窗固定 8898（避开 concurrency-proxy→8899）   # L10 用 8898：避开 concurrency-proxy→8899 的活生产转发路径（㉑/㉕ 防污染）
 SPEC="${SPEC:-0}"
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=8)
 ADAPTER_DIR="$HOME/migrate-assets/dsv41/adapter"          # 持久位（教训㊲）
 B12X_DIR="$HOME/migrate-assets/b12x"                       # b12x_next 计算树（fork 验证路径，U2 暂存件）
-NCCL_DIR="$HOME/migrate-assets/nccl-ringonly"
-NCCLPIN="$HOME/migrate-assets/ncclpin.so"
-PIP_NCCL=/opt/sglang/lib/python3.12/site-packages/nvidia/nccl/lib/libnccl.so.2
-ENG_HOST_HEAD="$HOME/dsv41-engram"                        # rank0 打包分片
-ENG_HOST_WORKER="\$HOME/dsv41-engram"  # rank1/2/3 打包分片（2026-10-10 ENV-UNIFY 四机统一路径）
+# RETIRED-net-rebuild-20261015（复靴段 R1 环网补丁链退役；以下三变量无消费方，留档）：
+# NCCL_DIR="$HOME/migrate-assets/nccl-ringonly"
+# NCCLPIN="$HOME/migrate-assets/ncclpin.so"
+# PIP_NCCL=/opt/sglang/lib/python3.12/site-packages/nvidia/nccl/lib/libnccl.so.2
+ENG_HOST_HEAD="$HOME/dsv41-engram-1017"                   # rank0 打包分片（MODEL-SWITCH-1017）
+ENG_HOST_WORKER="\$HOME/dsv41-engram-1017"  # rank1/2/3 打包分片（MODEL-SWITCH-1017；旧 ~/dsv41-engram 保留回退）
 
-# rank|host|ip|宿主权重路径|engram 宿主路径（绝对路径，四机同用户）|该秩 PEER_HCA
+# rank|host|ip|宿主权重路径|engram 宿主路径（绝对路径，四机同用户）|该秩 PEER_HCA（**末列已退役史档**：
+# net-rebuild-wc-20261015 起不再注入 NCCL_IB_PEER_HCA——键在在役 ringonly 2.30.7/ncclpin.so 零命中=惰性，
+# 且用户令弃用 per-rank HCA 变通，走正常网面修复；列保留作环网期史档）
 # 权重面（2026-09-29 事故后定稿）：rank2/3 走 /data/models/dsv41-net = NFS 全量树
 # （03←10.100.140.1=01 主源；04←10.20.0.9=02 备源，均 ro nfs4 nconnect=4，已入 fstab）。
+# net-rebuild-20261015: 上行 NFS 源址为旧编址记载，fstab 四机实况未证（L4 §三.5.h 待查项）——本窗仅注记不改语义。
 # stock main 的 filter_duplicate_safetensors_files 在装载前做全 48 分片在位校验——
 # 03/04 曾本地置 47/48 尾分片（逐文件直读设计态，2026-10-10 ENV-UNIFY 清理=设计未采用 R-批4）：
 # 尾分片已删，47/48 与其余分片同走 NFS 全量树；索引校验全树可见 ⇒ NFS 硬前置不变。
 WORKERS=(
-  "1|dgxspark02|192.168.0.202|/data/models/DeepSeek-V4.1-Flash|/home/liux***ya/dsv41-engram|0=rocep1s0f1,roceP2p1s0f1;2=rocep1s0f0,roceP2p1s0f0"
-  "2|dgxspark04|192.168.0.204|/data/models/dsv41-net|/home/liux***ya/dsv41-engram|1=rocep1s0f0,roceP2p1s0f0;3=rocep1s0f1,roceP2p1s0f1"
-  "3|dgxspark03|192.168.0.203|/data/models/dsv41-net|/home/liux***ya/dsv41-engram|0=rocep1s0f0,roceP2p1s0f0;2=rocep1s0f1,roceP2p1s0f1"
+  "1|dgxspark02|192.168.0.202|/data/models/DeepSeek-V4.1-Flash-1017|/home/liux***ya/dsv41-engram-1017|0=rocep1s0f1,roceP2p1s0f1;2=rocep1s0f0,roceP2p1s0f0"
+  "2|dgxspark04|192.168.0.204|/data/models/dsv41-net|/home/liux***ya/dsv41-engram-1017|1=rocep1s0f0,roceP2p1s0f0;3=rocep1s0f1,roceP2p1s0f1"
+  "3|dgxspark03|192.168.0.203|/data/models/dsv41-net|/home/liux***ya/dsv41-engram-1017|0=rocep1s0f0,roceP2p1s0f0;2=rocep1s0f1,roceP2p1s0f1"
 )
-PEER_HCA_HEAD="1=rocep1s0f1,roceP2p1s0f1;3=rocep1s0f0,roceP2p1s0f0"
-HEAD_MODEL_SRC="/data/models/DeepSeek-V4.1-Flash"
+PEER_HCA_HEAD="1=rocep1s0f1,roceP2p1s0f1;3=rocep1s0f0,roceP2p1s0f0"  # net-rebuild-wc-20261015：本变量退役（不再注入；保留史档）
+HEAD_MODEL_SRC="/data/models/DeepSeek-V4.1-Flash-1017"
 # CTN_PREFIX 可被环境覆盖（PROD-RS-20261003 名隔离：生产用 r3prod-*，
 # 避开 r3-watchdog 对精确名 r3boot-head/r3boot-worker 的管辖；缺省 r3boot
 # =测试线行为逐字不变）。
@@ -84,18 +109,36 @@ memavail() { awk '/MemAvailable/{printf "%d", $2/1024}' /proc/meminfo; }
 #    非零退出时：容器日志全量落盘 ~/l10-incident/，然后四机 rm 容器。
 #    CUDA/UMA 不进 cgroup（--memory 32g 拦不住），楔死容器会持续吃设备内存直至整机 OOM。
 INCIDENT_DIR="$HOME/l10-incident"
+# D15 门③ 账：本靴创建容器 Id（cleanup 只清本靴 Id；空=未起/非本靴——superseded 不落枪判据）
+HEAD_CID=""
+declare -A WORKER_CID=()
 cleanup_on_fail() {
   local rc=$?
   trap - EXIT INT TERM
   (( rc == 0 )) && return 0
   mkdir -p "$INCIDENT_DIR"
-  echo "[cleanup] rc=$rc — 落盘容器日志并清除容器（防 UMA 楔死续吃）"
-  docker logs "$HEAD_CTN" > "$INCIDENT_DIR/head.exit.log" 2>&1 || true
-  docker rm -f "$HEAD_CTN" >/dev/null 2>&1 || true
+  echo "[cleanup] rc=$rc — 落盘容器日志并清除容器（防 UMA 楔死续吃；D15 门③=只清本靴 Id）"
+  # D15 门③ superseded 不落枪（承 ext-switch control.py:39-40 / node.py:49-52
+  #   「A superseded start must never tear down a newer experimental boot」）：
+  #   现行容器 Id ≠ 本靴捕获 Id ⇒ 已被新靴替换——不落盘不清除（不落枪）。
+  local cur wcur wcid
+  cur=$(docker inspect -f '{{.Id}}' "$HEAD_CTN" 2>/dev/null || true)
+  if [[ -n "${HEAD_CID:-}" && "$cur" == "$HEAD_CID" ]]; then
+    docker logs "$HEAD_CTN" > "$INCIDENT_DIR/head.exit.log" 2>&1 || true
+    docker rm -f "$HEAD_CID" >/dev/null 2>&1 || true
+  else
+    echo "[cleanup][superseded] head 非本靴容器（本靴 Id=${HEAD_CID:-未起}/现行=${cur:-无}）——不落枪（新靴拒拆）"
+  fi
   for w in "${WORKERS[@]}"; do
     IFS='|' read -r _rk _h _ip _ _ _ph <<<"$w"
-    ssh "${SSH_OPTS[@]}" "$_h" "docker logs $WORKER_CTN" > "$INCIDENT_DIR/worker-$_h.exit.log" 2>&1 || true
-    ssh "${SSH_OPTS[@]}" "$_h" "docker rm -f $WORKER_CTN" >/dev/null 2>&1 || true
+    wcid="${WORKER_CID[$_h]:-}"
+    wcur=$(ssh "${SSH_OPTS[@]}" "$_h" "docker inspect -f '{{.Id}}' $WORKER_CTN 2>/dev/null" || true)
+    if [[ -n "$wcid" && "$wcur" == "$wcid" ]]; then
+      ssh "${SSH_OPTS[@]}" "$_h" "docker logs $WORKER_CTN" > "$INCIDENT_DIR/worker-$_h.exit.log" 2>&1 || true
+      ssh "${SSH_OPTS[@]}" "$_h" "docker rm -f $wcid" >/dev/null 2>&1 || true
+    else
+      echo "[cleanup][superseded] worker $_h 非本靴容器（本靴 Id=${wcid:-未起}/现行=${wcur:-无}）——不落枪"
+    fi
   done
   echo "[cleanup] 日志在 $INCIDENT_DIR/*.exit.log"
 }
@@ -144,28 +187,110 @@ info "== B2 GID 16 口 idx3 断言 =="
 gid3_check "-"
 for w in "${WORKERS[@]}"; do IFS='|' read -r _rk _h _ip _ _ _ph <<<"$w"; gid3_check "$_h"; done
 
+# ── 1.6 D15 门② PFC 位级断言 + trust dscp（2026-10-16）────────────────────────
+# 法源=ext-switch node.py:29-33 模式承接；**真值取我方**：PFC=0 0 0 1 0 1 0 0
+# （prio3+5）≠ 外部 prio3-only 单口形——盲抄外部 mask=误红合法靴（借模式不借值）。
+# 同判据在役件=dualplane-guard v1.3 :90-93（PRECOND c7b7ea1a59cf）+aicad-roce-tune
+# （QoS 主机权威）；本门=起靴前置断言（红=先 roce-tune 恢复 lossless 再靴）。
+# 设备=部署对 enp1s0f0np0+enP2p1s0f1np1（NCCL_IB_HCA 承载面 2 口；四口平面面
+# 归 dualplane-guard 在役自检）。
+pfc_probe_local() {  # 部署对 2 口：mtu=9000 + trust dscp + PFC 8 位逐位（解析式承 guard:90-93）
+  local ifc mq pfc tr mtu
+  for ifc in enp1s0f0np0 enP2p1s0f1np1; do
+    mtu=$(cat "/sys/class/net/$ifc/mtu" 2>/dev/null)
+    mq=$(mlnx_qos -i "$ifc" 2>/dev/null)
+    pfc=$(echo "$mq" | awk '$1=="enabled"{print $2,$3,$4,$5,$6,$7,$8,$9; exit}')
+    tr=$(echo "$mq" | awk '/trust state/{sub(/.*: /,""); print; exit}')
+    if [[ "$mtu" == "9000" && "$tr" == "dscp" && "$pfc" == "0 0 0 1 0 1 0 0" ]]; then
+      echo "OK $ifc pfc=[$pfc] trust=$tr mtu=$mtu"
+    else
+      echo "HOLE $ifc pfc=[$pfc] trust=[$tr] mtu=[$mtu]"
+    fi
+  done
+}
+pfc_check() {  # <ssh目标|->
+  local t=$1 out bad
+  if [[ "$t" == "-" ]]; then out=$(pfc_probe_local); else
+    out=$(ssh "${SSH_OPTS[@]}" "$t" "$(declare -f pfc_probe_local); pfc_probe_local"); fi
+  bad=$(grep -v '^OK ' <<<"$out" || true)
+  [[ -z "$bad" ]] || die "[D15] PFC 位级断言红（拒启；先 aicad-roce-tune 恢复 lossless 再靴）：
+$bad"
+  info "[D15] $(grep -c '^OK ' <<<"$out")/2 iface PFC prio3+5+trust dscp+mtu9000 在位"
+}
+info "== D15 门② PFC 位级断言（prio3+5/trust dscp/mtu9000）=="
+pfc_check "-"
+for w in "${WORKERS[@]}"; do IFS='|' read -r _rk _h _ip _ _ _ph <<<"$w"; pfc_check "$_h"; done
+
+# ── 1.7 D15 门⑤（K5 doctor 网络双检并入，2026-10-18 重锚版）──────────────────
+# 法源=ext-knapcio files/doctor-network.sh（51 行，只读核借模式）+EXT-KNAPCIO-SWITCH
+# CANDIDATES K5 行（S-GOV2 裁定：四门→五门，第五门=K5 并入 D15）。
+# 判据=**读 state 不读 rate**（/sys/class/infiniband/<HCA>/ports/1/state 文件读数，
+# 外部注记原文 "deliberately checks port 1"）：NCCL_IB_HCA 部署对 2 口（rocep1s0f0+
+# roceP2p1s0f1，真值源=本脚本 COMMON_ENV :245 现役值，与门② PFC 硬编码同法）逐口
+# state=='4: ACTIVE'；+ socket 接口（NCCL_SOCKET_IFNAME=enP7s7，:248 同源）存在。
+# 红=拒启（fail-closed=DOCTOR_STRICT 恒 1 形：boot 前置即 blocking——外部 doctor 缺省
+# 警告+DOCTOR_STRICT=1 才 block，我方并入 boot 前置=恒 block 语义）。
+# 外部教训注记：接口名四节点不同名 ⇒ Gloo init 杀 rank（"Unable to find address for"）。
+net_doctor_local() {  # HCA 部署对逐口 port1 ACTIVE + socket 接口存在（读 state 不读 rate）
+  local hca st bad=0
+  for hca in rocep1s0f0 roceP2p1s0f1; do
+    st=$(cat "/sys/class/infiniband/$hca/ports/1/state" 2>/dev/null || true)
+    if [[ "$st" == "4: ACTIVE" ]]; then
+      echo "OK $hca port1=${st}"
+    else
+      echo "HOLE $hca port1=${st:-missing}（期望 4: ACTIVE）"
+      bad=1
+    fi
+  done
+  if [[ -d "/sys/class/net/enP7s7" ]]; then
+    echo "OK socket-if enP7s7 在位"
+  else
+    echo "HOLE socket-if enP7s7 缺（GLOO/NCCL_SOCKET_IFNAME 承载面）"
+    bad=1
+  fi
+  return "$bad"
+}
+net_doctor_check() {  # <ssh目标|->
+  local t=$1 out bad
+  if [[ "$t" == "-" ]]; then out=$(net_doctor_local); else
+    out=$(ssh "${SSH_OPTS[@]}" "$t" "$(declare -f net_doctor_local); net_doctor_local"); fi
+  bad=$(grep -v '^OK ' <<<"$out" || true)
+  [[ -z "$bad" ]] || die "[D15-⑤] doctor 网络双检红（拒启；HCA 失活/接口缺=起机静默前置拦）：
+$bad"
+  info "[D15-⑤] $(grep -c '^OK ' <<<"$out")/3 doctor 面（HCA×2 ACTIVE+socket-if）在位"
+}
+info "== D15 门⑤ K5 doctor 网络双检（HCA ACTIVE+socket 接口；读 state 不读 rate）=="
+net_doctor_check "-"
+for w in "${WORKERS[@]}"; do IFS='|' read -r _rk _h _ip _ _ _ph <<<"$w"; net_doctor_check "$_h"; done
+
 # ── 2. UMA 总账前置（A1/A2 硬门：严禁整表；起栈前水位 ≥100G）+ 对称 drop_caches ──
 info "== UMA 总账 + 四机对称 drop_caches =="
 drop_and_check() {  # drop_and_check <显示名> <ssh目标|->
   local name="$1" target="$2" cmd pw
   pw=$(cat ~/.sudopw)
-  cmd="printf '%s\n' '$pw' | sudo -S sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches' 2>/dev/null; awk '/MemAvailable/{printf \"%d\", \$2/1024}' /proc/meminfo"
-  local m
-  if [[ "$target" == "-" ]]; then m=$(eval "$cmd"); else m=$(ssh "${SSH_OPTS[@]}" "$target" "$cmd" 2>/dev/null); fi
+  # D15 门①（KiB 形 UMA 门，承 ext-switch node.py:35-36 同式：raw KiB ≥100_000_000）：
+  #   既有 MB 形 ≥100000 保留=双形互证（KiB=字节级口径，不吃 awk 取整）。
+  cmd="printf '%s\n' '$pw' | sudo -S sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches' 2>/dev/null; awk '/MemAvailable/{print \$2}' /proc/meminfo"
+  local mkib m
+  if [[ "$target" == "-" ]]; then mkib=$(eval "$cmd"); else mkib=$(ssh "${SSH_OPTS[@]}" "$target" "$cmd" 2>/dev/null); fi
+  m=$(( ${mkib:-0} / 1024 ))
+  [[ "${mkib:-0}" -ge 100000000 ]] || die "$name drop 后 MemAvailable=${mkib}KiB < 100_000_000KiB（D15 门① KiB 形 UMA 门，拒起）"
   [[ "${m:-0}" -ge 100000 ]] || die "$name drop 后 MemAvailable=${m}M < 100G（UMA 总账红，拒起）"
-  info "$name drop_caches 后 ${m}M"
+  info "$name drop_caches 后 ${m}M（KiB=${mkib}；双形门绿）"
 }
 drop_and_check "head" "-"
 for w in "${WORKERS[@]}"; do IFS='|' read -r _rk _h _ip _ _ _ph <<<"$w"; drop_and_check "$_h" "$_h"; done
 
 # ── 3. 资产在位核验（adapter/NCCL/打包分片/权重） ─────────────────────────────
 [[ -d "$ADAPTER_DIR" && -f "$ADAPTER_DIR/sitecustomize.py" && -f "$ADAPTER_DIR/engram_backend.py" ]] || die "adapter 资产缺（~/migrate-assets/dsv41/adapter）"
-[[ -f "$NCCL_DIR/libnccl.so.2.30.7" && -f "$NCCLPIN" ]] || die "NCCL 资产缺（~/migrate-assets）"
-ls "$ENG_HOST_HEAD"/engram-l1-r0of4.bin >/dev/null 2>&1 || die "head 打包分片缺"
+# RETIRED-net-rebuild-20261015：环网补丁资产门退役（stock NCCL 接管；补丁件仍原位封存但不再为 boot 前置）
+# [[ -f "$NCCL_DIR/libnccl.so.2.30.7" && -f "$NCCLPIN" ]] || die "NCCL 资产缺（~/migrate-assets）"
+ls "$ENG_HOST_HEAD"/engram-l1-r0of4.bin "$ENG_HOST_HEAD"/engram-l14-r0of4.bin >/dev/null 2>&1 || die "head 打包分片缺（L1/L14）"
 for w in "${WORKERS[@]}"; do
   IFS='|' read -r _rk _h _ip _src _eng _ph <<<"$w"
-  ssh "${SSH_OPTS[@]}" "$_h" "test -f $_eng/engram-l1-r${_rk}of4.bin && test -f '$ADAPTER_DIR/sitecustomize.py' && test -f '$HOME/migrate-assets/nccl-ringonly/libnccl.so.2.30.7' && test -f '$HOME/migrate-assets/ncclpin.so' && test -f '$HOME/migrate-assets/b12x/b12x_next/__init__.py' && test -f '$_src/config.json'" \
-    || die "$_h 资产面缺（adapter/NCCL/b12x_next/分片/权重）"
+  # net-rebuild-wc-20261015 复靴段：环网补丁资产两 clause（nccl-ringonly/ncclpin）退役（同上行资产门注）
+  ssh "${SSH_OPTS[@]}" "$_h" "test -f $_eng/engram-l1-r${_rk}of4.bin && test -f $_eng/engram-l14-r${_rk}of4.bin && test -f '$ADAPTER_DIR/sitecustomize.py' && test -f '$HOME/migrate-assets/b12x/b12x_next/__init__.py' && test -f '$_src/config.json'" \
+    || die "$_h 资产面缺（adapter/b12x_next/分片/权重）"
   info "  $_h 资产面 OK"
 done
 
@@ -209,15 +334,22 @@ DOCKER_HW=(
   --memory 32g --memory-swap 32g
   --ulimit memlock=-1 --ulimit stack=67108864
   --device /dev/infiniband:/dev/infiniband
-  -v "$NCCL_DIR":/opt/nccl-ringonly:ro
-  -v "$NCCLPIN":/opt/ncclpin.so:ro
-  -v "$NCCL_DIR/libnccl.so.2.30.7":"$PIP_NCCL":ro
+# RETIRED-net-rebuild-20261015（复靴段 R1）：环网补丁链三挂载退役（stock NCCL 接管；回退=.bak-pre-reboot）
+#  -v "$NCCL_DIR":/opt/nccl-ringonly:ro
+#  -v "$NCCLPIN":/opt/ncclpin.so:ro
+#  -v "$NCCL_DIR/libnccl.so.2.30.7":"$PIP_NCCL":ro
   -v "$ADAPTER_DIR":/opt/dsv41/adapter:ro
   -v "$B12X_DIR":/opt/b12x-tree:ro
 )
 COMMON_ENV=(
   -e NCCL_NET=IB
-  -e NCCL_IB_HCA=rocep1s0f0,rocep1s0f1,roceP2p1s0f0,roceP2p1s0f1
+  # net-rebuild-wc-20261015（W-B §S4.2 必改①②；判读基座换代）：
+  # HCA 4 口裸列→部署双 rail 对（rocep1s0f0=rail0/enp1s0f0np0 + roceP2p1s0f1=rail1/enP2p1s0f1np1，
+  # 跨 PCIe 域各取一；W-B §S3.3：4 口形 twin 分区面间歇黑洞且不增带宽，2 口=同 196Gb/s 物理封顶）。
+  # NCCL_IB_TC=106 新增=唯一生效标记杆（→DSCP26→交换机 SP3/TC3/PFC prio3 受保护档；
+  # W-B A1：TC46/106 NCCL 层零差+per-priority 计数器生效核）。
+  -e NCCL_IB_HCA=rocep1s0f0,roceP2p1s0f1
+  -e NCCL_IB_TC=106
   -e NCCL_IB_GID_INDEX=3
   -e NCCL_SOCKET_IFNAME=enP7s7
   -e GLOO_SOCKET_IFNAME=enP7s7
@@ -229,11 +361,14 @@ COMMON_ENV=(
   # metadata None），而 fork 生产根本不用 candidate 系统 ⇒ json 覆盖置 0 走全量 topk
   # （fork 同构：门关+force 开+页 64 铁律）。dg_sm121 门保持关（adapter 留树不武装）。
   -e SGLANG_ENABLE_JIT_DEEPGEMM=1
-  -e "LD_PRELOAD=/opt/ncclpin.so $PIP_NCCL"
+# RETIRED-net-rebuild-20261015（复靴段 R1）：LD_PRELOAD 环网补丁退役（下行为史档）
+#  -e "LD_PRELOAD=/opt/ncclpin.so $PIP_NCCL"
   -e NCCL_ALGO=RING -e NCCL_BUFFSIZE=8388608 -e NCCL_CROSS_NIC=1
   -e NCCL_CUMEM_ENABLE=0 -e NCCL_CUMEM_HOST_ENABLE=0
   -e NCCL_IB_DISABLE=0 -e NCCL_IB_MERGE_NICS=0 -e NCCL_IB_RETRY_CNT=7
-  -e NCCL_IB_SUBNET_AWARE_ROUTING=1 -e NCCL_IB_TIMEOUT=1000 -e NCCL_IB_TOS=46
+  -e NCCL_IB_SUBNET_AWARE_ROUTING=1 -e NCCL_IB_TIMEOUT=1000
+  # net-rebuild-wc-20261015：NCCL_IB_TOS=46 退役（W-B §S4.2 必改③——键在 2.30.7 三二进制零命中=惰性，
+  # wire 实证流出网 prio0 无标记；回退=补 -e NCCL_IB_TOS=46 或旧件 .bak-pre-wc 回拷）。
   -e NCCL_IGNORE_CPU_AFFINITY=1 -e NCCL_LL128_BUFFSIZE=-2
   -e NCCL_MAX_NCHANNELS=4 -e NCCL_MIN_NCHANNELS=4
   -e NCCL_NET_PLUGIN=none -e NCCL_P2P_DISABLE=1
@@ -392,6 +527,25 @@ SERVER_ARGS=(
   # R3.4（doc94 §G）：无 pin 时 stock main 池按 fraction 吃满只剩 12.1G，UMA 必破。
   # pin=生产同值 9.6M（main fp8 KV ⇒ 池≈17GB/rank，CUDA 总≈45G，余量≈70G）。
   --max-total-tokens 9600000
+  # ── net-rebuild-wc-20261015：A8/A9 接线（0.3.2 ADDENDUM §十；boot 参面单键新增，不改源码、
+  #    不动既有六参——SPEC6 谱 6→8 参；SPEC6-SERVE-REF 表第 7/8 行同批补）──
+  # A8（issue #1）：DSML 原生工具调用不成型根因=serving.py tool_call_parser 缺省 None+
+  #   _tool_call_parsing_active() 门禁整链旁路。正字法铁律：tool_call 侧**必须连写** deepseekv41；
+  #   deepseek-v41（连字符）是 reasoning parser 写法、本参不认（第 5 行 --reasoning-parser 照旧不动）。
+  #   只对带 tools 请求生效；无 tools 请求行为零变化。验收=issue 复现 curl 三路径 tool_calls 成型。
+  --tool-call-parser deepseekv41
+  # A9（issue #2）：enable_cache_report 缺省 False（serving.py:189-192+serving_chat.py:796 硬门）
+  #   ⇒ usage.prompt_tokens_details 恒 null。接线=cached_tokens 随响应返回（可观测性面附加字段，
+  #   零计算路径；knapcio v2.4 生产栈同款交叉印证）。验收=cached_tokens 非 null（同前缀二发）。
+  --enable-cache-report
+  # ── NET-WG-SLEEPIDLE-20261016（引擎参数微调窗；来源=用户令 2026-10-16）：V1=空闲面单键——
+  #    SGLang 调度器空闲忙转吃满 1 个核、墙插 +10–12W/台（四台约 40–48W 可省）。
+  #    镜像已核支持：main-79cafec0 内 `python3 -m sglang.launch_server --help` 含
+  #    "--sleep-on-idle  Reduce CPU usage when sglang is idle."。
+  #    参面单键新增、不改源码、不动既有八参——SPEC6 谱 8→9 参（SPEC6-SERVE-REF 表同批补行，
+  #    九参归一指纹重算预登记）。行为面：仅空闲态降 CPU，请求路径零变化。
+  #    回退=去此单行重靴（或 .bak-pre-wg 还原；零 env 耦合、零 A8/A9 面耦合）。
+  --sleep-on-idle
 )
 [[ "$SPEC" == "1" ]] && SERVER_ARGS+=(--speculative-algorithm DSPARK) || info "SPEC=0"
 
@@ -407,8 +561,8 @@ info "== 起 workers =="
 for w in "${WORKERS[@]}"; do
   IFS='|' read -r rank host ip src eng phca <<<"$w"
   ssh "${SSH_OPTS[@]}" "$host" "docker rm -f $WORKER_CTN >/dev/null 2>&1 || true"
+  # net-rebuild-wc-20261015：NCCL_IB_PEER_HCA=-e 注入行退役（见 WORKERS 头注；不再注入）。
   REMOTE_CMD=(docker run -d --name "$WORKER_CTN" "${DOCKER_HW[@]}" "${COMMON_ENV[@]}"
-              -e "NCCL_IB_PEER_HCA=$phca"
               -v "$src:$MOUNT_TGT:ro"
               -v "$eng:/engram:ro"
               "$IMAGE" python3 -m sglang.launch_server "${SERVER_ARGS[@]}" --node-rank "$rank")
@@ -420,21 +574,23 @@ for w in "${WORKERS[@]}"; do
     warn "worker rank $rank ($host) 起后即死："; ssh "${SSH_OPTS[@]}" "$host" "docker logs --tail 30 $WORKER_CTN" 2>&1 || true
     die "worker rank $rank 起败"
   fi
-  info "  rank $rank @ $host 存活（PEER_HCA 已注入，/engram 已挂）"
+  WORKER_CID["$host"]="$(ssh "${SSH_OPTS[@]}" "$host" "docker inspect -f '{{.Id}}' $WORKER_CTN 2>/dev/null" || true)"
+  info "  rank $rank @ $host 存活（/engram 已挂；NCCL_IB_PEER_HCA 已退役不复注入；D15 门③ Id=${WORKER_CID[$host]:0:12}）"
 done
 
 # ── 6. 起 head ───────────────────────────────────────────────────────────────
 info "== 起 head (rank 0, API :$API_PORT) =="
 docker rm -f "$HEAD_CTN" >/dev/null 2>&1 || true
+# net-rebuild-wc-20261015：NCCL_IB_PEER_HCA（head 侧）注入行退役，不再注入。
 docker run -d --name "$HEAD_CTN" "${DOCKER_HW[@]}" "${COMMON_ENV[@]}" \
-  -e "NCCL_IB_PEER_HCA=$PEER_HCA_HEAD" \
   -v "$HEAD_MODEL_SRC:$MOUNT_TGT:ro" \
   -v "$ENG_HOST_HEAD:/engram:ro" \
   "$IMAGE" python3 -m sglang.launch_server "${SERVER_ARGS[@]}" \
   --node-rank 0 --host 0.0.0.0 --port "$API_PORT"
 sleep 8
 [[ "$(docker inspect -f '{{.State.Running}}' "$HEAD_CTN" 2>/dev/null)" == "true" ]] || { docker logs --tail 30 "$HEAD_CTN" 2>&1 || true; die "head 起败"; }
-info "head 存活"
+HEAD_CID="$(docker inspect -f '{{.Id}}' "$HEAD_CTN" 2>/dev/null || true)"
+info "head 存活（D15 门③ 本靴 Id=${HEAD_CID:0:12}）"
 
 # ── 7. 健康轮询（≤20 分钟）+ boot log 池核对 ─────────────────────────────────
 dump_all() {
@@ -448,6 +604,26 @@ while (( $(date +%s) < deadline )); do
   if curl -fsS --max-time 3 "http://127.0.0.1:${API_PORT}/health" >/dev/null 2>&1; then
     info "== R3 栈 UP：http://$HEAD_IP:$API_PORT（main+pread engram，spec=$SPEC）=="
     docker logs "$HEAD_CTN" 2>&1 | grep -E 'full_token|max_total|KV cache|token.*pool' | tail -5 || true
+    # ── D15 门④ /server_info 取参面真值断言（承 ext control.py:28-33 模式：断言值取自
+    #    真参面；**真值从 SERVER_ARGS 数组读**，不硬编码抄本——参面单键改动本门自动跟随）──
+    _argval() { local k="$1" i; for ((i=0;i<${#SERVER_ARGS[@]};i++)); do
+        [[ "${SERVER_ARGS[i]}" == "$k" ]] && { printf '%s' "${SERVER_ARGS[i+1]}"; return 0; }; done; return 1; }
+    si=$(curl -fsS --max-time 15 "http://127.0.0.1:${API_PORT}/server_info" 2>/dev/null) \
+      || { dump_all; die "D15 门④ /server_info 不可读"; }
+    _si_num() { grep -oE "\"$1\":[ ]*[0-9]+" <<<"$si" | head -1 | grep -oE '[0-9]+$'; }
+    tok=$(_si_num max_total_num_tokens); ctx=$(_si_num context_length); mrr=$(_si_num max_running_requests)
+    arg_tok=$(_argval --max-total-tokens) || { dump_all; die "D15 门④ SERVER_ARGS 无 --max-total-tokens"; }
+    arg_ctx=$(_argval --context-length) || { dump_all; die "D15 门④ SERVER_ARGS 无 --context-length"; }
+    arg_mrr=$(_argval --max-running-requests) || { dump_all; die "D15 门④ SERVER_ARGS 无 --max-running-requests"; }
+    arg_mdl=$(_argval --served-model-name) || arg_mdl=""
+    [[ -n "$tok" && "$tok" -ge "$arg_tok" ]] || { dump_all; die "D15 门④ max_total_num_tokens=${tok:-?} < 取参面 ${arg_tok}（SERVER_ARGS --max-total-tokens）"; }
+    [[ "$ctx" == "$arg_ctx" ]] || { dump_all; die "D15 门④ context_length=${ctx:-?} ≠ 取参面 ${arg_ctx}"; }
+    [[ "$mrr" == "$arg_mrr" ]] || { dump_all; die "D15 门④ max_running_requests=${mrr:-?} ≠ 取参面 ${arg_mrr}"; }
+    if [[ -n "$arg_mdl" ]]; then
+      curl -fsS --max-time 15 "http://127.0.0.1:${API_PORT}/v1/models" 2>/dev/null \
+        | grep -q "\"id\":[ ]*\"$arg_mdl\"" || { dump_all; die "D15 门④ /v1/models 无 served-model-name=$arg_mdl"; }
+    fi
+    info "D15 门④ /server_info 真值断言绿（tok=$tok≥$arg_tok ctx=$ctx mrr=$mrr mdl=$arg_mdl；取参面=SERVER_ARGS）"
     # ── 7.5 autotune 四秩加载自审（AT_ON；证据行=每秩自身 boot log）──
     # 证据链：per-rank "Running FlashInfer autotune with cache: …rank_tp<r>_pp…" 必现
     # （flashinfer_autotune.py:263，plain logger.info 每进程各打一条）；
