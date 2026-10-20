@@ -90,3 +90,33 @@ strings 全 0；GW_API_KEY 全空值；3 处假值=判别力 fixture 政策保�
 用户名 44 件+GitHub 账号名 1 处→已掩码（`liux***ya`/`lux***com`），受累 md5 清单
 7 份逐行重生成，git 全史 filter-branch 同步重写+tag 重钉。逐类结论表/处置动作/
 产线锚语义声明/范围外注记=**docs/registry/SANITIZATION-20261013.md**。
+
+---
+
+## 0.3.2 tag 清洁门（2026-10-20，`v0.3.2` 打标前）
+
+**受检树**：0.3.2 定版维护 commit `de93725`（`c52a560` 之后的一致性/可用性维护；
+tag `v0.3.2` 指向记录本节的收尾 commit）。**方法**：`git archive` 隔离检出
+（1233 件/91MB），不依赖工作树；密钥面+语法+链接+临时代码全在隔离树重跑。
+
+| # | 检查 | 结果 |
+|---|---|---|
+| T1 | 私钥块 / AWS / GitHub token / OpenAI key / Bearer / URL 内嵌凭据 | **0**（唯一 `scheme://user:pass@` 命中=本报告自身的模式文档行） |
+| T2 | 用户名/邮箱/电话真值 | **0**（仅 `liux***ya`/`lux***com` 掩码形） |
+| T3 | `~/.sudopw` 机制引用 | 28 处，全为机制路径（stdin 喂入、不打印、不入仓）；**零口令值**——沿 2026-10-13 政策保留 |
+| T4 | 赋值型凭据 | 16 处人工复核：全部为本报告自引/判别力 fixture（`test-key-not-a-secret`/`real-secret-here`/`GW_API_KEY` 空值）；零真值 |
+| T5 | 二进制面 | 7 件（NCCL ring-only 库+ncclpin+adapter `.so` 三件）；ELF `strings` 无凭据命中 |
+| T6 | 大件 | 最大 `deploy/nccl/nccl-ringonly/libnccl.so.2.30.7` 60.5MB（<100MB GitHub 单文件上限；历史已在仓） |
+| T7 | 临时/构建残留 | `*.pyc`/`__pycache__`/`*.log`/`*.bak`/`*.orig`/`*.rej` **0** |
+| T8 | shell 语法 | 105 件 `bash -n` **0 fail** |
+| T9 | Python 语法 | 全树 `compile()` **0 error** |
+| T10 | 相对文档链接 | **0 坏链**（修 1 处 b12x 上游 doc 引用） |
+| T11 | 起栈接线闸门自检 | `tools/serve_flags_gate.sh --self-test` R1-R7 **全 PASS** |
+| T12 | 量具自检 | `sd_bench.py --selfcheck` **21/21 PASS** |
+| T13 | 五包 selfcheck | 全包 **RED=0**（cfgmgmt 19/0/12、fabric-net 21/0/8、gateway 16/0/0、selfdiag 21/0/16、selfheal 18/0/11；UNKNOWN=宿主在役件不在隔离树，按 `sc_summary` 红优先于无法判语义 rc=2） |
+| T14 | 版本面一致性 | README=0.3.2 定版+系列总览；致谢计数 111；`deploy/README` 标注混合快照边界；无残留「当前产线在役」旧断言 |
+
+**结论：tag 清洁门 PASS**——零真凭据/零 PII 真值/零临时代码；保留项（`~/.sudopw`
+机制引用、判别力 fixture、内网 IP、在仓 NCCL 二进制）均为已裁定政策面，不因本次
+打标改变。重扫触发律沿前文：任何后续 commit 前重跑 T1-T4。
+
