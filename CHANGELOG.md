@@ -104,6 +104,31 @@
 6. **验证**：`verify.sh` 仍 `RECON-KIT PASS`；adapter 装配 `md5sum -c` 87/87；
    新增面密钥/PII 扫描与链接检查见 `SCAN-REPORT.md`。
 
+## 0.3.2 环网可用面回补（2026-10-20；公开升级面后）
+
+> 用户令：梳理本地 git 资料，把 main/环网分支用得上的修复与优化一并推送，
+> 不局限于交换机分支。只收**拓扑无关且可复核**的件；交换机专属运行时不进环网面。
+> 零产线触、零历史读数改动。
+
+1. **质量量具公开**：新增 `tools/bench/qeval.py` + `qeval_tasks.py`（75 题，
+   含 `extract_final_number` 独占纯数字行优先修复；`--selftest` 15/15）与
+   `tools/bench/gsm8k_dsv41.py`（8-shot CoT，`--nq 500`；输出目录/题源/API key
+   全部参数化，去掉硬编码宿主路径）。`tools/bench/README.md` 给 PR 七档/DE 五档/
+   GSM8K/qeval/needle 的完整口径。
+2. **needle 水位修复**：`tools/needle_probe.py` 回补随形校准律与输出 `water_m`
+   字段；SKIP 行同时带实测值与线值，长上下文 idle 形可用 `NEEDLE_WATER_M=6000`
+   校准后重跑。
+3. **环网可用边界档**：新增 `docs/RING-0.3.2-COMPAT.md`——环网形可直接用的
+   0.3.2 件（r032c 引擎+同名迁移 adapter、A6/R1、E16B2 split，拓扑无关键）、
+   交换机专属件（flat one-shot/C 层 W-E/交换机三键）与“环网 + r032c”尚缺的
+   boot profile；明确环网读数不得引用交换机形绝对值。
+4. **已知负判留档**：环网 `channelId % 4` 四口轮转（v5-quad）在现有 hairpin
+   布线下会落到不存在的直连口对并 `ibv_modify_qp` 超时；v4 配对表是对布线的
+   编码，不重布线不要开 quad。
+5. **口径同步**：UPGRADE §0/§6/§7/§10.3/§14、README 文档索引与结构块指向
+   环网边界档与量具 README；`verify.sh` 增加量具自检（qeval 15/15、needle
+   selfcheck、py_compile）。
+
 ## 0.3.2 死锁修复（2026-10-18 修复体验证毕 → 10-20 r032c 位级保持形终态转正在役）
 
 > 43h 长稳调度死锁（2026-10-16 站点甲；四机同点 `v41_indexer/scoring.py:164` 宿主同步

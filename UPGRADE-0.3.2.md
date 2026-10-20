@@ -28,6 +28,10 @@
 > switched flat 形。两者不可混拼：`B12X_ROCE_TOPOLOGY=switched` 与 4 口裸列
 > 同时出现会被 C 层 fail-closed 拒起。历史环网差异档仍在 `switch-fabric` 分支，
 > 0.3.2 的交换机增量已并入 main 的 reconstruct 包与 CBX1A env。
+>
+> **环网形采用者**：不要照抄本文的 CBX1A/2 口 boot。哪些 0.3.2 修复可拿、哪些
+> 键必须留在交换机形、以及“环网 + r032c”还缺的 boot profile，见
+> [`docs/RING-0.3.2-COMPAT.md`](docs/RING-0.3.2-COMPAT.md)。
 
 ## 1. 公开仓形状（先理解，再动手）
 
@@ -167,6 +171,11 @@ CBX1A(56, 0729e18d) → E16B2(56, 5877fcb0) → E16B1(54, d55baa00)
 W-C/W-E/W-G 的历史沿革（含“呈裁”字样），是 provenance，不是待办；**不要为了
 改注释而改文件**，否则 md5 立刻偏离 `0729e18d`。
 
+> **环网形不要整文件复制 CBX1A**：它含 `LUZ_SWITCH_ROCE_FLAT`、
+> `B12X_ROCE_TOPOLOGY=switched`、`B12X_ROCE_TRAFFIC_CLASS=106` 三个交换机键，
+> 且删除了环网的 `B12X_ROCE_PEER_HCA_MAPS`。环网增量按键表取，见
+> [`docs/RING-0.3.2-COMPAT.md`](docs/RING-0.3.2-COMPAT.md) §2.3。
+
 ## 7. overlay 与 b12x
 
 ```bash
@@ -187,6 +196,10 @@ cp <repo>/deploy/reconstruct/0.3.2/b12x/roce_oneshot.py \
 
 `_roce_proxy.c` 由 `_proxy.py` 按源码 sha256 缓存在 `~/.cache/b12x/roce/` 编译；
 源码变化会自动触发重建。若手工清了缓存，首靴会多一次编译时间，属正常。
+
+> 这 3 件是 **flat/交换机运行时**。环网形走 `b12x.comm.roce_ring`，不要用这 3 件
+> 覆盖 `roce_ring/` 同族件；环网 + r032c 的已知缺口见
+> [`docs/RING-0.3.2-COMPAT.md`](docs/RING-0.3.2-COMPAT.md) §4。
 
 ## 8. boot
 
@@ -281,17 +294,28 @@ done
 
 ### 10.3 质量门
 
-- GSM8K：≥0.97（0.3.2 复读 0.985-0.99）。驱动器不在本仓：
-  `~/dsv41-flash-dgxsparks/bench/gsm8k_dsv41.py --nq 500`，题源与采样态保持
-  与 0.3.1 基线同功率；只换栈不换题/温度/并发。
+- GSM8K：≥0.97（0.3.2 复读 0.985-0.99）。公开驱动器=
+  `tools/bench/gsm8k_dsv41.py`（题源需自备 GSM8K `test.jsonl`）：
+  ```bash
+  python3 <repo>/tools/bench/gsm8k_dsv41.py \
+    --base http://127.0.0.1:8899 --nq 500 --temperature 0.6 --max-tokens 1024 \
+    --data ~/data/gsm8k_test.jsonl \
+    --out-raw /tmp/gsm8k.raw.jsonl --out-summary /tmp/gsm8k.summary.json
+  ```
+  题源与采样态保持与 0.3.1 基线同功率；只换栈不换题/温度/并发。
+- qeval 75 题：`python3 <repo>/tools/bench/qeval.py --selftest` 期望 15/15；
+  改配置前后各跑一次 `run before` / `run after`，再 `compare`。
 - needle：600k 三探针全中：
   ```bash
   python3 <repo>/tools/needle_probe.py \
     --base http://127.0.0.1:8898 --form r1 --sizes 600000 \
     --json-out /tmp/needle_600k.json
   ```
-  重复三次（不同 `--seed`），三次都命中才算 3/3。
+  重复三次（不同 `--seed`），三次都命中才算 3/3。输出 JSON 的 `water_m` 是本次
+  有效水位线；长上下文 idle 形按 `NEEDLE_WATER_M=6000` 校准。
 - 质量门红时不要用“性能更好”解释；先回退到 0.3.1 同题复测，区分栈回归与题源漂移。
+- 量具完整口径（PR filler 三档、DE mt400、qeval、needle）见
+  [`tools/bench/README.md`](tools/bench/README.md)。
 
 ### 10.4 C8 聚合（可选）
 
@@ -343,9 +367,11 @@ bash <repo>/deploy/reconstruct/0.3.2/verify.sh   # 期望 RECON-KIT PASS
 ## 14. 相关档
 
 - [0.3.2 release note](docs/release/0.3.2-RELEASE-NOTE.md)（性能/质量/回退正典）
+- [环网形可用边界](docs/RING-0.3.2-COMPAT.md)（环网能拿哪些 0.3.2 件、哪些不能）
 - [重建包 README](deploy/reconstruct/0.3.2/README.md)（逐件重建细节）
 - [adapter 装配](deploy/adapter/0.3.2-ASSEMBLY.md) · [adapter 增量谱系](deploy/reconstruct/0.3.2/adapter/NOTES.md)
 - [env 逐级链](deploy/reconstruct/0.3.2/env/ENV-CHAIN.md)
 - [boot 参面](deploy/reconstruct/0.3.2/boot/RUN-ARGS.md)
+- [性能与质量量具](tools/bench/README.md)（PR/DE/GSM8K/qeval/needle）
 - [部署指南](docs/DEPLOY-GUIDE.md) · [switch-fabric 分支](https://github.com/luxingcom/luz-deepseek-flash-all-in-one/tree/switch-fabric)
 - [CHANGELOG](CHANGELOG.md) · [FORM-REGISTRY](docs/registry/FORM-REGISTRY-031.md)

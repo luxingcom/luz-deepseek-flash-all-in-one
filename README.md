@@ -156,7 +156,10 @@ load/校验/身份核对细则=包内 `README-DIST.md`。GitHub Releases=发布�
 **精确重建包**=`deploy/reconstruct/0.3.2/`（CBX1A env、adapter 13+4 件、r032c
 16 件补丁+构建配方、1017 权重/engram 台账；自验 `verify.sh` 期望 `RECON-KIT PASS`）。
 **升级与复现**=**[UPGRADE-0.3.2.md](UPGRADE-0.3.2.md)**（0.3.1 基底+混合快照的逐步
-升级、性能复现判据、回退与排障）。
+升级、性能复现判据、回退与排障）。**环网形**（4 口 CX-7 hairpin）能拿哪些 0.3.2
+修复、哪些键必须留在交换机形、以及“环网 + r032c”还缺的 boot profile，见
+**[docs/RING-0.3.2-COMPAT.md](docs/RING-0.3.2-COMPAT.md)**；量具口径见
+**[tools/bench/README.md](tools/bench/README.md)**。
 **boot 四查**=health 200/printenv 四机逐字/横幅直读/面指纹四机全等；另加
 **起栈接线闸门** `tools/serve_flags_gate.sh`（issue #4 采纳件：从运行进程
 argv 断言 A8/A9 两旗标，只读 fail-closed）。从零部署全流程见
@@ -193,18 +196,22 @@ docs/        定版成果：release(0.3.2 RELEASE-NOTE+发布索引)/report(0.3.
              runbook(OPS-MANUAL)/registry(FORM-REGISTRY)/quality(RELEASE-QUALITY)/research(FL6+红带+
              VL-NATIVE 三档)/DEPLOY-GUIDE(含 §9 VL 面部署)/
              ACKNOWLEDGEMENTS(定版 111 条：上游谱系/社区同行/官方资产/外部对照/工具田野)/
+             RING-0.3.2-COMPAT(环网形可用边界+已知缺口)/
              deploy/DEADLOCK-MITIGATION-AND-FORENSICS-20261018(0.3.2 死锁规避+py-spy 取证包)
 deploy/      服务面全集：env(0.3.1 历史形+CBX1A 现役+VL 四臂)/bin(r3 链+VL 双臂 boot+冒烟量具)/
              reconstruct/0.3.2(现役形逐文件重建包：env/adapter/overlay/b12x/image/weights/boot)/
              adapter(0.3.1 基底+0.3.2 装配账)/overlay(o12c1-prod 29 件+v4vl-79cafec0 复原树 28 件)/
              nccl(ring-only 库+ncclpin)/b12x(计算树)/kit(guard/instruments)/models.d(权重注册卡)/sentinel
 tools/       全树工具：packages(五包+_lib+_bake；gateway 含 VL 车道两件)/boot-with-slotlock/census 面板族/
-             judge/boot_sentinel/量具与门禁脚本/serve_flags_gate(issue #4 起栈接线闸门)/patches/运维件
+             judge/boot_sentinel/量具与门禁脚本/serve_flags_gate(issue #4 起栈接线闸门)/patches/运维件/
+             bench(sd_bench PR/DE、qeval 75 题、gsm8k、real-text 补丁)
 tests/       fl6-recall(双臂 6 测)/unit(b12x/row_store/serve_flags_gate)/whitebox(14 件矩阵)
 ```
 
 CHANGELOG（0.3.0→0.3.2 定版）· SCAN-REPORT（密钥扫描+0.3.2 tag 清洁门）· NOTICE/LICENSE（许可）·
-[UPGRADE-0.3.2](UPGRADE-0.3.2.md)（0.3.1→0.3.2 升级/性能复现/回退）
+[UPGRADE-0.3.2](UPGRADE-0.3.2.md)（0.3.1→0.3.2 升级/性能复现/回退）·
+[RING-0.3.2-COMPAT](docs/RING-0.3.2-COMPAT.md)（环网形可用边界）·
+[BENCH-README](tools/bench/README.md)（量具口径）
 
 ---
 
