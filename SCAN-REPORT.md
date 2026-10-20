@@ -120,3 +120,29 @@ tag `v0.3.2` 指向记录本节的收尾 commit）。**方法**：`git archive` 
 机制引用、判别力 fixture、内网 IP、在仓 NCCL 二进制）均为已裁定政策面，不因本次
 打标改变。重扫触发律沿前文：任何后续 commit 前重跑 T1-T4。
 
+
+---
+
+## 0.3.2 重建包清洁门（2026-10-20，`v0.3.2-recon` 打标前）
+
+**受检面**：新增 `deploy/reconstruct/0.3.2/`（70 件/1.8MB）+ 同步改动的 8 份文档。
+**方法**：包内 `MANIFEST.md5` + `verify.sh` 全量自验；密钥/用户名/临时代码/语法/
+链接独立复扫。
+
+| # | 检查 | 结果 |
+|---|---|---|
+| R1 | 包内 `MANIFEST.md5` | **69/69 PASS**（MANIFEST 自身不计） |
+| R2 | `verify.sh`（env/adapter/overlay/b12x/image/weights/补丁/负向自检） | **RECON-KIT PASS** |
+| R3 | 私钥块 / GitHub/OpenAI token / sudo 口令 / 赋值型凭据 | **0**（`verify.sh` 自身模式行除外） |
+| R4 | 未掩码家目录（`/home/<8+位小写用户>`） | **0**；`adapter/build_repack_cuda.sh` 注释位=`/home/<deploy-user>` |
+| R5 | 用户点名删除的 aria2 RPC 令牌 / `ms1017` | **0**（带宽优先辅助件未收，非重建闭包） |
+| R6 | shell 语法 | 7 件 `bash -n` **0 fail** |
+| R7 | Python 语法 | 34 件 `.py` `compile()` **0 error**（16 镜像件+engram 工具+包内件） |
+| R8 | 临时/构建残留 | `*.pyc`/`__pycache__`/`*.log`/`*.bak`/`*.rej` **0** |
+| R9 | 大件 | 最大 170KB（`common.py`/overlay backend）；**无二进制、无大文件新增** |
+| R10 | 相对链接（17 份 md） | **0 坏链** |
+| R11 | 补丁可应用性 | adapter/overlay/b12x 对公开 0.3.1 基线 `git apply --check` **PASS**；image 补丁对 `79cafec0` 16 件 **PASS** |
+| R12 | 逐件复算 | adapter 12 件、overlay 1 件、b12x 3 件、image 16 件应用后 md5 **全等产线** |
+
+**结论：重建包清洁门 PASS**。包内零真凭据、零未掩码用户名、零临时件；唯一人工
+差异=`build_repack_cuda.sh` 注释路径脱敏（运行逻辑零改，还原后 md5=cd6c7707）。

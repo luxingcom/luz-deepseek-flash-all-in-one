@@ -35,10 +35,9 @@
    （0.3.0/0.3.1/0.3.2）与 0.3.2 性能主表（PR 七档/DE 五档锚/C8 聚合/512k/质量）；
    0.3.1 读数保留为历史基线；镜像表补 `0.3.2-r032c`（digest `47f6d91a…ffc4`）；
    现役形状态位改为 CBX1A 56 键+SPEC6 九参+adapter `b58e49ff`；致谢计数 110→**111**。
-2. **部署面注记**：`deploy/README.md` 标明混合快照（boot 参面=0.3.2 终态，
-   env/adapter=0.3.1 样本；0.3.2 臂件归位=呈裁位）；`deploy/bin/r3-boot-arm.sh`
-   行 md5 更新为 `20f22bc6`；`deploy/SPEC6-SERVE-REF.md` 与
-   `docs/DEPLOY-GUIDE.md` 加 0.3.2 定版注记。
+2. **部署面注记**：`deploy/README.md` 标明 0.3.1 历史样本与 0.3.2 重建包入口；
+   `deploy/bin/r3-boot-arm.sh` 行 md5 更新为 `20f22bc6`（产线）/`9ac6e113`（公开件）；
+   `deploy/SPEC6-SERVE-REF.md` 与 `docs/DEPLOY-GUIDE.md` 加 0.3.2 定版注记。
 3. **issue #4 采纳件**：新增 `tools/serve_flags_gate.sh`——从运行进程 argv /
    `/get_server_info` 断言 `--tool-call-parser deepseekv41` 与
    `--enable-cache-report` 真的接线（只读、fail-closed、不经管道取 rc）；
@@ -55,6 +54,32 @@
 7. **tag `v0.3.2` 清洁门**：打 tag 前在定版树上重跑密钥/凭据/PII 全量扫描、
    103 件 shell + 927 件 Python 语法检查、临时件检查与相对链接检查；
    结果与保留项见 `SCAN-REPORT.md` §「0.3.2 tag 清洁门」。
+
+## 0.3.2 重建包（2026-10-20 定版后；tag `v0.3.2-recon`）
+
+> `v0.3.2` tag 后核对“公开材料能否完整重建部署环境”，确认 r032c/A6/R1/E16B2/
+> CBX1A 的增量件与 1017 配套尚未入仓。本节=补齐后的重建面；零产线触、零历史
+> 读数改动。
+
+1. **r032c 镜像面**：`deploy/reconstruct/0.3.2/image/` 收录 16 件全文、
+   `79cafec0→f9d89b02` 补丁、公开构建脚本（单 COPY 层+读回+py_compile+import+
+   collection）、IMAGE-IDENTITY、16 件 md5 台账、基座 16 件 md5。
+2. **adapter 面**：13 件现役增量（A6 `sitecustomize.py` beb131ab、R1
+   `kv_fp4.py` 75062432、E16B2 `replicated_split.py` 7d6f79b0、W-E `roce_ar.py`
+   f61e0183、r032c 迁移 9 件）+4 件产线旁挂；12 件代码逐字节=产线 md5。
+3. **overlay/b12x**：`deepseek_v4_backend.py` a1e7c3b5；b12x 三件
+   035c860c/7253717a/23646e89（含 W-E 的 C 层 fabric/TC 语义）。
+4. **env 链**：CBX1A 56 键 0729e18d + E16B2 5877fcb0 + E16B1 d55baa00 + FB54
+   ad635762，附逐级键差与回退序。
+5. **权重/engram**：1017 84 文件 SHA256SUMS（510,311,045,870 B）、NFS/四机秩映射、
+   engram 8 分片 sha256（202,758,065,168 B）+ `pack_engram.py`/打包/分发/校验工具。
+6. **boot/文档**：九参/WORKERS/四查与回退说明；README、DEPLOY-GUIDE、
+   release note §八、发布索引同步指向重建包；不再保留“内部臂件/呈裁位”缺件口径。
+7. **验证**：新增 `deploy/reconstruct/0.3.2/verify.sh`（MANIFEST/env/adapter/
+   overlay/b12x/image/weights/patch apply/敏感面/反向自检），本地结果
+   `RECON-KIT PASS`；补丁在公开 0.3.1 基线上逐件复算到产线 md5。
+8. **边界**：基座镜像（48.6GB）、1017 权重（476G）、engram（189G）属外部大件，
+   不分发；包内给身份指纹与校验清单。
 
 ## 0.3.2 死锁修复（2026-10-18 修复体验证毕 → 10-20 r032c 位级保持形终态转正在役）
 

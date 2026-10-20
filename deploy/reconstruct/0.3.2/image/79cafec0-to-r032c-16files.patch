@@ -1,0 +1,2521 @@
+diff --git a/python/sglang/kernels/ops/attention/dsv4/candidate_blocks.py b/python/sglang/kernels/ops/attention/dsv4/candidate_blocks.py
+index ba5550f0adb6e6ea1a528964a39d7fb611f9c67e..4f292307051ab8ab9557ec25441fc27f2295d054 100644
+--- a/python/sglang/kernels/ops/attention/dsv4/candidate_blocks.py
++++ b/python/sglang/kernels/ops/attention/dsv4/candidate_blocks.py
+@@ -143,6 +143,18 @@ def amax_topk_blocks(
+     return blocks
+ 
+ 
++def candidate_block_mask(
++    blocks: torch.Tensor, width: int, block_size: int
++) -> torch.Tensor:
++    """Materialize a source's block IDs once for Hopper paged-score consumers."""
++    num_blocks = (width + block_size - 1) // block_size
++    keep = torch.zeros(
++        (*blocks.shape[:-1], num_blocks + 1), dtype=torch.bool, device=blocks.device
++    )
++    keep.scatter_(-1, blocks.to(torch.int64).masked_fill(blocks < 0, num_blocks), True)
++    return keep[..., :num_blocks].repeat_interleave(block_size, dim=-1)[..., :width]
++
++
+ def select_candidate_block_ids(
+     logits: torch.Tensor,
+     compress_lens: Union[torch.Tensor, int],
+diff --git a/python/sglang/kernels/ops/attention/dsv4/fp4_indexer.py b/python/sglang/kernels/ops/attention/dsv4/fp4_indexer.py
+index 28bb762599aed3b705acdbf43a996dc54bfd82a0..213d97c2b9c9b5b57c97f6e4c70458113487cb8e 100644
+--- a/python/sglang/kernels/ops/attention/dsv4/fp4_indexer.py
++++ b/python/sglang/kernels/ops/attention/dsv4/fp4_indexer.py
+@@ -15,6 +15,170 @@ INDEX_K_SCALE_BYTES = tl.constexpr(4)
+ INDEX_K_SLOT_BYTES = INDEX_K_PAYLOAD_BYTES.value + INDEX_K_SCALE_BYTES.value
+ 
+ 
++@triton.jit
++def _finish_paged_indexer_topk_kernel(
++    Indices,
++    Scores,
++    Lengths,
++    Requests,
++    ReqTable,
++    Pages,
++    Raw,
++    BATCH: tl.constexpr,
++    K: tl.constexpr,
++    WIDTH: tl.constexpr,
++    OUT_WIDTH: tl.constexpr,
++    IDX_STRIDE: tl.constexpr,
++    SCORE_STRIDE: tl.constexpr,
++    TABLE_STRIDE: tl.constexpr,
++    PAGE_STRIDE: tl.constexpr,
++    RAW_STRIDE: tl.constexpr,
++    RATIO: tl.constexpr,
++    MASK_SCORES: tl.constexpr,
++    WRITE_RAW: tl.constexpr,
++    BLOCK: tl.constexpr,
++):
++    row = tl.program_id(0)
++    col = tl.arange(0, BLOCK)
++    idx = tl.load(Indices + row * IDX_STRIDE + col, (row < BATCH) & (col < K), WIDTH)
++    if MASK_SCORES:
++        valid = (row < BATCH) & (col < K) & (idx >= 0) & (idx < WIDTH)
++        score = tl.load(Scores + row * SCORE_STRIDE + idx, valid, -float("inf"))
++        idx = tl.where(valid & (score > -float("inf")), idx, WIDTH)
++    idx = tl.sort(tl.where(idx >= 0, idx, WIDTH), descending=False)
++    length = tl.load(Lengths + row, row < BATCH, 0)
++    req = tl.load(Requests + row, row < BATCH, 0)
++    valid = (row < BATCH) & (col < K) & (idx < length)
++    slot = tl.load(
++        ReqTable + req.to(tl.int64) * TABLE_STRIDE + idx.to(tl.int64) * RATIO,
++        valid,
++        0,
++    )
++    tl.store(
++        Pages + row * PAGE_STRIDE + col,
++        tl.where(valid, slot.to(tl.int64) // RATIO, -1),
++        col < OUT_WIDTH,
++    )
++    if WRITE_RAW:
++        tl.store(
++            Raw + row * RAW_STRIDE + col, tl.where(valid, idx, -1), col < OUT_WIDTH
++        )
++
++
++def finish_paged_indexer_topk(
++    indices: torch.Tensor,
++    scores: torch.Tensor,
++    lengths: torch.Tensor,
++    req: torch.Tensor,
++    req_table: torch.Tensor,
++    page_indices: torch.Tensor,
++    raw_indices: torch.Tensor | None,
++    ratio: int,
++    mask_scores: bool,
++) -> None:
++    """Sort selected positions and map them to compressed KV slots.
++
++    Candidate consumers discard selected masked scores, including top-k underfill.
++    The entire output (including padded rows/columns) is written, with -1 padding.
++    """
++    if not page_indices.shape[0]:
++        return
++    _finish_paged_indexer_topk_kernel[(page_indices.shape[0],)](
++        indices,
++        scores,
++        lengths,
++        req,
++        req_table,
++        page_indices,
++        raw_indices,
++        lengths.numel(),
++        indices.shape[1],
++        scores.shape[1],
++        page_indices.shape[1],
++        indices.stride(0),
++        scores.stride(0),
++        req_table.stride(0),
++        page_indices.stride(0),
++        raw_indices.stride(0) if raw_indices is not None else 0,
++        ratio,
++        mask_scores,
++        raw_indices is not None,
++        triton.next_power_of_2(max(page_indices.shape[1], indices.shape[1])),
++        num_warps=4,
++    )
++
++
++# Visible key counts change across batches; keep them out of the JIT key.
++@triton.jit(do_not_specialize=["NUM_SLOTS"])
++def _finish_flat_indexer_topk_kernel(
++    Indices,
++    Slots,
++    Starts,
++    Pages,
++    Raw,
++    K: tl.constexpr,
++    NUM_SLOTS,
++    IDX_STRIDE: tl.constexpr,
++    PAGE_STRIDE: tl.constexpr,
++    RAW_STRIDE: tl.constexpr,
++    WRITE_RAW: tl.constexpr,
++    BLOCK: tl.constexpr,
++):
++    row = tl.program_id(0)
++    col = tl.arange(0, BLOCK)
++    unselected = 2147483647
++    idx = tl.load(Indices + row * IDX_STRIDE + col, col < K, unselected)
++    idx = tl.sort(tl.where(idx < 0, unselected, idx), descending=False)
++    chosen = (col < K) & (idx != unselected)
++    slot = tl.load(Slots + tl.minimum(idx, NUM_SLOTS - 1), chosen, -1)
++    tl.store(Pages + row * PAGE_STRIDE + col, slot, col < K)
++    if WRITE_RAW:
++        start = tl.load(Starts + row)
++        tl.store(
++            Raw + row * RAW_STRIDE + col, tl.where(chosen, idx - start, -1), col < K
++        )
++
++
++def finish_flat_indexer_topk(
++    indices: torch.Tensor,
++    slots: torch.Tensor,
++    request_starts: torch.Tensor,
++    page_indices: torch.Tensor,
++    raw_indices: torch.Tensor | None,
++) -> None:
++    """Sort flattened prefill positions and map them to KV slots in one kernel.
++
++    Negative positions and INT32_MAX are unselected. Write only the selected
++    rows and columns; callers retain responsibility for resetting output padding.
++    """
++    rows, k = indices.shape
++    if not rows or not k:
++        return
++    assert indices.dtype == torch.int32 and indices.stride(1) == 1
++    assert slots.ndim == 1 and slots.is_contiguous() and slots.numel() > 0
++    assert request_starts.shape == (rows,) and request_starts.is_contiguous()
++    assert page_indices.shape[0] >= rows and page_indices.shape[1] >= k
++    assert page_indices.dtype == torch.int32 and page_indices.stride(1) == 1
++    if raw_indices is not None:
++        assert raw_indices.shape[0] >= rows and raw_indices.shape[1] >= k
++        assert raw_indices.dtype == torch.int32 and raw_indices.stride(1) == 1
++    _finish_flat_indexer_topk_kernel[(rows,)](
++        indices,
++        slots,
++        request_starts,
++        page_indices,
++        raw_indices,
++        k,
++        slots.numel(),
++        indices.stride(0),
++        page_indices.stride(0),
++        raw_indices.stride(0) if raw_indices is not None else 0,
++        raw_indices is not None,
++        triton.next_power_of_2(k),
++        num_warps=4,
++    )
++
++
+ @triton.jit
+ def _select_group_value(group, v0, v1, v2, v3):
+     return tl.where(
+@@ -297,6 +461,67 @@ def store_fp4_index_k_cache(
+     )
+ 
+ 
++@triton.jit
++def _gather_fp4_index_k_kernel(
++    cache,
++    cache_stride,
++    slots,
++    payload,
++    scales,
++    n,
++    page_size: tl.constexpr,
++    BLOCK_ROWS: tl.constexpr,
++):
++    # int32 view of a page: page_size * 16 payload words, then page_size scale words.
++    rows = tl.program_id(0) * BLOCK_ROWS + tl.arange(0, BLOCK_ROWS)
++    valid = rows < n
++    slot = tl.load(slots + rows, valid, 0).to(tl.int64)
++    page = slot // page_size
++    offset = slot - page * page_size
++    page_base = cache + page * cache_stride
++    words = tl.arange(0, 16)
++    payload_words = tl.load(
++        page_base[:, None] + offset[:, None] * 16 + words[None, :], valid[:, None]
++    )
++    tl.store(
++        payload + rows[:, None].to(tl.int64) * 16 + words[None, :],
++        payload_words,
++        valid[:, None],
++    )
++    tl.store(scales + rows, tl.load(page_base + page_size * 16 + offset, valid), valid)
++
++
++def gather_fp4_index_k(
++    cache: torch.Tensor, slots: torch.Tensor, *, page_size: int
++) -> tuple[torch.Tensor, torch.Tensor]:
++    """Packed fp4 rows at ``slots`` of the index-K ``cache`` (``[pages, page_size *
++    68]`` uint8, ``store_fp4_index_k_cache``'s layout): (payload int8 ``[n, 64]``,
++    ue8m0 scales packed int32 ``[n]``), the layout ``quantize_fp4_indexer_tensor``
++    returns."""
++    assert cache.shape[1] == page_size * INDEX_K_SLOT_BYTES and cache.stride(1) == 1
++    # The kernel addresses slots as `slots + rows`, so a strided view would be read
++    # as if its elements were packed.
++    assert slots.is_contiguous()
++    words = cache.view(torch.int32)
++    n = slots.shape[0]
++    payload = torch.empty((n, 16), device=cache.device, dtype=torch.int32)
++    scales = torch.empty((n,), device=cache.device, dtype=torch.int32)
++    if n > 0:
++        block_rows = 64
++        _gather_fp4_index_k_kernel[(triton.cdiv(n, block_rows),)](
++            words,
++            words.stride(0),
++            slots,
++            payload,
++            scales,
++            n,
++            page_size,
++            BLOCK_ROWS=block_rows,
++            num_warps=4,
++        )
++    return payload.view(torch.int8), scales
++
++
+ @triton.jit
+ def _index_k_rope_pack_kernel(
+     X,
+@@ -430,6 +655,73 @@ def _e2m1_decode(code):
+     return tl.where((code >> 3) == 1, -v, v)
+ 
+ 
++@triton.jit
++def _fp4_index_logits_tile(
++    q_ptr,
++    w_ptr,
++    table_ptr,
++    b,
++    slot,
++    valid,
++    page_size,
++    row_stride,
++    stride_qb,
++    stride_qh,
++    stride_wb,
++    H: tl.constexpr,
++    HALF_D: tl.constexpr,
++):
++    offs_h = tl.arange(0, H)
++    offs_i = tl.arange(0, HALF_D)
++    page = slot // page_size
++    off = slot % page_size
++    row_base = page * row_stride
++    # K payload: [BLOCK_L, HALF_D] uint8
++    pay = tl.load(
++        table_ptr
++        + row_base[:, None]
++        + off[:, None] * INDEX_K_PAYLOAD_BYTES
++        + offs_i[None, :],
++        mask=valid[:, None],
++        other=0,
++    )
++    low = _e2m1_decode(pay & 0x0F)
++    high = _e2m1_decode((pay >> 4) & 0x0F)
++    # e8m0 block scales: element j uses block j // 32 -> byte i uses block i // 16.
++    sc_idx = offs_i // 16
++    exps = tl.load(
++        table_ptr
++        + row_base[:, None]
++        + page_size * INDEX_K_PAYLOAD_BYTES
++        + off[:, None] * INDEX_K_SCALE_BYTES
++        + sc_idx[None, :],
++        mask=valid[:, None],
++        other=127,
++    )
++    scale = tl.exp2(exps.to(tl.float32) - 127.0)
++    k_low = (low * scale).to(tl.bfloat16)  # [BLOCK_L, HALF_D] elements 2i
++    k_high = (high * scale).to(tl.bfloat16)  # elements 2i+1
++
++    # queries: even / odd elements, [H, HALF_D] bf16
++    q_even = tl.load(
++        q_ptr + b * stride_qb + offs_h[:, None] * stride_qh + 2 * offs_i[None, :]
++    )
++    q_odd = tl.load(
++        q_ptr + b * stride_qb + offs_h[:, None] * stride_qh + 2 * offs_i[None, :] + 1
++    )
++
++    acc = tl.dot(q_even, tl.trans(k_low))  # [H, BLOCK_L] fp32
++    acc += tl.dot(q_odd, tl.trans(k_high))
++    # reference rounding points: bf16 dot -> relu -> * bf16 weight -> bf16 -> sum -> bf16
++    s = acc.to(tl.bfloat16).to(tl.float32)
++    s = tl.maximum(s, 0.0)
++    w = tl.load(w_ptr + b * stride_wb + offs_h).to(tl.float32)
++    s = (s * w[:, None]).to(tl.bfloat16).to(tl.float32)
++    logit = tl.sum(s, axis=0).to(tl.bfloat16).to(tl.float32)
++    logit = tl.where(valid, logit, float("-inf"))
++    return logit
++
++
+ @triton.jit
+ def _fp4_index_logits_kernel(
+     q_ptr,  # [B, H, D] bf16, fq4 queries (already rope'd)
+@@ -456,11 +748,6 @@ def _fp4_index_logits_kernel(
+     b = tl.program_id(0)
+     lb = tl.program_id(1)
+     offs_l = lb * BLOCK_L + tl.arange(0, BLOCK_L)
+-    offs_h = tl.arange(0, H)
+-    offs_i = tl.arange(
+-        0, HALF_D
+-    )  # byte index i holds elements 2i (low nibble), 2i+1 (high nibble)
+-
+     n_vis = tl.load(lens_ptr + b)
+     # Graph replay keeps the capacity-sized grid even for short live contexts.
+     # Skip whole invisible tiles using the current device-side length; masking
+@@ -472,57 +759,21 @@ def _fp4_index_logits_kernel(
+         slot = tl.load(slots_ptr + b * L + offs_l, mask=offs_l < L, other=0).to(
+             tl.int64
+         )
+-        page = slot // page_size
+-        off = slot % page_size
+-        row_base = page * row_stride
+-
+-        # K payload: [BLOCK_L, HALF_D] uint8
+-        pay = tl.load(
+-            table_ptr
+-            + row_base[:, None]
+-            + off[:, None] * INDEX_K_PAYLOAD_BYTES
+-            + offs_i[None, :],
+-            mask=valid[:, None],
+-            other=0,
+-        )
+-        low = _e2m1_decode(pay & 0x0F)
+-        high = _e2m1_decode((pay >> 4) & 0x0F)
+-        # e8m0 block scales: element j uses block j // 32 -> byte i uses block i // 16.
+-        sc_idx = offs_i // 16
+-        exps = tl.load(
+-            table_ptr
+-            + row_base[:, None]
+-            + page_size * INDEX_K_PAYLOAD_BYTES
+-            + off[:, None] * INDEX_K_SCALE_BYTES
+-            + sc_idx[None, :],
+-            mask=valid[:, None],
+-            other=127,
+-        )
+-        scale = tl.exp2(exps.to(tl.float32) - 127.0)
+-        k_low = (low * scale).to(tl.bfloat16)  # [BLOCK_L, HALF_D] elements 2i
+-        k_high = (high * scale).to(tl.bfloat16)  # elements 2i+1
+-
+-        # queries: even / odd elements, [H, HALF_D] bf16
+-        q_even = tl.load(
+-            q_ptr + b * stride_qb + offs_h[:, None] * stride_qh + 2 * offs_i[None, :]
++        logit = _fp4_index_logits_tile(
++            q_ptr,
++            w_ptr,
++            table_ptr,
++            b,
++            slot,
++            valid,
++            page_size,
++            row_stride,
++            stride_qb,
++            stride_qh,
++            stride_wb,
++            H,
++            HALF_D,
+         )
+-        q_odd = tl.load(
+-            q_ptr
+-            + b * stride_qb
+-            + offs_h[:, None] * stride_qh
+-            + 2 * offs_i[None, :]
+-            + 1
+-        )
+-
+-        acc = tl.dot(q_even, tl.trans(k_low))  # [H, BLOCK_L] fp32
+-        acc += tl.dot(q_odd, tl.trans(k_high))
+-        # reference rounding points: bf16 dot -> relu -> * bf16 weight -> bf16 -> sum -> bf16
+-        s = acc.to(tl.bfloat16).to(tl.float32)
+-        s = tl.maximum(s, 0.0)
+-        w = tl.load(w_ptr + b * stride_wb + offs_h).to(tl.float32)
+-        s = (s * w[:, None]).to(tl.bfloat16).to(tl.float32)
+-        logit = tl.sum(s, axis=0).to(tl.bfloat16).to(tl.float32)
+-        logit = tl.where(valid, logit, float("-inf"))
+         tl.store(out_ptr + b * L + offs_l, logit, mask=offs_l < L)
+ 
+ 
+@@ -569,3 +820,127 @@ def fp4_index_logits_decode(
+         num_warps=4,
+     )
+     return out
++
++
++@triton.jit
++def _fp4_index_logits_paged_kernel(
++    q_ptr,
++    w_ptr,
++    req_ptr,
++    req_table_ptr,
++    lens_ptr,
++    table_ptr,
++    mask_ptr,
++    out_ptr,
++    L,
++    page_size,
++    row_stride,
++    req_stride,
++    mask_stride,
++    out_stride,
++    stride_qb,
++    stride_qh,
++    stride_wb,
++    H: tl.constexpr,
++    HALF_D: tl.constexpr,
++    RATIO: tl.constexpr,
++    HAS_MASK: tl.constexpr,
++    BLOCK_L: tl.constexpr,
++):
++    b = tl.program_id(0)
++    n_vis = tl.minimum(tl.load(lens_ptr + b), L)
++    req = tl.load(req_ptr + b).to(tl.int64)
++    for tile in range(tl.program_id(1), tl.cdiv(n_vis, BLOCK_L), tl.num_programs(1)):
++        offs_l = tile * BLOCK_L + tl.arange(0, BLOCK_L)
++        valid = offs_l < n_vis
++        if HAS_MASK:
++            valid = valid & tl.load(
++                mask_ptr + b * mask_stride + offs_l, mask=offs_l < n_vis, other=False
++            )
++        slot = (
++            tl.load(
++                req_table_ptr + req * req_stride + offs_l * RATIO, mask=valid, other=0
++            ).to(tl.int64)
++            // RATIO
++        )
++        logit = _fp4_index_logits_tile(
++            q_ptr,
++            w_ptr,
++            table_ptr,
++            b,
++            slot,
++            valid,
++            page_size,
++            row_stride,
++            stride_qb,
++            stride_qh,
++            stride_wb,
++            H,
++            HALF_D,
++        )
++        tl.store(out_ptr + b * out_stride + offs_l, logit, mask=offs_l < L)
++
++
++def fp4_index_logits_paged(
++    q: torch.Tensor,
++    weights: torch.Tensor,
++    req: torch.Tensor,
++    req_table: torch.Tensor,
++    lens: torch.Tensor,
++    table: torch.Tensor,
++    page_size: int,
++    max_len: int,
++    ratio: int,
++    candidate_mask: torch.Tensor | None = None,
++) -> torch.Tensor:
++    """Score visible compressed positions directly from the request table.
++
++    The output has graph-stable capacity, but only the first ``lens[b]`` values
++    are initialized. Consumers must use the current device-side lengths.
++    The FP4 decoding and BF16 rounding are shared with the dense-slot path.
++    """
++    assert q.dtype == torch.bfloat16 and q.shape[-1] == INDEX_HEAD_DIM
++    assert table.dtype == torch.uint8 and table.ndim == 2
++    assert ratio in (1, 2) and max_len <= req_table.shape[1] // ratio
++    assert req_table.stride(1) == 1
++    if candidate_mask is not None:
++        assert candidate_mask.shape[1] >= max_len and candidate_mask.stride(1) == 1
++    batch, heads, _ = q.shape
++    q = q.contiguous()
++    weights = weights.to(torch.bfloat16).contiguous()
++    req = req.contiguous()
++    lens = lens.contiguous()
++    # Existing candidate-amax needs rows aligned to eight floats.
++    out = torch.empty(
++        (batch, triton.cdiv(max_len, 8) * 8), device=q.device, dtype=torch.float32
++    )
++    if not batch or not max_len:
++        return out[:, :max_len]
++    num_sms = torch.cuda.get_device_properties(q.device).multi_processor_count
++    workers = min(triton.cdiv(max_len, 64), triton.cdiv(num_sms * 4, batch))
++    _fp4_index_logits_paged_kernel[(batch, workers)](
++        q,
++        weights,
++        req,
++        req_table,
++        lens,
++        table,
++        candidate_mask,
++        out,
++        max_len,
++        page_size,
++        table.stride(0),
++        req_table.stride(0),
++        candidate_mask.stride(0) if candidate_mask is not None else 0,
++        out.stride(0),
++        q.stride(0),
++        q.stride(1),
++        weights.stride(0),
++        H=heads,
++        HALF_D=INDEX_HEAD_DIM // 2,
++        RATIO=ratio,
++        HAS_MASK=candidate_mask is not None,
++        BLOCK_L=64,
++        num_warps=4,
++    )
++    return out[:, :max_len]
+diff --git a/python/sglang/srt/layers/attention/deepseek_v4_backend.py b/python/sglang/srt/layers/attention/deepseek_v4_backend.py
+index ce8d926134ecf2478ac459cec4b119bd71015db4..fcf318df42c2a7f17fbac1b0a40415bc2514de1d 100644
+--- a/python/sglang/srt/layers/attention/deepseek_v4_backend.py
++++ b/python/sglang/srt/layers/attention/deepseek_v4_backend.py
+@@ -82,7 +82,6 @@ from sglang.srt.layers.attention.dsv4.v41_indexer import (
+     CapturedPrefillInputs,
+     DecodeInputs,
+     PrefillInputs,
+-    Selection,
+     has_dense_fp4_indexer,
+     is_sm100_or_newer,
+     make_candidate_indexer,
+@@ -122,6 +121,7 @@ from sglang.srt.speculative.ragged_verify import (
+     resolve_ragged_verify_layout,
+ )
+ from sglang.srt.utils import ceil_align, is_cuda, is_xpu
++from sglang.srt.utils.common import async_h2d
+ 
+ if TYPE_CHECKING:
+     from sgl_kernel.flash_mla import FlashMLASchedMeta
+@@ -3084,7 +3084,6 @@ class DeepseekV4AttnBackend(
+         is_source = layer.indexer.is_candidate_source
+         is_consumer = layer.indexer.uses_candidates
+         ratio = layer.compress_ratio
+-        out = self._get_low_ratio_selection(ratio)
+         published = self.forward_metadata.candidate_metadata
+         mode = forward_batch.forward_mode
+         if mode.is_decode() or mode.is_target_verify():
+@@ -3102,27 +3101,28 @@ class DeepseekV4AttnBackend(
+                 layer, x, q_lora, req, pos, mode
+             )
+             if is_source:
+-                published = self.decode_candidates.publish_decode(inputs, out)
++                published = self.decode_candidates.publish_decode(inputs)
+                 self._publish_candidate_metadata(published)
+             elif is_consumer:
+-                self.decode_candidates.consume_decode(inputs, published, out)
++                self.decode_candidates.consume_decode(inputs, published)
+             else:
+-                self.full_topk_indexer.topk_decode(inputs, out)
++                self.full_topk_indexer.topk_decode(inputs)
+         else:
+             inputs = self._make_low_ratio_prefill_indexer_inputs(
+                 layer, x, q_lora, req, pos, forward_batch, rows_per_request
+             )
+             if is_source:
+-                published = self.prefill_candidates.publish_prefill(inputs, out)
++                published = self.prefill_candidates.publish_prefill(inputs)
+                 self._publish_candidate_metadata(published)
+             elif is_consumer:
+-                self.prefill_candidates.consume_prefill(inputs, published, out)
++                self.prefill_candidates.consume_prefill(inputs, published)
+             else:
+-                self.full_topk_indexer.topk_prefill(inputs, out)
++                self.full_topk_indexer.topk_prefill(inputs)
+ 
+     def _low_ratio_index_topk_captured(self, layer, projected_q, projected_w) -> None:
+         ratio = layer.compress_ratio
+         indexer = layer.indexer
++        core = self.forward_metadata.core_metadata
+         metadata = (
+             self.forward_metadata.c1_indexer_metadata
+             if ratio == 1
+@@ -3141,16 +3141,10 @@ class DeepseekV4AttnBackend(
+             q=projected_q,
+             weights=projected_w,
+             paged_metadata=metadata,
++            out_page_indices=core.sparse_page_indices(ratio),
++            out_raw_indices=core.sparse_raw_indices(ratio),
+         )
+-        out = self._get_low_ratio_selection(ratio)
+-        self.full_topk_indexer.topk_prefill_captured(inputs, out)
+-
+-    def _get_low_ratio_selection(self, compress_ratio: int) -> Selection:
+-        core = self.forward_metadata.core_metadata
+-        return Selection(
+-            page_indices=core.sparse_page_indices(compress_ratio),
+-            raw_indices=core.sparse_raw_indices(compress_ratio),
+-        )
++        self.full_topk_indexer.topk_prefill_captured(inputs)
+ 
+     def _make_low_ratio_decode_indexer_inputs(self, layer, x, q_lora, req, pos, mode):
+         ratio = layer.compress_ratio
+@@ -3171,6 +3165,9 @@ class DeepseekV4AttnBackend(
+             req_rows=req,
+             paged_metadata=metadata,
+             is_verify=mode.is_target_verify(),
++            out_page_indices=self.forward_metadata.core_metadata.sparse_page_indices(
++                ratio
++            ),
+         )
+ 
+     def _make_low_ratio_prefill_indexer_inputs(
+@@ -3183,9 +3180,10 @@ class DeepseekV4AttnBackend(
+         forward_batch,
+         rows_per_request,
+     ) -> PrefillInputs:
++        core = self.forward_metadata.core_metadata
+         tail = self.forward_metadata.late_layer_tail
+         if rows_per_request is not None:
+-            rows_per_request_device = torch.tensor(
++            rows_per_request_device = async_h2d(
+                 rows_per_request, dtype=torch.int32, device=x.device
+             )
+         elif tail is not None:
+@@ -3204,10 +3202,29 @@ class DeepseekV4AttnBackend(
+             positions=pos,
+             req_rows=req,
+             req_pool_indices=forward_batch.req_pool_indices,
+-            kv_page_table=self.forward_metadata.core_metadata.page_table,
++            kv_page_table=core.page_table,
+             seq_lens_cpu=_as_int_list(forward_batch.seq_lens_cpu),
+             rows_per_request=rows_per_request,
+             rows_per_request_device=rows_per_request_device,
++            out_raw_indices=core.sparse_raw_indices(layer.compress_ratio),
++            out_page_indices=(
++                core.sparse_page_indices(layer.compress_ratio)
++                if self._low_ratio_prefill_reads_page_indices(forward_batch)
++                else None
++            ),
++        )
++
++    def _low_ratio_prefill_reads_page_indices(self, forward_batch: ForwardBatch):
++        # The negation of the sparse-prefill gate in forward(), which reads only
++        # raw_indices; the query-count clause is dropped, so this errs to True.
++        return (
++            self.trtllm_attn
++            or not forward_batch.forward_mode.is_extend_without_speculative()
++            or get_platform().is_sm120
++            or self.tail_forward_metadata is not None
++            or self.forward_metadata.late_layer_tail is not None
++            or self.token_to_kv_pool.request_window is not None
++            or not envs.SGLANG_OPT_FLASHMLA_SPARSE_PREFILL.get()
+         )
+ 
+     def _publish_candidate_metadata(self, published: Optional[CandidateMetadata]):
+diff --git a/python/sglang/srt/layers/attention/dsv4/v41_indexer/__init__.py b/python/sglang/srt/layers/attention/dsv4/v41_indexer/__init__.py
+index 60f6fc690561ef8c3b64df01948278e4a9c802ce..548977a58082ce04dd13a187a072b921391191e6 100644
+--- a/python/sglang/srt/layers/attention/dsv4/v41_indexer/__init__.py
++++ b/python/sglang/srt/layers/attention/dsv4/v41_indexer/__init__.py
+@@ -17,7 +17,6 @@ from .types import (
+     DecodeInputs,
+     PrefillCandidates,
+     PrefillInputs,
+-    Selection,
+ )
+ 
+ if TYPE_CHECKING:
+@@ -31,7 +30,6 @@ __all__ = [
+     "FullTopKIndexer",
+     "PrefillCandidates",
+     "PrefillInputs",
+-    "Selection",
+     "has_dense_fp4_indexer",
+     "is_sm100_or_newer",
+     "make_candidate_indexer",
+diff --git a/python/sglang/srt/layers/attention/dsv4/v41_indexer/dense_blocks.py b/python/sglang/srt/layers/attention/dsv4/v41_indexer/dense_blocks.py
+index 3cc44e2bfd251942182cd25ab3e8d095af34fe45..b9ed473ce07ff0dc229bbc8d18822db381e2db9f 100644
+--- a/python/sglang/srt/layers/attention/dsv4/v41_indexer/dense_blocks.py
++++ b/python/sglang/srt/layers/attention/dsv4/v41_indexer/dense_blocks.py
+@@ -9,16 +9,20 @@ import msgspec
+ import torch
+ 
+ from sglang.kernels.ops.attention.dsv4.candidate_blocks import (
++    amax_topk_blocks,
++    candidate_block_mask,
+     select_candidate_block_ids,
+     topk_among_blocks,
+ )
+ 
+ from .scoring import (
+     DeepGEMMPrefillData,
++    PagedDecodeScores,
+     decode_scores,
+     get_deep_gemm_prefill_data,
+     prefill_requests,
+     score_tiles,
++    select_decode,
+     write_decode,
+     write_prefill,
+ )
+@@ -26,7 +30,6 @@ from .types import (
+     CandidateMetadata,
+     DecodeInputs,
+     PrefillInputs,
+-    Selection,
+     get_tail_row_indices,
+ )
+ 
+@@ -40,6 +43,8 @@ class BlockIds(CandidateMetadata, msgspec.Struct):
+     blocks: torch.Tensor
+     # prefill: query rows of each request in row order, for the late-layer tail
+     rows_per_request: Optional[List[int]] = None
++    # Hopper decode materializes this once at the source and reuses it in consumers.
++    decode_mask: Optional[torch.Tensor] = None
+ 
+     def tail(self, rows_per_request: List[int]) -> BlockIds:
+         assert self.rows_per_request is not None, "prefill block ids missing"
+@@ -67,69 +72,78 @@ class DenseBlocksBackend:
+         self.block_size = candidate_block_size
+         self.use_deep_gemm_prefill = use_deep_gemm_prefill
+ 
+-    def publish_prefill(self, inputs: PrefillInputs, out: Selection):
++    def publish_prefill(self, inputs: PrefillInputs):
+         if self.use_deep_gemm_prefill:
+-            return self._deep_gemm_publish_prefill(inputs, out)
+-        return self._torch_publish_prefill(inputs, out)
++            return self._deep_gemm_publish_prefill(inputs)
++        return self._torch_publish_prefill(inputs)
+ 
+     def consume_prefill(
+         self,
+         inputs: PrefillInputs,
+         published: Optional[BlockIds],
+-        out: Selection,
+     ) -> None:
+         if self.use_deep_gemm_prefill:
+-            self._deep_gemm_consume_prefill(inputs, published, out)
++            self._deep_gemm_consume_prefill(inputs, published)
+         else:
+-            self._torch_consume_prefill(inputs, published, out)
++            self._torch_consume_prefill(inputs, published)
+ 
+-    def publish_decode(self, inputs: DecodeInputs, out: Selection):
++    def publish_decode(self, inputs: DecodeInputs):
+         d = decode_scores(
+             inputs=inputs,
+-            out=out,
+             token_to_kv_pool=self.token_to_kv_pool,
+             req_to_token=self.req_to_token,
+         )
+         if d is None:
+             return None
+-        published = BlockIds(
+-            blocks=select_candidate_block_ids(
+-                d.scores,
+-                d.lens[:, None],
+-                topk_blocks=self.topk_blocks,
+-                block_size=self.block_size,
++        if isinstance(d, PagedDecodeScores):
++            assert self.block_size == 8
++            blocks = amax_topk_blocks(
++                d.scores, d.lens, (d.lens + 7) // 8, self.topk_blocks
+             )
+-        )
+-        k = min(inputs.indexer.index_topk, d.lmax)
+-        idx = d.scores.topk(k, dim=-1, sorted=False).indices
+-        write_decode(out, d, idx)
++            published = BlockIds(
++                blocks=blocks,
++                decode_mask=candidate_block_mask(blocks, d.lmax, self.block_size),
++            )
++        else:
++            published = BlockIds(
++                blocks=select_candidate_block_ids(
++                    d.scores,
++                    d.lens[:, None],
++                    topk_blocks=self.topk_blocks,
++                    block_size=self.block_size,
++                )
++            )
++        select_decode(inputs, d, inputs.indexer.index_topk)
+         return published
+ 
+     def consume_decode(
+         self,
+         inputs: DecodeInputs,
+         published: Optional[BlockIds],
+-        out: Selection,
+     ) -> None:
+         d = decode_scores(
+             inputs=inputs,
+-            out=out,
+             token_to_kv_pool=self.token_to_kv_pool,
+             req_to_token=self.req_to_token,
++            candidate_mask=published.decode_mask if published is not None else None,
+         )
+         if d is None:
+             return
+         assert published is not None and published.blocks.shape[0] == d.bs
++        if isinstance(d, PagedDecodeScores):
++            assert published.decode_mask is not None
++            select_decode(inputs, d, inputs.indexer.index_topk)
++            return
+         k = min(inputs.indexer.index_topk, d.lmax)
+         idx = topk_among_blocks(
+             d.scores, d.lens, published.blocks, k, block_size=self.block_size
+         )
+-        write_decode(out, d, idx.masked_fill(idx < 0, d.lmax))
++        write_decode(inputs, d, idx.masked_fill(idx < 0, d.lmax))
+ 
+     # ---------- DeepGEMM: flattened-K scores ----------
+ 
+-    def _deep_gemm_publish_prefill(self, inputs: PrefillInputs, out: Selection):
+-        out.reset()
++    def _deep_gemm_publish_prefill(self, inputs: PrefillInputs):
++        inputs.reset_outputs()
+         data = get_deep_gemm_prefill_data(inputs, self.req_to_token)
+         if data is None:
+             return None
+@@ -142,16 +156,15 @@ class DenseBlocksBackend:
+             topk_blocks=self.topk_blocks,
+             block_size=self.block_size,
+         )
+-        data.write_selection(selected=selected, out=out)
++        data.write_selection(selected, inputs)
+         return BlockIds(blocks=blocks, rows_per_request=data.rows_per_request)
+ 
+     def _deep_gemm_consume_prefill(
+         self,
+         inputs: PrefillInputs,
+         published: Optional[BlockIds],
+-        out: Selection,
+     ) -> None:
+-        out.reset()
++        inputs.reset_outputs()
+         data = get_deep_gemm_prefill_data(inputs, self.req_to_token)
+         if data is None:
+             return
+@@ -165,15 +178,14 @@ class DenseBlocksBackend:
+             blocks=published.blocks,
+             block_size=self.block_size,
+         )
+-        data.write_selection(selected=selected, out=out)
++        data.write_selection(selected, inputs)
+ 
+     # ---------- torch: per-request scores ----------
+ 
+-    def _torch_publish_prefill(self, inputs: PrefillInputs, out: Selection):
++    def _torch_publish_prefill(self, inputs: PrefillInputs):
+         picked = []  # (query rows, their block ids) per scored chunk
+         for request, chunks in prefill_requests(
+             inputs=inputs,
+-            out=out,
+             token_to_kv_pool=self.token_to_kv_pool,
+             req_to_token=self.req_to_token,
+         ):
+@@ -190,7 +202,7 @@ class DenseBlocksBackend:
+                     )
+                 )
+                 idx = chunk.scores.topk(request.k, dim=-1, sorted=False).indices
+-                write_prefill(out, request, chunk, idx)
++                write_prefill(inputs, request, chunk, idx)
+         width = max((ids.shape[1] for _, ids in picked), default=0)
+         blocks = torch.full(
+             (inputs.positions.shape[0], width),
+@@ -206,12 +218,10 @@ class DenseBlocksBackend:
+         self,
+         inputs: PrefillInputs,
+         published: Optional[BlockIds],
+-        out: Selection,
+     ) -> None:
+         assert published is not None
+         for request, chunks in prefill_requests(
+             inputs=inputs,
+-            out=out,
+             token_to_kv_pool=self.token_to_kv_pool,
+             req_to_token=self.req_to_token,
+         ):
+@@ -223,7 +233,9 @@ class DenseBlocksBackend:
+                     request.k,
+                     block_size=self.block_size,
+                 )
+-                write_prefill(out, request, chunk, idx.masked_fill(idx < 0, request.lc))
++                write_prefill(
++                    inputs, request, chunk, idx.masked_fill(idx < 0, request.lc)
++                )
+ 
+ 
+ def _publish_prefill_blocks(
+diff --git a/python/sglang/srt/layers/attention/dsv4/v41_indexer/full_topk.py b/python/sglang/srt/layers/attention/dsv4/v41_indexer/full_topk.py
+index db9dadfcd3e8bd998ecbe0f48d24624798c73523..a2f317a9d392861266a2f83005e920014771b21a 100644
+--- a/python/sglang/srt/layers/attention/dsv4/v41_indexer/full_topk.py
++++ b/python/sglang/srt/layers/attention/dsv4/v41_indexer/full_topk.py
+@@ -21,14 +21,13 @@ from .scoring import (
+     get_index_k_cache,
+     prefill_requests,
+     quantize_index_q,
+-    write_decode,
++    select_decode,
+     write_prefill,
+ )
+ from .types import (
+     CapturedPrefillInputs,
+     DecodeInputs,
+     PrefillInputs,
+-    Selection,
+ )
+ 
+ if TYPE_CHECKING:
+@@ -49,45 +48,44 @@ class FullTopKIndexer:
+         self.use_deep_gemm_prefill = use_deep_gemm_prefill
+         self.use_deep_gemm_decode = use_deep_gemm_decode
+ 
+-    def topk_prefill(self, inputs: PrefillInputs, out: Selection) -> None:
++    def topk_prefill(self, inputs: PrefillInputs) -> None:
+         if self.use_deep_gemm_prefill:
+-            self._deep_gemm_prefill(inputs, out)
++            self._deep_gemm_prefill(inputs)
+         else:
+-            self._torch_prefill(inputs, out)
++            self._torch_prefill(inputs)
+ 
+-    def topk_prefill_captured(self, inputs: CapturedPrefillInputs, out: Selection):
+-        self._deep_gemm_prefill_captured(inputs, out)
++    def topk_prefill_captured(self, inputs: CapturedPrefillInputs) -> None:
++        self._deep_gemm_prefill_captured(inputs)
+ 
+-    def topk_decode(self, inputs: DecodeInputs, out: Selection) -> None:
++    def topk_decode(self, inputs: DecodeInputs) -> None:
+         if self.use_deep_gemm_decode:
+-            self._deep_gemm_decode(inputs, out)
++            self._deep_gemm_decode(inputs)
+         else:
+-            self._torch_decode(inputs, out)
++            self._torch_decode(inputs)
+ 
+-    def _deep_gemm_prefill(self, inputs: PrefillInputs, out: Selection) -> None:
+-        out.reset()
++    def _deep_gemm_prefill(self, inputs: PrefillInputs) -> None:
++        inputs.reset_outputs()
+         data = get_deep_gemm_prefill_data(inputs, self.req_to_token)
+         if data is None:
+             return
+         kv = self.token_to_kv_pool.get_low_ratio_index_k_fp4(
+             inputs.layer_id, data.k_slots
+         )
+-        selected = dense_prefill_topk(data, kv, topk=inputs.indexer.index_topk)
+-        data.write_selection(selected=selected, out=out)
++        dense_prefill_topk(data, kv, out=inputs.out_raw_indices[: data.num_rows])
++        data.write_page_indices(inputs)
+ 
+-    def _torch_prefill(self, inputs: PrefillInputs, out: Selection) -> None:
++    def _torch_prefill(self, inputs: PrefillInputs) -> None:
+         requests = prefill_requests(
+             inputs=inputs,
+-            out=out,
+             token_to_kv_pool=self.token_to_kv_pool,
+             req_to_token=self.req_to_token,
+         )
+         for request, chunks in requests:
+             for chunk in chunks:
+                 idx = chunk.scores.topk(request.k, dim=-1, sorted=False).indices
+-                write_prefill(out, request, chunk, idx)
++                write_prefill(inputs, request, chunk, idx)
+ 
+-    def _deep_gemm_decode(self, inputs: DecodeInputs, out: Selection) -> None:
++    def _deep_gemm_decode(self, inputs: DecodeInputs) -> None:
+         data = get_deep_gemm_decode_data(inputs, self.token_to_kv_pool)
+         metadata = inputs.paged_metadata
+         if isinstance(metadata.deep_gemm_metadata, list):
+@@ -107,8 +105,7 @@ class FullTopKIndexer:
+                 topk_transform_paged_from_metadata(
+                     logits,
+                     metadata,
+-                    out.page_indices,
+-                    out.raw_indices,
++                    inputs.out_page_indices,
+                     rows=rows,
+                     topk_metadata=(
+                         topk_plans[chunk_idx] if topk_plans is not None else None
+@@ -126,25 +123,20 @@ class FullTopKIndexer:
+         )
+         # TODO(dark): add bf16 topk
+         topk_transform_paged_from_metadata(
+-            logits, metadata, out.page_indices, out.raw_indices
++            logits, metadata, inputs.out_page_indices, None
+         )
+ 
+-    def _torch_decode(self, inputs: DecodeInputs, out: Selection) -> None:
++    def _torch_decode(self, inputs: DecodeInputs) -> None:
+         d = decode_scores(
+             inputs=inputs,
+-            out=out,
+             token_to_kv_pool=self.token_to_kv_pool,
+             req_to_token=self.req_to_token,
+         )
+         if d is None:
+             return
+-        k = min(inputs.indexer.index_topk, d.lmax)
+-        idx = d.scores.topk(k, dim=-1, sorted=False).indices
+-        write_decode(out, d, idx)
++        select_decode(inputs, d, inputs.indexer.index_topk)
+ 
+-    def _deep_gemm_prefill_captured(
+-        self, inputs: CapturedPrefillInputs, out: Selection
+-    ) -> None:
++    def _deep_gemm_prefill_captured(self, inputs: CapturedPrefillInputs) -> None:
+         indexer = inputs.indexer
+         metadata = inputs.paged_metadata
+         assert indexer.n_local_heads == indexer.n_heads
+@@ -178,7 +170,7 @@ class FullTopKIndexer:
+                 logits,
+                 lens[rows],
+                 page_table[rows],
+-                out.page_indices[rows, :topk],
++                inputs.out_page_indices[rows, :topk],
+                 page_size,
+-                out.raw_indices[rows, :topk] if out.raw_indices is not None else None,
++                inputs.out_raw_indices[rows, :topk],
+             )
+diff --git a/python/sglang/srt/layers/attention/dsv4/v41_indexer/scoring.py b/python/sglang/srt/layers/attention/dsv4/v41_indexer/scoring.py
+index 1cd46108fa1d8edd843978d081854686d625b5ec..06d0d75c229f5f4b3b92a0419f45a4509d9d3dfb 100644
+--- a/python/sglang/srt/layers/attention/dsv4/v41_indexer/scoring.py
++++ b/python/sglang/srt/layers/attention/dsv4/v41_indexer/scoring.py
+@@ -4,19 +4,27 @@ a selection back into pool slots."""
+ 
+ from __future__ import annotations
+ 
++import itertools
+ from typing import TYPE_CHECKING, Generator, Iterator, List, Optional, Tuple
+ 
+ import msgspec
+ import torch
+ 
+-from sglang.kernels.ops.attention.dsv4.fp4_indexer import fp4_index_logits_decode
++from sglang.kernels.ops.attention.dsv4.fp4_indexer import (
++    finish_paged_indexer_topk,
++    fp4_index_logits_decode,
++    fp4_index_logits_paged,
++)
++from sglang.kernels.ops.attention.dsv4.fp4_indexer_rope import index_q_rope_pack_weights
+ from sglang.kernels.ops.attention.dsv4.index_logits import flat_index_logits_tiles
+-
+-from .types import (
+-    DecodeInputs,
+-    PrefillInputs,
+-    Selection,
++from sglang.kernels.ops.attention.dsv4.topk import (
++    plan_topk_v2,
++    topk_transform_paged_v2,
+ )
++from sglang.srt.runtime_context import get_platform
++from sglang.srt.utils.common import async_h2d
++
++from .types import DecodeInputs, PrefillInputs
+ 
+ if TYPE_CHECKING:
+     from sglang.srt.layers.attention.dsv4.dsv41_sparse import DeepseekV41Indexer
+@@ -56,18 +64,38 @@ class DeepGEMMPrefillData(msgspec.Struct, frozen=True):
+             (self.num_rows, topk), -1, dtype=torch.int32
+         )
+ 
+-    def write_selection(self, selected: torch.Tensor, out: Selection) -> None:
++    def write_page_indices(self, inputs: PrefillInputs) -> None:
++        """The pool slots of the request-local ``inputs.out_raw_indices`` rows,
++        each row ordered ascending with the ``-1`` padding at the end (r032c:
++        the stock bit-level selection order; also applied when only the raw
++        indices are read, i.e. the sparse-prefill gate)."""
++        raw = inputs.out_raw_indices[: self.num_rows]
++        unselected = torch.iinfo(torch.int32).max
++        ordered = raw.masked_fill(raw < 0, unselected).sort(dim=-1).values
++        raw.copy_(torch.where(ordered != unselected, ordered, -1))
++        if inputs.out_page_indices is None:
++            return
++        columns = (raw + self.request_starts[:, None]).clamp_min(0)
++        inputs.out_page_indices[: self.num_rows, : raw.shape[1]] = torch.where(
++            raw >= 0, self.k_slots[columns], -1
++        )
++
++    def write_selection(self, selected: torch.Tensor, inputs: PrefillInputs) -> None:
++        """Write flattened-K columns ``selected`` into the selection buffers, each
++        row ascending with the padding at the end (r032c: restores the stock
++        79cafec0 bit-level selection order verbatim; #41659's raw write was
++        output-equivalent only -- S-FIX-W0b code-type attribution)."""
+         num_tokens, topk = selected.shape
+         unselected = torch.iinfo(torch.int32).max
+         selected = selected.masked_fill(selected < 0, unselected).sort(dim=-1).values
+         chosen = selected != unselected
+-        out.page_indices[:num_tokens, :topk] = torch.where(
+-            chosen, self.k_slots[selected.clamp_max(self.k_slots.shape[0] - 1)], -1
+-        ).to(torch.int32)
+-        if out.raw_indices is not None:
+-            out.raw_indices[:num_tokens, :topk] = torch.where(
+-                chosen, selected - self.request_starts[:, None], -1
+-            )
++        if inputs.out_page_indices is not None:
++            inputs.out_page_indices[:num_tokens, :topk] = torch.where(
++                chosen, self.k_slots[selected.clamp_max(self.k_slots.shape[0] - 1)], -1
++            ).to(torch.int32)
++        inputs.out_raw_indices[:num_tokens, :topk] = torch.where(
++            chosen, selected - self.request_starts[:, None], -1
++        )
+ 
+ 
+ def quantize_index_q(q: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+@@ -93,38 +121,42 @@ def get_index_k_cache(
+     return k_cache.view(k_cache.shape[0], page_size, 1, 68)
+ 
+ 
++def _index_q_and_weights(
++    *,
++    indexer: DeepseekV41Indexer,
++    x: torch.Tensor,
++    q_lora: torch.Tensor,
++    freqs_cis: torch.Tensor,
++    positions: torch.Tensor,
++) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
++    """fp4 index queries ``[rows, heads, 64]`` int8 with ``[rows, heads]`` packed
++    ue8m0 scales, and fp32 head weights ``[rows, heads]``."""
++    rows, heads = x.shape[0], indexer.n_local_heads
++    q, _ = indexer.wq_b(q_lora)
++    q_fp4, q_sf, weights = index_q_rope_pack_weights(
++        q.view(rows, heads, indexer.index_head_dim),
++        torch.view_as_real(freqs_cis).flatten(-2),
++        positions,
++        indexer.head_weights_raw(x),
++        indexer.head_weight_scale,
++    )
++    return q_fp4.view(rows, heads, 64), q_sf.view(rows, heads), weights
++
++
+ def get_deep_gemm_decode_data(
+     inputs: DecodeInputs, token_to_kv_pool: DeepSeekV4TokenToKVPool
+ ) -> DeepGEMMDecodeData:
+     indexer = inputs.indexer
+-    x, q_lora, pos = inputs.x, inputs.q_lora, inputs.positions
+     # The kernel sums head scores locally, so the indexer heads must be replicated.
+     assert indexer.n_local_heads == indexer.n_heads
+-    if (
+-        x.is_cuda
+-        and torch.version.cuda is not None
+-        and x.dtype == torch.bfloat16
+-        and indexer.index_head_dim == 128
+-    ):
+-        from sglang.kernels.ops.attention.dsv4.fp4_indexer_rope import (
+-            index_q_rope_pack_weights,
+-        )
+-
+-        q, _ = indexer.wq_b(q_lora)
+-        q = q.view(q.shape[0], indexer.n_local_heads, indexer.index_head_dim)
+-        # The fused pack also computes head_weights(x).float(), same rounding.
+-        q_fp4, q_sf, weights = index_q_rope_pack_weights(
+-            q,
+-            torch.view_as_real(inputs.freqs_cis).flatten(-2),
+-            pos,
+-            indexer.head_weights_raw(x),  # [bs, n_local] bf16, n32k5120
+-            indexer.head_weight_scale,
+-        )
+-    else:
+-        q = indexer.queries(q_lora, inputs.freqs_cis[pos])
+-        q_fp4, q_sf = quantize_index_q(q)
+-        weights = indexer.head_weights(x).float()  # [bs, n_local]
+-    bs = q.shape[0]
++    q_fp4, q_sf, weights = _index_q_and_weights(
++        indexer=indexer,
++        x=inputs.x,
++        q_lora=inputs.q_lora,
++        freqs_cis=inputs.freqs_cis,
++        positions=inputs.positions,
++    )
++    bs = q_fp4.shape[0]
+     q_fp4 = q_fp4.view(bs, 1, indexer.n_local_heads, 64)
+     q_sf = q_sf.view(bs, 1, indexer.n_local_heads)
+ 
+@@ -142,47 +174,44 @@ def get_deep_gemm_prefill_data(
+ ) -> Optional[DeepGEMMPrefillData]:
+     """None when the chunk has no row or no visible compressed position."""
+     ratio = inputs.compress_ratio
+-    indexer = inputs.indexer
+     pos = inputs.positions
+-    seq_lens_cpu = inputs.seq_lens_cpu
+     assert (
+-        seq_lens_cpu is not None
++        inputs.seq_lens_cpu is not None
+         and inputs.rows_per_request is not None
+         and inputs.rows_per_request_device is not None
+     ), "the DeepGEMM prefill indexer needs the CPU length vectors"
+     device = pos.device
+     # Visible compressed positions per request; (pos + 1) // ratio bounds each row.
+-    lc_per_req = [s // ratio for s in seq_lens_cpu]
+-    req_pool_indices = inputs.req_pool_indices.to(torch.int64)
+-    slot_chunks, starts, start = [], [], 0
+-    for r, lc in enumerate(lc_per_req):
+-        starts.append(start)
+-        if lc == 0:
+-            continue
+-        j = torch.arange(lc, device=device)
+-        slot_chunks.append(
+-            req_to_token[req_pool_indices[r], j * ratio].to(torch.int64) // ratio
+-        )
+-        start += lc
++    lens_per_request = [s // ratio for s in inputs.seq_lens_cpu]
++    columns = sum(lens_per_request)
+     num_tokens = pos.shape[0]
+-    if not slot_chunks or num_tokens == 0:
++    if columns == 0 or num_tokens == 0:
+         return None
+-    k_slots = torch.cat(slot_chunks)
+-    q = indexer.queries(inputs.q_lora, inputs.freqs_cis[pos])
+-    q_fp4, q_sf = quantize_index_q(q)
+-    weights = indexer.head_weights(inputs.x).float()
+-    compress_lens = ((pos + 1) // ratio).to(torch.int32)
+-    request_starts = torch.repeat_interleave(
+-        torch.tensor(starts, dtype=torch.int32, device=device),
+-        inputs.rows_per_request_device.to(torch.int64),
+-        output_size=num_tokens,
++    starts = list(itertools.accumulate(lens_per_request, initial=0))[:-1]
++    lens = async_h2d(lens_per_request, dtype=torch.int64, device=device)
++    starts_dev = async_h2d(starts, dtype=torch.int64, device=device)
++    request = torch.repeat_interleave(
++        torch.arange(len(lens_per_request), device=device), lens, output_size=columns
++    )
++    position = torch.arange(columns, device=device) - starts_dev[request]
++    pool_rows = inputs.req_pool_indices.to(torch.int64)[request]
++    q_fp4, q_sf, weights = _index_q_and_weights(
++        indexer=inputs.indexer,
++        x=inputs.x,
++        q_lora=inputs.q_lora,
++        freqs_cis=inputs.freqs_cis,
++        positions=pos,
+     )
+     return DeepGEMMPrefillData(
+-        k_slots=k_slots,
+-        request_starts=request_starts,
+-        lens_per_request=lc_per_req,
++        k_slots=req_to_token[pool_rows, position * ratio].to(torch.int64) // ratio,
++        request_starts=torch.repeat_interleave(
++            starts_dev.to(torch.int32),
++            inputs.rows_per_request_device.to(torch.int64),
++            output_size=num_tokens,
++        ),
++        lens_per_request=lens_per_request,
+         rows_per_request=inputs.rows_per_request,
+-        compress_lens=compress_lens,
++        compress_lens=((pos + 1) // ratio).to(torch.int32),
+         q_fp4=q_fp4,
+         q_sf=q_sf,
+         weights=weights,
+@@ -211,22 +240,22 @@ def dense_prefill_topk(
+     data: DeepGEMMPrefillData,
+     kv: Tuple[torch.Tensor, torch.Tensor],
+     *,
+-    topk: int,
+-) -> torch.Tensor:
+-    """Flattened-K columns, ``-1`` padded, unordered."""
++    out: torch.Tensor,
++) -> None:
++    """Request-local compressed positions into ``out``, ``-1`` padded, unordered."""
+     from sglang.kernels.ops.attention.dsv4 import topk_transform_ragged_v2
+ 
+-    selected = data.empty_selection(topk)
++    # Score columns are request-relative, so a zero offset emits request-local positions.
++    zero_offsets = torch.zeros_like(data.request_starts)
+     for tile, logits in score_tiles(data, kv, width_align=4):
+         topk_transform_ragged_v2(
+             logits,
+             data.compress_lens[tile],
+-            out_offsets=data.request_starts[tile],
+-            out_indices=selected[tile],
++            out_offsets=zero_offsets[tile],
++            out_indices=out[tile],
+         )
+         # Free this tile's logits before the generator scores the next one.
+         del logits
+-    return selected
+ 
+ 
+ # ---------- torch ----------
+@@ -263,7 +292,6 @@ class DecodeScores(msgspec.Struct, frozen=True):
+ def prefill_requests(
+     *,
+     inputs: PrefillInputs,
+-    out: Selection,
+     token_to_kv_pool: DeepSeekV4TokenToKVPool,
+     req_to_token: torch.Tensor,
+ ) -> Iterator[tuple[RequestScores, Iterator[ChunkScores]]]:
+@@ -273,7 +301,7 @@ def prefill_requests(
+     indexer = inputs.indexer
+     req, pos = inputs.req_rows, inputs.positions
+     assert req is not None, "the torch indexer needs the batch's rows"
+-    out.reset()
++    inputs.reset_outputs()
+     q = indexer.queries(inputs.q_lora, inputs.freqs_cis[pos])
+     weights = indexer.head_weights(inputs.x)
+     # A compressed position is visible once the query has passed its last token.
+@@ -320,36 +348,59 @@ def _score_chunks(
+ 
+ 
+ def write_prefill(
+-    out: Selection, request: RequestScores, chunk: ChunkScores, idx: torch.Tensor
++    inputs: PrefillInputs,
++    request: RequestScores,
++    chunk: ChunkScores,
++    idx: torch.Tensor,
+ ) -> None:
+     k, lc = request.k, request.lc
+     idx = idx.sort(dim=-1).values
+     reach = idx < chunk.lens[:, None]
+-    out.page_indices[chunk.tok, :k] = torch.where(
+-        reach, request.slots[idx.clamp_max(lc - 1)], -1
+-    ).to(torch.int32)
+-    if out.raw_indices is not None:
+-        out.raw_indices[chunk.tok, :k] = torch.where(reach, idx, -1).to(torch.int32)
++    if inputs.out_page_indices is not None:
++        inputs.out_page_indices[chunk.tok, :k] = torch.where(
++            reach, request.slots[idx.clamp_max(lc - 1)], -1
++        ).to(torch.int32)
++    inputs.out_raw_indices[chunk.tok, :k] = torch.where(reach, idx, -1).to(torch.int32)
++
++
++class PagedDecodeScores(msgspec.Struct, frozen=True):
++    """Paged decode scores with graph-stable capacity ``lmax``.
++
++    Only positions below each device-side ``lens`` are initialized. Top-k
++    consumers must respect those lengths. With ``has_candidate_mask``, masked
++    positions have -inf scores and must be discarded during selection writeback.
++    """
++
++    bs: int
++    lmax: int
++    lens: torch.Tensor
++    scores: torch.Tensor
++    req: torch.Tensor
++    req_to_token: torch.Tensor
++    ratio: int
++    plan: torch.Tensor
++    has_candidate_mask: bool
+ 
+ 
+ def decode_scores(
+     *,
+     inputs: DecodeInputs,
+-    out: Selection,
+     token_to_kv_pool: DeepSeekV4TokenToKVPool,
+     req_to_token: torch.Tensor,
+-) -> Optional[DecodeScores]:
++    candidate_mask: Optional[torch.Tensor] = None,
++) -> Optional[DecodeScores | PagedDecodeScores]:
+     """None when there is no row, or nothing visible yet."""
+     pool = token_to_kv_pool
+     ratio = inputs.compress_ratio
+     indexer = inputs.indexer
+     req, pos = inputs.req_rows, inputs.positions
+-    out.reset()
++    paged = get_platform().is_sm90
+     bs = req.shape[0]
+     assert pos.shape[0] == bs, (
+         f"decode expects one token per request, {pos.shape=} {bs=}"
+     )
+     if bs == 0:
++        inputs.reset_outputs()
+         return None
+     lens = (pos + 1) // ratio
+     metadata = inputs.paged_metadata
+@@ -357,26 +408,75 @@ def decode_scores(
+     # A capture-time length read would both synchronize and truncate replay.
+     lmax = min(metadata.max_compressed_seq_len, req_to_token.shape[1] // ratio)
+     if lmax == 0:
++        inputs.reset_outputs()
+         return None
+     q = indexer.queries(inputs.q_lora, inputs.freqs_cis[pos])
+     weights = indexer.head_weights(inputs.x)
++    table = pool.get_index_k_with_scale_buffer(inputs.layer_id)
++    if paged:
++        lens = lens.to(torch.int32)
++        # Prepare the device-side plan before scoring, away from its top-k consumer.
++        plan = plan_topk_v2(lens)
++        scores = fp4_index_logits_paged(
++            q,
++            weights,
++            req,
++            req_to_token,
++            lens,
++            table,
++            table.shape[1] // 68,
++            lmax,
++            ratio,
++            candidate_mask,
++        )
++        return PagedDecodeScores(
++            bs=bs,
++            lmax=lmax,
++            lens=lens,
++            scores=scores,
++            req=req,
++            req_to_token=req_to_token,
++            ratio=ratio,
++            plan=plan,
++            has_candidate_mask=candidate_mask is not None,
++        )
++    inputs.reset_outputs()
+     j = torch.arange(lmax, device=pos.device)
+     valid = j[None, :] < lens[:, None]
+     slots = req_to_token[req[:, None], (j * ratio)[None, :]].to(torch.int64) // ratio
+     slots = slots.masked_fill(~valid, 0)
+-    table = pool.get_index_k_with_scale_buffer(inputs.layer_id)
+     scores = fp4_index_logits_decode(
+         q, weights, slots, lens, table, table.shape[1] // 68
+     )
+     return DecodeScores(bs=bs, lmax=lmax, lens=lens, slots=slots, scores=scores)
+ 
+ 
+-def write_decode(out: Selection, d: DecodeScores, idx: torch.Tensor) -> None:
++def select_decode(
++    inputs: DecodeInputs, d: DecodeScores | PagedDecodeScores, topk: int
++) -> None:
++    k = min(topk, d.lmax)
++    if isinstance(d, PagedDecodeScores):
++        idx = torch.empty((d.bs, k), dtype=torch.int32, device=d.scores.device)
++        topk_transform_paged_v2(d.scores, d.lens, None, idx, 1, d.plan)
++        finish_paged_indexer_topk(
++            idx,
++            d.scores,
++            d.lens,
++            d.req,
++            d.req_to_token,
++            inputs.out_page_indices,
++            None,
++            d.ratio,
++            d.has_candidate_mask,
++        )
++    else:
++        write_decode(inputs, d, d.scores.topk(k, dim=-1, sorted=False).indices)
++
++
++def write_decode(inputs: DecodeInputs, d: DecodeScores, idx: torch.Tensor) -> None:
+     k = idx.shape[1]
+     idx = idx.sort(dim=-1).values
+     reach = idx < d.lens[:, None]
+-    out.page_indices[: d.bs, :k] = torch.where(
++    inputs.out_page_indices[: d.bs, :k] = torch.where(
+         reach, d.slots.gather(1, idx.clamp_max(d.lmax - 1)), -1
+     ).to(torch.int32)
+-    if out.raw_indices is not None:
+-        out.raw_indices[: d.bs, :k] = torch.where(reach, idx, -1).to(torch.int32)
+diff --git a/python/sglang/srt/layers/attention/dsv4/v41_indexer/sparse_table.py b/python/sglang/srt/layers/attention/dsv4/v41_indexer/sparse_table.py
+index c01d76f7be946a4f95c2ccfcc981de2deac98ddf..85f4947b1d02831fdf0a65c37f0851d14d00f503 100644
+--- a/python/sglang/srt/layers/attention/dsv4/v41_indexer/sparse_table.py
++++ b/python/sglang/srt/layers/attention/dsv4/v41_indexer/sparse_table.py
+@@ -30,6 +30,7 @@ from sglang.kernels.ops.attention.dsv4.topk import (
+ )
+ from sglang.srt.layers.attention.dsv4.indexer import topk_transform_paged_from_metadata
+ from sglang.srt.layers.attention.dsv4.metadata import expand_index_page_table
++from sglang.srt.utils.common import async_h2d
+ 
+ from .scoring import (
+     DeepGEMMDecodeData,
+@@ -43,7 +44,6 @@ from .types import (
+     CandidateMetadata,
+     DecodeInputs,
+     PrefillInputs,
+-    Selection,
+     get_tail_row_indices,
+ )
+ 
+@@ -73,7 +73,7 @@ class _SparsePrefillTable(_SparseTable):
+ 
+     compress_lens: torch.Tensor  # [rows] int32
+     page_table: torch.Tensor  # [rows, index pages] int32
+-    request_ids: torch.Tensor  # [rows] int32
++    request_ids: torch.Tensor  # [rows] int32 row-pair ids, see _row_pair_ids
+     q_dtype: torch.dtype
+     page_size: int  # index-K pool page size (slots)
+     rows_per_request: List[int]  # rows of each request, in row order
+@@ -118,12 +118,11 @@ class SparseTableBackend:
+         # captured graphs keep reading the buffers they saw
+         self._retired_cached_row_ids: list = []
+ 
+-    def publish_prefill(self, inputs: PrefillInputs, out: Selection):
+-        out.reset()
++    def publish_prefill(self, inputs: PrefillInputs):
++        inputs.reset_outputs()
+         data = get_deep_gemm_prefill_data(inputs, self.req_to_token)
+         if data is None:
+             return None
+-        selected = data.empty_selection(inputs.indexer.index_topk)
+         index_page_size = self.token_to_kv_pool.get_index_k_page_size(
+             inputs.compress_ratio
+         )
+@@ -140,23 +139,21 @@ class SparseTableBackend:
+             ).contiguous(),
+             index_page_size=index_page_size,
+             topk_blocks=self.topk_blocks,
+-            out_positions=selected,
++            out_positions=inputs.out_raw_indices[: data.num_rows],
+         )
+-        data.write_selection(selected=selected, out=out)
++        data.write_page_indices(inputs)
+         return table
+ 
+     def consume_prefill(
+         self,
+         inputs: PrefillInputs,
+         published: Optional[_SparsePrefillTable],
+-        out: Selection,
+     ) -> None:
+-        out.reset()
++        inputs.reset_outputs()
+         data = get_deep_gemm_prefill_data(inputs, self.req_to_token)
+         if data is None:
+             return
+         assert published is not None
+-        selected = data.empty_selection(inputs.indexer.index_topk)
+         select_prefill_table(
+             table=published,
+             data=data,
+@@ -167,16 +164,16 @@ class SparseTableBackend:
+                     inputs.compress_ratio
+                 ),
+             ),
+-            out_positions=selected,
++            out_positions=inputs.out_raw_indices[: data.num_rows],
+         )
+-        data.write_selection(selected=selected, out=out)
++        data.write_page_indices(inputs)
+ 
+-    def publish_decode(self, inputs: DecodeInputs, out: Selection):
++    def publish_decode(self, inputs: DecodeInputs):
+         data = get_deep_gemm_decode_data(inputs, self.token_to_kv_pool)
+         metadata = inputs.paged_metadata
+         seq_lens = metadata.compressed_seq_lens.reshape(-1)
+         if isinstance(metadata.deep_gemm_metadata, list):
+-            return self._publish_decode_chunked(inputs, data, seq_lens, out)
++            return self._publish_decode_chunked(inputs, data, seq_lens)
+         logits = deep_gemm_fp4_paged_mqa_logits(
+             (data.q_fp4, data.q_sf),
+             data.k_cache,
+@@ -195,10 +192,9 @@ class SparseTableBackend:
+             logits,
+             seq_lens,
+             metadata.page_table,
+-            out.page_indices,
++            inputs.out_page_indices,
+             metadata.compressed_page_size,
+             metadata.topk_metadata,
+-            out_raw_indices=out.raw_indices,
+         )
+         # per row: block count for the block top-k, sparse-row length for the consumers
+         with torch.cuda.stream(self.alt_stream):
+@@ -237,7 +233,6 @@ class SparseTableBackend:
+         inputs: DecodeInputs,
+         data: DeepGEMMDecodeData,
+         seq_lens: torch.Tensor,
+-        out: Selection,
+     ) -> _SparseTable:
+         """On the current stream, so each chunk's logits are released before the next."""
+         metadata = inputs.paged_metadata
+@@ -259,8 +254,8 @@ class SparseTableBackend:
+             topk_transform_paged_from_metadata(
+                 logits,
+                 metadata,
+-                out.page_indices,
+-                out.raw_indices,
++                inputs.out_page_indices,
++                None,
+                 rows=rows,
+                 topk_metadata=(
+                     topk_plans[chunk_idx] if topk_plans is not None else None
+@@ -304,7 +299,6 @@ class SparseTableBackend:
+         self,
+         inputs: DecodeInputs,
+         published: Optional[_SparseTable],
+-        out: Selection,
+     ) -> None:
+         assert published is not None
+         data = get_deep_gemm_decode_data(inputs, self.token_to_kv_pool)
+@@ -317,9 +311,8 @@ class SparseTableBackend:
+             published.schedule,
+             published.blocks.shape[1],
+         )
+-        assert out.raw_indices is None
+         topk_transform_sparse(
+-            logits, published.valid_lens, published.phys_blocks, out.page_indices
++            logits, published.valid_lens, published.phys_blocks, inputs.out_page_indices
+         )
+ 
+     def _get_request_ids(self, inputs: DecodeInputs, rows: int, device: torch.device):
+@@ -372,6 +365,25 @@ def _build_prefill_table(
+     )
+ 
+ 
++def _row_pair_ids(rows_per_request: List[int], *, device: torch.device) -> torch.Tensor:
++    """[rows] int32: one id per consecutive row pair of a request, never across two.
++    DeepGEMM's schedule walks back over equal ids to a row's request start once per
++    row, quadratic in a request's rows; per-pair ids bound the walk to one step.
++
++    Pairs, not larger groups, because DeepGEMM's paged scheduler has BLOCK_Q == 2:
++    the ids only have to delimit what it already groups, and its page table is
++    indexed by Q row rather than by the id value, so the ids never address anything.
++    A wider BLOCK_Q would need the pair width here to follow it."""
++    counts = async_h2d(rows_per_request, dtype=torch.int64, device=device)
++    rows = sum(rows_per_request)
++    row = torch.arange(rows, device=device)
++    request = torch.repeat_interleave(
++        torch.arange(counts.numel(), device=device), counts, output_size=rows
++    )
++    first_row = torch.cumsum(counts, 0) - counts
++    return (row - ((row - first_row[request]) & 1)).to(torch.int32)
++
++
+ # TODO(dark): support fusion of publish + topk of publish layer
+ def publish_prefill_table(
+     *,
+@@ -382,8 +394,9 @@ def publish_prefill_table(
+     topk_blocks: int,
+     out_positions: torch.Tensor,
+ ) -> _SparsePrefillTable:
+-    """The source's own top-k into ``out_positions`` and the chunk's table, from one
+-    pass over its dense scores; ``index_page_table`` is at ``index_page_size`` slots."""
++    """The source's own top-k into ``out_positions`` (request-local compressed
++    positions) and the chunk's table, from one pass over its dense scores;
++    ``index_page_table`` is at ``index_page_size`` slots."""
+     rows = data.num_rows
+     device = data.q_fp4.device
+     nblocks, valid_lens = candidate_row_lens(data.compress_lens, topk_blocks)
+@@ -395,7 +408,7 @@ def publish_prefill_table(
+         topk_transform_ragged_v2(
+             logits,
+             lens,
+-            out_offsets=data.request_starts[tile],
++            out_offsets=zero_offsets[tile],
+             out_indices=out_positions[tile],
+         )
+         # keys past a row's block count stay unset; the top-k reads a row
+@@ -411,17 +424,12 @@ def publish_prefill_table(
+             out_offsets=zero_offsets[: logits.shape[0]],
+             out_indices=blocks[tile],
+         )
+-    request_ids = torch.repeat_interleave(
+-        torch.arange(len(data.rows_per_request), dtype=torch.int32, device=device),
+-        torch.tensor(data.rows_per_request, dtype=torch.int64, device=device),
+-        output_size=rows,
+-    )
+     return _build_prefill_table(
+         blocks=blocks,
+         compress_lens=data.compress_lens,
+         page_table=index_page_table,
+         page_size=index_page_size,
+-        request_ids=request_ids,
++        request_ids=_row_pair_ids(data.rows_per_request, device=device),
+         rows_per_request=data.rows_per_request,
+         q_dtype=data.q_fp4.dtype,
+         valid_lens=valid_lens,
+@@ -446,4 +454,3 @@ def select_prefill_table(
+     )
+     # request-relative compressed positions, -1 padded
+     topk_transform_sparse(logits, table.valid_lens, table.blocks, out_positions)
+-    out_positions.add_(torch.where(out_positions >= 0, data.request_starts[:, None], 0))
+diff --git a/python/sglang/srt/layers/attention/dsv4/v41_indexer/types.py b/python/sglang/srt/layers/attention/dsv4/v41_indexer/types.py
+index 8dee611dc6243ecdf289e95c1bf0926725e10ed4..7800b366ac27cae4a27c3fa069e8ac150d8e11f9 100644
+--- a/python/sglang/srt/layers/attention/dsv4/v41_indexer/types.py
++++ b/python/sglang/srt/layers/attention/dsv4/v41_indexer/types.py
+@@ -1,4 +1,4 @@
+-"""The inputs and outputs of the V4.1 indexer backends."""
++"""The inputs of the V4.1 indexer backends, including the selection buffers they fill."""
+ 
+ from __future__ import annotations
+ 
+@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING, List, Optional, Protocol, TypeVar
+ import msgspec
+ import torch
+ 
++from sglang.srt.utils.common import async_h2d
++
+ if TYPE_CHECKING:
+     from sglang.srt.layers.attention.dsv4.dsv41_sparse import DeepseekV41Indexer
+     from sglang.srt.layers.attention.dsv4.metadata import PagedIndexerMetadata
+@@ -22,11 +24,7 @@ def get_tail_row_indices(
+     for n, t in zip(full_rows_per_request, tail_rows_per_request):
+         rows.extend(range(start + n - t, start + n))
+         start += n
+-    device = torch.device(device)
+-    if device.type != "cuda":
+-        return torch.tensor(rows, dtype=torch.int64, device=device)
+-    staged = torch.tensor(rows, dtype=torch.int64, pin_memory=True)
+-    return staged.to(device, non_blocking=True)
++    return async_h2d(rows, dtype=torch.int64, device=device)
+ 
+ 
+ class CandidateMetadata:
+@@ -34,16 +32,6 @@ class CandidateMetadata:
+         raise NotImplementedError(f"{type(self).__name__} is not a prefill publish")
+ 
+ 
+-class Selection(msgspec.Struct, frozen=True):
+-    page_indices: torch.Tensor  # index-K pool slots, ascending
+-    raw_indices: Optional[torch.Tensor]  # the same picks as compressed positions
+-
+-    def reset(self) -> None:
+-        self.page_indices.fill_(-1)
+-        if self.raw_indices is not None:
+-            self.raw_indices.fill_(-1)
+-
+-
+ class PrefillInputs(msgspec.Struct, frozen=True, kw_only=True):
+     """An eager extend: the backend projects the queries and gathers the index K."""
+ 
+@@ -68,6 +56,17 @@ class PrefillInputs(msgspec.Struct, frozen=True, kw_only=True):
+     rows_per_request: Optional[List[int]]
+     rows_per_request_device: Optional[torch.Tensor]
+ 
++    # The selection, unordered, -1 padded: [rows, topk] int32 request-local
++    # compressed positions, and the same picks as index-K pool slots, which is
++    # None when this forward's attention reads only the positions (sparse prefill).
++    out_raw_indices: torch.Tensor
++    out_page_indices: Optional[torch.Tensor]
++
++    def reset_outputs(self) -> None:
++        self.out_raw_indices.fill_(-1)
++        if self.out_page_indices is not None:
++            self.out_page_indices.fill_(-1)
++
+ 
+ class DecodeInputs(msgspec.Struct, frozen=True, kw_only=True):
+     """Decode (one row per request) or verify (one row per draft token)."""
+@@ -83,6 +82,12 @@ class DecodeInputs(msgspec.Struct, frozen=True, kw_only=True):
+     paged_metadata: PagedIndexerMetadata
+     is_verify: bool
+ 
++    # [rows, topk] int32 index-K pool slots of the selection, unordered, -1 padded.
++    out_page_indices: torch.Tensor
++
++    def reset_outputs(self) -> None:
++        self.out_page_indices.fill_(-1)
++
+ 
+ class CapturedPrefillInputs(msgspec.Struct, frozen=True, kw_only=True):
+     """An extend under the prefill graph: projected queries, paged index K."""
+@@ -92,6 +97,9 @@ class CapturedPrefillInputs(msgspec.Struct, frozen=True, kw_only=True):
+     q: torch.Tensor  # [rows, heads, 128] bf16, roped
+     weights: torch.Tensor  # [rows, heads] bf16 head weights
+     paged_metadata: PagedIndexerMetadata
++    # The selection as pool slots and as request-local compressed positions.
++    out_page_indices: torch.Tensor
++    out_raw_indices: torch.Tensor
+ 
+ 
+ Metadata = TypeVar("Metadata", bound=CandidateMetadata)
+@@ -100,30 +108,16 @@ Metadata = TypeVar("Metadata", bound=CandidateMetadata)
+ class PrefillCandidates(Protocol[Metadata]):
+     """The attention backend keeps a publish alive and hands it back unread."""
+ 
+-    def publish_prefill(
+-        self,
+-        inputs: PrefillInputs,
+-        out: Selection,
+-    ) -> Optional[Metadata]: ...
++    def publish_prefill(self, inputs: PrefillInputs) -> Optional[Metadata]: ...
+ 
+     def consume_prefill(
+-        self,
+-        inputs: PrefillInputs,
+-        published: Optional[Metadata],
+-        out: Selection,
++        self, inputs: PrefillInputs, published: Optional[Metadata]
+     ) -> None: ...
+ 
+ 
+ class DecodeCandidates(Protocol[Metadata]):
+-    def publish_decode(
+-        self,
+-        inputs: DecodeInputs,
+-        out: Selection,
+-    ) -> Optional[Metadata]: ...
++    def publish_decode(self, inputs: DecodeInputs) -> Optional[Metadata]: ...
+ 
+     def consume_decode(
+-        self,
+-        inputs: DecodeInputs,
+-        published: Optional[Metadata],
+-        out: Selection,
++        self, inputs: DecodeInputs, published: Optional[Metadata]
+     ) -> None: ...
+diff --git a/python/sglang/srt/layers/engram.py b/python/sglang/srt/layers/engram.py
+index 0cb2e953c19aa4c7f905865ef7111f966b1ae995..90e19854af5c4fef5dd2f67204cc7f4ec2a7718a 100644
+--- a/python/sglang/srt/layers/engram.py
++++ b/python/sglang/srt/layers/engram.py
+@@ -309,7 +309,13 @@ class EngramHasher(nn.Module):
+             )
+             lens = forward_batch.extend_seq_lens.to(torch.int64)
+             starts = forward_batch.extend_start_loc.to(torch.int64)
+-            row = torch.repeat_interleave(torch.arange(bs, device=device), lens)
++            lens_cpu = forward_batch.extend_seq_lens_cpu
++            row = torch.repeat_interleave(
++                torch.arange(bs, device=device),
++                lens,
++                # The host total skips the device sum's sync.
++                output_size=sum(lens_cpu) if lens_cpu is not None else None,
++            )
+             num_real = row.shape[0]
+             kmode = MODE_EXTEND
+             if forward_batch.engram_history is not None:
+diff --git a/python/sglang/srt/model_executor/model_runner_components/ngram_embedding_manager.py b/python/sglang/srt/model_executor/model_runner_components/ngram_embedding_manager.py
+index 468bda64257020d6c28bfe521304819729801ffa..f3347b334097f4f1c3f78177e487adccde37abb7 100644
+--- a/python/sglang/srt/model_executor/model_runner_components/ngram_embedding_manager.py
++++ b/python/sglang/srt/model_executor/model_runner_components/ngram_embedding_manager.py
+@@ -12,6 +12,7 @@ from sglang.srt.configs.model_config import ModelConfig
+ from sglang.srt.managers.schedule_batch import ForwardMode
+ from sglang.srt.mem_cache.memory_pool import ReqToTokenPool
+ from sglang.srt.runtime_context import get_schedule
++from sglang.srt.utils.common import async_h2d
+ 
+ if TYPE_CHECKING:
+     from sglang.srt.layers.engram import EngramHasher
+@@ -200,7 +201,8 @@ class NgramEmbeddingManager:
+             lo = max(0, start - n1)
+             ids = req.full_untruncated_fill_ids[lo:start]
+             rows.append([0] * (n1 - len(ids)) + list(ids))
+-        batch.engram_history = torch.tensor(
++        # The forward stream waits on the schedule stream, which orders this copy.
++        batch.engram_history = async_h2d(
+             rows, dtype=torch.int32, device=self.engram_hasher.history.device
+         ).view(len(rows), n1)
+ 
+diff --git a/python/sglang/srt/utils/common.py b/python/sglang/srt/utils/common.py
+index 59572210b982ada7d843211b895bec0a5cabc043..e52328fec32a743edda33ad108397c4131dc304a 100644
+--- a/python/sglang/srt/utils/common.py
++++ b/python/sglang/srt/utils/common.py
+@@ -559,6 +559,13 @@ def is_pin_memory_available(device=None) -> bool:
+     return current_platform.is_pin_memory_available(device)
+ 
+ 
++def async_h2d(args: List, *, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
++    """A host list on ``device``; staged in pinned memory so the copy is enqueued
++    on the current stream instead of synchronizing like a pageable copy."""
++    pin = is_pin_memory_available(device)
++    return torch.tensor(args, dtype=dtype, pin_memory=pin).to(device, non_blocking=pin)
++
++
+ def async_d2h(tensor: torch.Tensor) -> torch.Tensor:
+     """Enqueue a CUDA-to-pinned-host copy on the current stream."""
+     if not tensor.is_cuda:
+diff --git a/test/registered/kernels/ops/attention/test_dense_prefill_indexer.py b/test/registered/kernels/ops/attention/test_dense_prefill_indexer.py
+index 34682a239ea97aec7bc17e8b55d9212c87be5546..77df9c4670e2a66e57a719816868d94987a25091 100644
+--- a/test/registered/kernels/ops/attention/test_dense_prefill_indexer.py
++++ b/test/registered/kernels/ops/attention/test_dense_prefill_indexer.py
+@@ -81,7 +81,17 @@ def run_dense(inputs, *, publish_candidates, candidates):
+             block_size=inputs["candidate_block_size"],
+         )
+         return selected, None
+-    return scoring.dense_prefill_topk(data, inputs["kv"], topk=inputs["topk"]), None
++    # The plain top-k writes request-local positions into a -1 filled buffer;
++    # the checks compare flattened-K columns, as the CP paths return.
++    local = torch.full(
++        (data.compress_lens.shape[0], inputs["topk"]),
++        -1,
++        dtype=torch.int32,
++        device="cuda",
++    )
++    scoring.dense_prefill_topk(data, inputs["kv"], out=local)
++    starts = data.request_starts[:, None]
++    return torch.where(local >= 0, local + starts, local), None
+ 
+ 
+ def request_blocks(inputs, candidates):
+diff --git a/test/registered/kernels/ops/attention/test_dsv41_prefill_sparse_indexer.py b/test/registered/kernels/ops/attention/test_dsv41_prefill_sparse_indexer.py
+index c6ce00b12261481d046cf452e846101fd448de1d..1b61ae3b036662c6b8f10abae77f1780f04bbbf1 100644
+--- a/test/registered/kernels/ops/attention/test_dsv41_prefill_sparse_indexer.py
++++ b/test/registered/kernels/ops/attention/test_dsv41_prefill_sparse_indexer.py
+@@ -98,6 +98,86 @@ def make_case(rows, ctx, seed) -> Case:
+     return Case(dense, lens, data, (k_fp4[:width], k_sf[:width]), k_cache, page_table)
+ 
+ 
++def make_multi_case(rows_per_request, ctx, seed) -> Case:
++    """Several requests over one index-K pool, each owning its own slot range, so
++    their rows carry different request ids. `dense` is left empty: this fixture is
++    for comparing two schedules of the same rows, not against a scalar reference."""
++    torch.manual_seed(seed)
++    dev = "cuda"
++    rows = sum(rows_per_request)
++    slots = (ctx + PAGE - 1) // PAGE * PAGE
++    pages = slots // PAGE
++    n_req = len(rows_per_request)
++    k_fp4, k_sf = quantize_fp4_indexer_tensor(
++        torch.randn(slots * n_req, DIM, device=dev, dtype=torch.bfloat16), rne=True
++    )
++    k_cache = torch.cat(
++        [
++            k_fp4.view(torch.uint8).reshape(pages * n_req, PAGE * 64),
++            k_sf.view(torch.uint8).reshape(pages * n_req, PAGE * 4),
++        ],
++        1,
++    ).view(pages * n_req, PAGE, 1, 68)
++    q_fp4, q_sf = quantize_fp4_indexer_tensor(
++        torch.randn(rows * HEADS, DIM, device=dev, dtype=torch.bfloat16), rne=True
++    )
++    lens, starts, table = [], [], []
++    for r, n in enumerate(rows_per_request):
++        lens.append(torch.linspace(ctx - n + 1, ctx, n, device=dev))
++        starts.append(torch.full((n,), r * slots, device=dev))
++        table.append(
++            (torch.arange(pages, device=dev) + r * pages).expand(n, -1).contiguous()
++        )
++    cat = lambda xs, d: (
++        torch.cat(xs).to(d) if xs else torch.empty(0, device=dev, dtype=d)
++    )
++    data = DeepGEMMPrefillData(
++        k_slots=torch.arange(slots * n_req, device=dev),
++        request_starts=cat(starts, torch.int32),
++        lens_per_request=[ctx] * n_req,
++        rows_per_request=list(rows_per_request),
++        compress_lens=cat(lens, torch.int32),
++        q_fp4=q_fp4.view(rows, HEADS, 64),
++        q_sf=q_sf.view(rows, HEADS),
++        weights=torch.rand(rows, HEADS, device=dev),
++    )
++    page_table = (
++        torch.cat(table).to(torch.int32)
++        if table
++        else torch.empty(0, pages, device=dev, dtype=torch.int32)
++    )
++    return Case(
++        torch.empty(0), data.compress_lens, data, (k_fp4, k_sf), k_cache, page_table
++    )
++
++
++def retable(table, request_ids: torch.Tensor):
++    """The same rows scheduled with a different request-id vector."""
++    from sglang.srt.layers.attention.dsv4.v41_indexer.sparse_table import (
++        _build_prefill_table,
++    )
++
++    return _build_prefill_table(
++        # sort_candidate_blocks works in place; keep the source table intact.
++        blocks=table.blocks.clone(),
++        compress_lens=table.compress_lens,
++        page_table=table.page_table,
++        page_size=table.page_size,
++        request_ids=request_ids,
++        rows_per_request=table.rows_per_request,
++        q_dtype=table.q_dtype,
++        valid_lens=table.valid_lens,
++    )
++
++
++def per_request_ids(rows_per_request, device) -> torch.Tensor:
++    """The ids the schedule carried before the row-pair ones: one per request."""
++    counts = torch.tensor(rows_per_request, device=device)
++    return torch.repeat_interleave(
++        torch.arange(len(rows_per_request), device=device), counts
++    ).to(torch.int32)
++
++
+ def rows_of(data: DeepGEMMPrefillData, idx: torch.Tensor) -> DeepGEMMPrefillData:
+     """The operands of a subset of rows (one request)."""
+     return msgspec.structs.replace(
+@@ -186,6 +266,21 @@ def select_dense(blocks, case: Case):
+     )
+ 
+ 
++def logits_of(table, data: DeepGEMMPrefillData, k_cache: torch.Tensor):
++    """The paged sparse logits this table's schedule produces."""
++    from sglang.kernels.ops.attention.dsv4.index_logits import sparse_logits
++
++    rows, heads = data.q_sf.shape
++    return sparse_logits(
++        data.q_fp4.view(rows, 1, heads, 64),
++        data.q_sf.view(rows, 1, heads),
++        k_cache,
++        data.weights.to(torch.bfloat16),
++        table.schedule,
++        table.blocks.shape[1],
++    )
++
++
+ def picks(positions: torch.Tensor, row: int) -> set:
+     return set(positions[row].tolist()) - {-1}
+ 
+@@ -262,6 +357,56 @@ class TestPrefillSparseIndexer(CustomTestCase):
+             a, b = picks(full, rows - tail + r), picks(part, r)
+             self.assertGreaterEqual(len(a & b), MIN_TAIL_OVERLAP * len(a), r)
+ 
++    @torch.inference_mode()
++    def test_row_pair_ids_schedule_the_same_logits_as_per_request_ids(self):
++        """Row-pair ids only split what DeepGEMM's BLOCK_Q == 2 pairing already
++        groups, so the sparse logits are the ones per-request ids produced. Odd
++        row counts put a request boundary inside a pair; the single-row and
++        zero-row requests are the degenerate groups."""
++        for rows_per_request in ([5, 1, 4, 3], [2, 0, 7, 1]):
++            with self.subTest(rows_per_request=rows_per_request):
++                case = make_multi_case(
++                    rows_per_request, 6000, seed=len(rows_per_request)
++                )
++                table, _ = publish_sparse(case)
++                flat = retable(table, per_request_ids(rows_per_request, "cuda"))
++                a = logits_of(table, case.data, case.k_cache)
++                b = logits_of(flat, case.data, case.k_cache)
++                # Past a row's valid length the logits are an unread tail.
++                j = torch.arange(a.shape[-1], device=a.device)
++                valid = j[None, :] < table.valid_lens[:, None]
++                self.assertTrue(torch.equal(a[valid], b[valid]))
++
++    @torch.inference_mode()
++    def test_prefill_tail_starting_inside_a_pair(self):
++        """`tail()` slices the id vector instead of rebuilding it, so a tail whose
++        first row is the second of a pair leaves that row's id alone in the tail,
++        a group of one. The schedule must still carry those rows' blocks and
++        select inside them. Asserted on the selection's shape rather than its
++        overlap with the full table: the two row sets pair differently, which
++        moves boundary scores by a pick or two."""
++        rows, tail = 128, 15  # starts at row 113, the odd half of a pair
++        case = make_case(rows, 20000, seed=11)
++        table, _ = publish_sparse(case)
++        idx = torch.arange(rows - tail, rows, device="cuda")
++        sub = table.tail([tail])
++        self.assertNotEqual(
++            int(sub.request_ids[0]), int(sub.request_ids[1]), "tail starts mid-pair"
++        )
++        self.assertTrue(torch.equal(sub.blocks, table.blocks[idx]))
++        self.assertTrue(torch.equal(sub.valid_lens, table.valid_lens[idx]))
++
++        part = select_sparse(sub, rows_of(case.data, idx), case.k_cache)
++        keep = reference_blocks(case).repeat_interleave(BLOCK, dim=1)
++        for r in range(tail):
++            row = rows - tail + r
++            picked = sorted(picks(part, r))
++            self.assertEqual(len(picked), min(TOPK, int(case.lens[row])), r)
++            self.assertTrue(keep[row, picked].all(), f"row {r}: outside its blocks")
++            self.assertLess(
++                picked[-1], int(case.lens[row]), f"row {r}: past its length"
++            )
++
+     def test_block_ids_tail_does_not_sync_the_host(self):
+         """The late-layer tail of published block ids is cut on the device
+         without a host sync while earlier work is still queued."""
+diff --git a/test/registered/kernels/ops/attention/test_fp4_indexer.py b/test/registered/kernels/ops/attention/test_fp4_indexer.py
+index 10509632c624ba7f047a9be35010583527811b5a..edd355f1e2af8502da28ea91500fdb26fd64fa8b 100644
+--- a/test/registered/kernels/ops/attention/test_fp4_indexer.py
++++ b/test/registered/kernels/ops/attention/test_fp4_indexer.py
+@@ -1,6 +1,8 @@
+ from __future__ import annotations
+ 
+ import sys
++from types import SimpleNamespace
++from unittest.mock import patch
+ 
+ import pytest
+ import torch
+@@ -15,7 +17,9 @@ from sglang.kernels.ops.attention.dsv4 import (
+     fused_q_indexer_rope_hadamard_fp4_quant,
+ )
+ from sglang.kernels.ops.attention.dsv4.fp4_indexer import (
++    finish_paged_indexer_topk,
+     fp4_index_logits_decode,
++    fp4_index_logits_paged,
+     quantize_fp4_indexer_tensor,
+     store_fp4_index_k_cache,
+ )
+@@ -464,5 +468,386 @@ def test_fp4_logits_invisible_tiles_ignore_nonfinite_queries(value):
+     assert torch.isneginf(actual).all().item()
+ 
+ 
++@pytest.mark.skipif(_is_xpu, reason="Paged decode uses CUDA persistent kernels")
++@pytest.mark.parametrize(
++    "batch,ratio,width,masked",
++    [
++        (6, 1, 193, False),
++        (6, 2, 193, True),
++        (6, 1, 16385, True),
++        (6, 2, 8193, False),
++        (6, 1, 32769, False),
++        (64, 1, 32769, True),
++    ],
++)
++def test_fp4_paged_logits_replay(batch, ratio, width, masked):
++    from sglang.kernels.ops.attention.dsv4.candidate_blocks import amax_topk_blocks
++    from sglang.kernels.ops.attention.dsv4.topk import (
++        plan_topk_v2,
++        topk_transform_paged_v2,
++    )
++
++    q, weights, slots, lens, table = _make_logits_case(batch, 32, width)
++    capacity = 1048580 // ratio
++    req = torch.arange(batch, device=q.device, dtype=torch.int32)
++    req_table = torch.full(
++        (batch, capacity * ratio), -1, device=q.device, dtype=torch.int32
++    )
++    req_table[:, : width * ratio : ratio] = (slots * ratio).to(torch.int32)
++    lengths = lens.to(torch.int32)
++    candidate_mask = (
++        torch.rand(batch, capacity, device=q.device) > 0.3 if masked else None
++    )
++    k = min(512, width)
++
++    def run():
++        plan = plan_topk_v2(lengths)
++        scores = fp4_index_logits_paged(
++            q,
++            weights,
++            req,
++            req_table,
++            lengths,
++            table,
++            PAGE_SIZE,
++            capacity,
++            ratio,
++            candidate_mask,
++        )
++        indices = torch.empty((batch, k), dtype=torch.int32, device=q.device)
++        topk_transform_paged_v2(scores, lengths, None, indices, 1, plan)
++        pages = torch.empty((batch + 1, 528), dtype=torch.int32, device=q.device)[
++            :, :512
++        ]
++        raw = torch.empty_like(pages) if ratio == 1 else None
++        finish_paged_indexer_topk(
++            indices, scores, lengths, req, req_table, pages, raw, ratio, masked
++        )
++        return scores, indices, pages, raw
++
++    for _ in range(3):
++        run()
++    graph = torch.cuda.CUDAGraph()
++    with torch.cuda.graph(graph):
++        scores, indices, pages, raw = run()
++    for step, visible in enumerate([width, 0, 1, 63, 64, 65, width]):
++        lens.copy_((visible - torch.arange(batch, device=q.device)).clamp_min(0))
++        lengths.copy_(lens)
++        req.copy_(req.roll(1))
++        slots.copy_(slots.roll(step, dims=1))
++        req_table[req.long(), : width * ratio : ratio] = (slots * ratio).to(torch.int32)
++        q.neg_()
++        # Poison the unused capacity: length-aware top-k must never select it.
++        scores.fill_(torch.inf)
++        graph.replay()
++        expected = _reference_logits(q, weights, slots, lens, table)
++        if masked:
++            expected.masked_fill_(~candidate_mask[:, :width], -torch.inf)
++        visible_mask = torch.arange(width, device=q.device)[None, :] < lens[:, None]
++        torch.testing.assert_close(
++            scores[:, :width][visible_mask], expected[visible_mask], atol=0, rtol=0
++        )
++        blocks = amax_topk_blocks(scores, lengths, (lengths + 7) // 8, 2048)
++        assert (pages[batch] == -1).all().item()
++        if raw is not None:
++            assert (raw[batch] == -1).all().item()
++        for row, length in enumerate(lens.tolist()):
++            selected = indices[row][indices[row] >= 0].long()
++            assert selected.numel() == selected.unique().numel() == min(k, length)
++            assert not selected.numel() or selected.max().item() < length
++            torch.testing.assert_close(
++                expected[row, selected].sort().values,
++                expected[row, :length].topk(min(k, length)).values.sort().values,
++                atol=0,
++                rtol=0,
++            )
++            kept = (
++                selected[expected[row, selected] > -torch.inf] if masked else selected
++            )
++            kept = kept.sort().values
++            expected_pages = torch.full_like(pages[row], -1)
++            expected_pages[: kept.numel()] = slots[row, kept].to(torch.int32)
++            torch.testing.assert_close(pages[row], expected_pages, rtol=0, atol=0)
++            if raw is not None:
++                expected_raw = torch.full_like(raw[row], -1)
++                expected_raw[: kept.numel()] = kept.to(torch.int32)
++                torch.testing.assert_close(raw[row], expected_raw, rtol=0, atol=0)
++            nblocks = (length + 7) // 8
++            chosen = blocks[row][blocks[row] >= 0].long()
++            assert chosen.numel() == chosen.unique().numel() == min(2048, nblocks)
++            if nblocks:
++                assert chosen.max().item() < nblocks
++                assert nblocks - 1 in chosen.tolist()
++                padded = torch.full((nblocks * 8,), -torch.inf, device=q.device)
++                padded[:length] = expected[row, :length]
++                maxima = padded.view(-1, 8).amax(1)
++                maxima[-1] = torch.inf
++                torch.testing.assert_close(
++                    maxima[chosen].sort().values,
++                    maxima.topk(min(2048, nblocks)).values.sort().values,
++                    atol=0,
++                    rtol=0,
++                )
++
++
++@pytest.mark.skipif(
++    not torch.cuda.is_available() or torch.cuda.get_device_capability()[0] != 9,
++    reason="Hopper paged indexer dispatch",
++)
++@pytest.mark.parametrize("ratio", [1, 2])
++def test_hopper_indexer_backends_replay(ratio):
++    from sglang.srt.layers.attention.dsv4.v41_indexer import scoring
++    from sglang.srt.layers.attention.dsv4.v41_indexer.dense_blocks import (
++        DenseBlocksBackend,
++    )
++    from sglang.srt.layers.attention.dsv4.v41_indexer.full_topk import FullTopKIndexer
++    from sglang.srt.layers.attention.dsv4.v41_indexer.types import (
++        DecodeInputs,
++    )
++
++    batch, width, capacity, topk = 12, 193, 32772, 64
++    q, weights, slots, lens, table = _make_logits_case(batch, 32, width)
++    consumer_q = -q
++    req = torch.arange(batch, device=q.device, dtype=torch.int32) // 6
++    req_table = torch.full(
++        (2, capacity * ratio), -1, device=q.device, dtype=torch.int32
++    )
++    req_table[:, : width * ratio : ratio] = (slots[::6] * ratio).int()
++    positions = (lens * ratio - 1).clamp_min(0)
++    pool = SimpleNamespace(get_index_k_with_scale_buffer=lambda layer: table)
++    indexer = SimpleNamespace(
++        queries=lambda q, freqs: q, head_weights=lambda x: x, index_topk=topk
++    )
++    common = dict(
++        indexer=indexer,
++        layer_id=0,
++        compress_ratio=ratio,
++        freqs_cis=torch.zeros(width * ratio + 1, device=q.device),
++        x=weights,
++        positions=positions,
++        req_rows=req,
++        paged_metadata=SimpleNamespace(max_compressed_seq_len=capacity),
++        is_verify=True,
++    )
++    kwargs = dict(
++        token_to_kv_pool=pool, req_to_token=req_table, use_deep_gemm_prefill=False
++    )
++    full = FullTopKIndexer(**kwargs, use_deep_gemm_decode=False)
++    candidates = DenseBlocksBackend(
++        **kwargs, candidate_topk_blocks=4, candidate_block_size=8
++    )
++    outputs = [
++        SimpleNamespace(
++            page_indices=torch.empty(
++                (batch + 1, topk + 8), device=q.device, dtype=torch.int32
++            ),
++            raw_indices=None,
++        )
++        for _ in range(3)
++    ]
++    decode_inputs = [
++        DecodeInputs(
++            q_lora=q if i < 2 else consumer_q,
++            out_page_indices=out.page_indices,
++            **common,
++        )
++        for i, out in enumerate(outputs)
++    ]
++    captured_scores = []
++    captured_masks = []
++
++    def record_scores(*args, **kwargs):
++        result = fp4_index_logits_paged(*args, **kwargs)
++        captured_scores.append(result)
++        captured_masks.append(args[-1])
++        return result
++
++    def run():
++        full.topk_decode(decode_inputs[0])
++        published = candidates.publish_decode(decode_inputs[1])
++        candidates.consume_decode(decode_inputs[2], published)
++        return published
++
++    for _ in range(3):
++        run()
++    graph = torch.cuda.CUDAGraph()
++    with patch.object(scoring, "fp4_index_logits_paged", side_effect=record_scores):
++        with torch.cuda.graph(graph):
++            published = run()
++    assert (
++        len(captured_scores) == 3
++    )  # all three runtime entrypoints took the paged path
++    mask = published.decode_mask
++    assert captured_masks[:2] == [None, None]
++    assert captured_masks[2] is mask
++    for step, visible in enumerate([193, 0, 1, 7, 8, 9, 65, 193]):
++        # -1 positions exercise zero-length padded rows, also for ratio 1.
++        lens.copy_((visible - torch.arange(batch, device=q.device) % 6).clamp_min(0))
++        positions.copy_(lens * ratio - 1)
++        req.copy_(req.roll(1))
++        req_table[:, : width * ratio : ratio] = (slots[::6].roll(step, 1) * ratio).int()
++        q.neg_()
++        for scores in captured_scores:
++            scores.fill_(torch.inf)
++        for out in outputs:
++            out.page_indices.fill_(12345)
++            if out.raw_indices is not None:
++                out.raw_indices.fill_(12345)
++        graph.replay()
++        current_slots = req_table[req.long(), : width * ratio : ratio].long() // ratio
++        source_scores = _reference_logits(q, weights, current_slots, lens, table)
++        consumer_scores = _reference_logits(
++            consumer_q, weights, current_slots, lens, table
++        )
++        for row, length in enumerate(lens.tolist()):
++            blocks = published.blocks[row]
++            blocks = blocks[blocks >= 0].long()
++            nblocks = (length + 7) // 8
++            assert blocks.numel() == blocks.unique().numel() == min(4, nblocks)
++            if nblocks:
++                assert nblocks - 1 in blocks.tolist()
++                maxima = torch.full((nblocks * 8,), -torch.inf, device=q.device)
++                maxima[:length] = source_scores[row, :length]
++                maxima = maxima.view(-1, 8).amax(-1)
++                maxima[-1] = torch.inf
++                torch.testing.assert_close(
++                    maxima[blocks].sort().values,
++                    maxima.topk(min(4, nblocks)).values.sort().values,
++                )
++            keep = torch.isin(torch.arange(width, device=q.device) // 8, blocks)
++            torch.testing.assert_close(mask[row, :width], keep)
++            consumer_scores[row].masked_fill_(~keep, -torch.inf)
++            for out, scores in zip(
++                outputs, (source_scores, source_scores, consumer_scores)
++            ):
++                pages = out.page_indices[row]
++                pages = pages[pages >= 0]
++                # The shuffled request mapping is bijective within a row.
++                selected = (current_slots[row, :, None] == pages[None, :]).nonzero()[
++                    :, 0
++                ]
++                count = min(topk, int(torch.isfinite(scores[row]).sum()))
++                assert pages.numel() == selected.unique().numel() == count
++                torch.testing.assert_close(
++                    scores[row, selected].sort().values,
++                    scores[row].topk(count).values.sort().values,
++                )
++                expected_pages = torch.full_like(out.page_indices[row], -1)
++                expected_pages[:count] = current_slots[
++                    row, selected.sort().values
++                ].int()
++                torch.testing.assert_close(out.page_indices[row], expected_pages)
++                if out.raw_indices is not None:
++                    expected_raw = torch.full_like(out.raw_indices[row], -1)
++                    expected_raw[:count] = selected.sort().values.int()
++                    torch.testing.assert_close(out.raw_indices[row], expected_raw)
++        for out in outputs:
++            assert (out.page_indices[batch] == -1).all().item()
++            if out.raw_indices is not None:
++                assert (out.raw_indices[batch] == -1).all().item()
++
++
++@pytest.mark.parametrize("rows", [0, 1, 32, 129])
++@pytest.mark.parametrize("topk", [0, 1, 65, 512])
++@pytest.mark.parametrize("write_raw", [False, True])
++def test_flat_indexer_finalization_replay(rows, topk, write_raw):
++    from sglang.kernels.ops.attention.dsv4.fp4_indexer import finish_flat_indexer_topk
++
++    torch.manual_seed(81 + rows + topk)
++    indices = torch.randint(
++        0, 2048, (rows, topk + 8), device="cuda", dtype=torch.int32
++    )[:, :topk]
++    slots = torch.randperm(2048, device="cuda").to(torch.int64)
++    starts = torch.randint(0, 128, (rows,), device="cuda", dtype=torch.int32)
++    pages = torch.full((rows + 1, topk + 8), 12345, device="cuda", dtype=torch.int32)
++    raw = torch.full_like(pages, 12345) if write_raw else None
++
++    def run():
++        finish_flat_indexer_topk(indices, slots, starts, pages, raw)
++
++    for _ in range(3):
++        run()
++    graph = None
++    if rows and topk:
++        graph = torch.cuda.CUDAGraph()
++        with torch.cuda.graph(graph):
++            run()
++    for step in range(3):
++        indices.copy_(
++            torch.randint(0, 2048, indices.shape, device="cuda", dtype=torch.int32)
++        )
++        indices[:, step::7] = -1 - step
++        indices[:, 2::11] = torch.iinfo(torch.int32).max
++        if step == 1:
++            indices.fill_(-1)
++        slots.copy_(slots.roll(17))
++        starts.add_(1)
++        pages.fill_(12345)
++        if raw is not None:
++            raw.fill_(12345)
++        if graph is not None:
++            graph.replay()
++        else:
++            run()
++        sentinel = torch.iinfo(torch.int32).max
++        selected = indices.masked_fill(indices < 0, sentinel).sort(-1).values
++        chosen = selected != sentinel
++        expected_pages = torch.full_like(pages, 12345)
++        expected_pages[:rows, :topk] = torch.where(
++            chosen, slots[selected.clamp_max(slots.numel() - 1)], -1
++        ).int()
++        torch.testing.assert_close(pages, expected_pages, rtol=0, atol=0)
++        if raw is not None:
++            expected_raw = torch.full_like(raw, 12345)
++            expected_raw[:rows, :topk] = torch.where(
++                chosen, selected - starts[:, None], -1
++            )
++            torch.testing.assert_close(raw, expected_raw, rtol=0, atol=0)
++
++
++@pytest.mark.parametrize("write_raw", [False, True])
++def test_flat_indexer_slot_count_does_not_recompile(write_raw):
++    from sglang.kernels.ops.attention.dsv4.fp4_indexer import (
++        _finish_flat_indexer_topk_kernel,
++    )
++
++    rows, topk = 32, 512
++    torch.manual_seed(95)
++    indices = torch.randint(0, 8192, (rows, topk), device="cuda", dtype=torch.int32)
++    indices[:, 0] = -3
++    indices[:, 1] = torch.iinfo(torch.int32).max
++    starts = torch.arange(rows, device="cuda", dtype=torch.int32)
++    pages = torch.empty_like(indices)
++    raw = torch.empty_like(indices) if write_raw else None
++    hashes = set()
++    for num_slots in (1, 17, 64, 65, 129, 2048, 8192):
++        slots = torch.arange(num_slots, device="cuda", dtype=torch.int64) * 3 + 7
++        compiled = _finish_flat_indexer_topk_kernel[(rows,)](
++            indices,
++            slots,
++            starts,
++            pages,
++            raw,
++            topk,
++            num_slots,
++            indices.stride(0),
++            pages.stride(0),
++            raw.stride(0) if raw is not None else 0,
++            write_raw,
++            topk,
++            num_warps=4,
++        )
++        hashes.add(compiled.hash)
++        sentinel = torch.iinfo(torch.int32).max
++        selected = indices.masked_fill(indices < 0, sentinel).sort(-1).values
++        chosen = selected != sentinel
++        expected = torch.where(chosen, slots[selected.clamp_max(num_slots - 1)], -1)
++        torch.testing.assert_close(pages, expected.int(), rtol=0, atol=0)
++        if raw is not None:
++            expected_raw = torch.where(chosen, selected - starts[:, None], -1)
++            torch.testing.assert_close(raw, expected_raw, rtol=0, atol=0)
++    assert len(hashes) == 1, "Changing the visible slot count must reuse the kernel"
++
++
+ if __name__ == "__main__":
+     sys.exit(pytest.main([__file__, "-v"]))
+diff --git a/test/registered/unit/layers/test_dsv4_nonpaged_indexer.py b/test/registered/unit/layers/test_dsv4_nonpaged_indexer.py
+index d9399f2195c8ce6febde77acb011e808f183b97b..a50aacc38039835a3f559a4df4cf1ff344b52a81 100644
+--- a/test/registered/unit/layers/test_dsv4_nonpaged_indexer.py
++++ b/test/registered/unit/layers/test_dsv4_nonpaged_indexer.py
+@@ -946,6 +946,7 @@ class TestChunkedPagedDecode(CustomTestCase):
+             req_rows=torch.arange(num_rows),
+             paged_metadata=metadata,
+             is_verify=True,
++            out_page_indices=torch.full((num_rows, 4), -1, dtype=torch.int32),
+         )
+         data = DeepGEMMDecodeData(
+             q_fp4=torch.zeros((num_rows, 1, 2, 64), dtype=torch.int8),
+@@ -955,12 +956,6 @@ class TestChunkedPagedDecode(CustomTestCase):
+         )
+         return inputs, data
+ 
+-    def _selection(self):
+-        from sglang.srt.layers.attention.dsv4.v41_indexer import Selection
+-
+-        page_indices = torch.full((self.num_rows, 4), -1, dtype=torch.int32)
+-        return Selection(page_indices=page_indices, raw_indices=page_indices.clone())
+-
+     def _mocks(self):
+         width = self.width
+         deep_gemm = MagicMock(
+@@ -1023,7 +1018,7 @@ class TestChunkedPagedDecode(CustomTestCase):
+             patch.object(mod.torch.cuda, "Event", return_value=event),
+             patch.object(mod.torch.cuda, "current_stream", return_value=stream),
+         ):
+-            table = backend.publish_decode(inputs, self._selection())
++            table = backend.publish_decode(inputs)
+ 
+         self._assert_chunked_calls(deep_gemm, topk)
+         self.assertEqual(table.blocks.shape, (self.num_rows, backend.topk_blocks))
+@@ -1044,7 +1039,7 @@ class TestChunkedPagedDecode(CustomTestCase):
+             patch.object(mod, "deep_gemm_fp4_paged_mqa_logits", deep_gemm),
+             patch.object(mod, "topk_transform_paged_from_metadata", topk),
+         ):
+-            indexer.topk_decode(inputs, self._selection())
++            indexer.topk_decode(inputs)
+ 
+         self._assert_chunked_calls(deep_gemm, topk)
+ 

@@ -1,0 +1,666 @@
+"""Install storage adapter in every serving worker, only when explicitly enabled."""
+import importlib.abc
+import importlib.machinery
+import os
+import sys
+
+
+def _tp4_launcher():
+    """True inside containers launched by the TP4 stack (DSV41_LAUNCHER=tp4)."""
+    return os.environ.get('DSV41_LAUNCHER', '') == 'tp4'
+
+class EngramLoader(importlib.abc.Loader):
+    def __init__(self, original):
+        self.original = original
+
+    def create_module(self, spec):
+        return self.original.create_module(spec)
+
+    def exec_module(self, module):
+        self.original.exec_module(module)
+        if module.__name__ == 'sglang.srt.layers.engram':
+            from engram_backend import install
+            install(module)
+            # S1b (R4): compact ragged-verify x engram equal-block assert fix
+            # (A9 84tok/16x6 crash). BEFORE engram_prefetch so its gov wrapper
+            # stays outermost. Self-gated: installs only when
+            # SGLANG_RAGGED_VERIFY_MODE=compact; every other boot keeps the
+            # engine class untouched.
+            from engram_compact import install as install_engram_compact
+            install_engram_compact(module)
+            # AFTER engram_backend, whose staging layout and Work record this mirrors.
+            # EP1e: Engram rows fetched on a side stream once the hasher has the ids. Gated on
+            # DSV41_ENGRAM_PREFETCH, inactive by default; refuses to boot if the engine's engram
+            # classes or engram_backend's symbols drift.
+            from engram_prefetch import install as install_engram_prefetch
+            install_engram_prefetch(module)
+        elif module.__name__ == 'sglang.srt.layers.quantization.fp8_utils':
+            from mxfp8_b12x import install
+            install(module)
+            # AFTER b12x, so this wraps its wrapper rather than the original.
+            # Gated on DSV41_SHARED_PAD_K, inactive by default.
+            from shared_pad_k import install as install_shared_pad
+            install_shared_pad(module)
+            # EP1g: record the weight and scales of every MXFP8 dense linear call, so the prefetch
+            # plan knows what the next step will read. Gated on DSV41_L2_PREFETCH, inactive by
+            # default; the hook returns immediately unless the gate is on.
+            from l2_prefetch import install_fp8_utils
+            install_fp8_utils(module)
+        elif module.__name__ == 'sglang.srt.layers.quantization.fp8':
+            from mxfp8_b12x import install_fp8
+            install_fp8(module)
+            from shared_pad_k import install_fp8 as install_shared_pad_fp8
+            install_shared_pad_fp8(module)
+        elif module.__name__ == 'sglang.srt.model_executor.model_runner':
+            from prefill_empty_cache import install
+            install(module)
+        elif module.__name__ == 'sglang.srt.managers.scheduler':
+            # FIX-B port: idle-window empty_cache (0.2.9 prod DSV41_IDLE_RELEASE=1).
+            # Dormant unless DSV41_IDLE_RELEASE=1; wraps Scheduler.on_idle after stock.
+            from idle_release import install as install_idle_release
+            install_idle_release(module)
+        elif module.__name__ == (
+            'sglang.srt.layers.quantization.mxfp4_flashinfer_cutlass_moe'
+        ):
+            from moe_b12x import install_scale_snapshot
+            install_scale_snapshot(module)
+            # EP1: routed MoE on b12x main. Gated on DSV41_MOE_B12X_NEXT, inactive by
+            # default; refuses to boot if b12x_next's SOURCE_COMMIT or the engine methods
+            # it patches drift.
+            from moe_b12x_next import install_method
+            install_method(module)
+        elif module.__name__ == (
+            'sglang.srt.layers.moe.moe_runner.flashinfer_cutlass'
+        ):
+            from moe_b12x import install
+            install(module)
+            from moe_b12x_next import install_runner
+            install_runner(module)
+        elif module.__name__ == 'sglang.srt.models.deepseek_v4':
+            # EP1f: wo_a's fp8 twin for the 2..8-row verify/draft path (+ MID/DROP on request).
+            # Gated on DSV41_WO_A_W8, inactive by default.
+            from wo_a_w8 import install_model
+            install_model(module)
+            # C0b opt1: DSV41_SKIP_NONFINAL_DECODER=1 非末 chunk 全跳 late-layer 尾窗
+            #（128 边距守卫；0.2.9 血统，A15-DBR 之上）。默认关；拒装于锚点漂移。
+            from skip_nonfinal_decoder import install_model as install_opt1_model
+            install_opt1_model(module)
+            # EP1g: L2 prefetch (ported from knapcio @ 9df6ffe, retargeted from their RoCE one-shot
+            # collectives to this stack's NCCL ring). Brackets DeepseekV4Model.forward -- a
+            # different class from wo_a_w8's, so the two wrappers cannot hide each other.
+            # Gated on DSV41_L2_PREFETCH, inactive by default.
+            from l2_prefetch import install_model as install_l2_prefetch_model
+            install_l2_prefetch_model(module)
+            # P-SP P0: forward bracket arming the comm swap only for plain
+            # eager prefill batches (extend-without-speculative, MIN_ROWS,
+            # capture-excluded); rebinds this module's from-imported
+            # attn_tp_all_reduce defensively (L2PF dual-module lesson).
+            from prefill_sp import install_model as install_psp_model
+            install_psp_model(module)
+            # IH (B-R6): bracket DeepseekV4Model.forward so the indexer
+            # decode prefix cache lives exactly one decode/verify forward --
+            # the lifetime boundary that makes the identity cache key safe.
+            # Gated on DSV41_INDEXER_HOIST=1; every other boot untouched.
+            from indexer_hoist import install_model as install_ih_model
+            install_ih_model(module)
+            # EP1o: mark target-verify forwards for the dead-row expert remap
+            # (adapter/verify_cap.py, knapcio lineage). Gated on DSV41_VERIFY_CAP.
+            if os.environ.get('DSV41_VERIFY_CAP', '').strip() not in ('', '0', 'off'):
+                from verify_cap import install_model as install_verify_cap_model
+                install_verify_cap_model(module)
+            # F6 件3 cert_head (adapter/lm_cert.py; knapcio cert_head.py 判别式移植,
+            # d7-dev/cert_head_port.py 评审件): Hook 1 -- load_weights 后建 MXINT8 筛幕表.
+            # 分支末位=最后装=outermost wrap => 建表读到 wo_a_w8 装载后的最终权重;
+            # is_nextn=True draft 装载不触发(件内自守). Gated on DSV41_CERT_HEAD.
+            if os.environ.get('DSV41_CERT_HEAD', '').strip().lower() not in (
+                    '', '0', 'off', 'false', 'no'):
+                from lm_cert import install_model as install_lm_cert_model
+                install_lm_cert_model(module)
+        elif module.__name__ == 'sglang.srt.layers.logits_processor':
+            # F6 件3 cert_head Hook 2 -- _get_logits 标记 target-verify +
+            # _compute_lm_head 伺服认证筛幕 (fail-closed; PORT DELTA a: LogitsMetadata).
+            # exec 时装(与 l2pf_attn 同律: from-import 消费者在模块 exec 完即绑名字);
+            # 白名单行见 EngramFinder.find_spec (评审 F-1: 漏加则本分支永不触发).
+            if os.environ.get('DSV41_CERT_HEAD', '').strip().lower() not in (
+                    '', '0', 'off', 'false', 'no'):
+                from lm_cert import install_logits as install_lm_cert_logits
+                install_lm_cert_logits(module)
+        elif module.__name__ == 'sglang.srt.distributed.communication_op':
+            # EP1g: the NCCL all-reduce / all-gather entry points the prefetch rides on.
+            # Gated on DSV41_L2_PREFETCH, inactive by default.
+            from l2_prefetch import install_collectives
+            install_collectives(module)
+            # P-SP P0 (P-PREFILL-GROUP-DESIGN 20261001): prefill comm swap --
+            # the plain TP-AR leaves become reduce-scatter+all-gather inside an
+            # armed prefill bracket (byte-neutral, first-call bit-checked per
+            # site/dtype/size-bucket). Self-gated on DSV41_PREFILL_SP=comm;
+            # every other boot keeps the engine functions untouched. Installed
+            # AFTER l2_prefetch so its decode/verify windows keep their
+            # collective numbering on non-prefill forwards.
+            from prefill_sp import install_communication_op as install_psp_comm
+            install_psp_comm(module)
+        elif module.__name__ == 'sglang.srt.layers.communicator':
+            # EP1g: the attention / MoE TP collective helpers live here too; both are hooked, or
+            # the windows the plan was built from would not all exist at replay time.
+            from l2_prefetch import install_collectives
+            install_collectives(module)
+        elif module.__name__ == 'sglang.srt.layers.dp_attention':
+            # EP1g-#3 (KNAPCIO-RECON 9817936): L2PF 第二缝 -- 注意力 AR 面。main 注意力
+            # AR 不走 communicator/communication_op（=MoE 面），而是本模块 :1142 的
+            # attn_tp_all_reduce -> GroupCoordinator.all_reduce。挂点必须在 exec 时装：
+            # deepseek_v4.py:88 的 from-import 在模块 exec 完即绑定名字。门：
+            # DSV41_L2PF_ATTN=1 叠在 DSV41_L2_PREFETCH=1 之上，缺省不装（向后兼容）。
+            from l2pf_attn import install_dp_attention
+            install_dp_attention(module)
+            # P-SP P0: the attention-TP AR leaf (deepseek_v4.py:2531/2565 and
+            # the vocab-embedding attn face ride it). Same gate and fail-closed
+            # seam law as the communication_op wraps above.
+            from prefill_sp import install_dp_attention as install_psp_dpa
+            install_psp_dpa(module)
+        elif module.__name__ == 'sglang.kernels.ops.gemm.tiny_gemm':
+            # EP1g: record the bf16 router weight, read right after the post-attention all-reduce.
+            from l2_prefetch import install_router
+            install_router(module)
+        elif module.__name__ in ('b12x.comm.roce.roce_oneshot',
+                                 'b12x.comm.roce_ring.roce_oneshot'):
+            # EP1j: the RoCEnante counterpart of install_collectives (SGLANG_ROCE_ALLREDUCE=1
+            # arms route the collectives through b12x). Gate read at import time, same as above;
+            # the NCCL arms never import these modules, so the two hooks never share a boot.
+            from l2_prefetch import install_roce
+            install_roce(module)
+        elif module.__name__ == 'sglang.srt.distributed.device_communicators.pynccl':
+            # I14-A (C1): RoCEnante TP all-reduce face on stock main-79cafec0 -- the fork
+            # pynccl.py RoCE delta as import-time wraps: b12x runtime init at communicator
+            # construction (before any graph capture), all_reduce/outplace_all_reduce dual
+            # routing, synchronize_and_check_roce exported for the I14-C scheduler wiring.
+            # Installed BEFORE roce_gather: its __init__ wrap reads self.roce in post-init
+            # and this adapter is what creates it (last installed runs outermost). Refuses
+            # with a banner unless TP_SIZE=4; inert when either key is unset.
+            if (os.environ.get('DSV41_ROCE_RING', '0').strip() == '1'
+                    and os.environ.get('SGLANG_ROCE_ALLREDUCE', '0').strip() == '1'):
+                from roce_ar import install as install_roce_ar
+                install_roce_ar(module)
+            # EP1j: route small TP all-gathers (draft logits / markov) through the one-shot
+            # kernel. Gated on DSV41_ROCE_GATHER=<max bytes per rank>; on NCCL arms the mounted
+            # pynccl never sets self.roce, so install() is inert there.
+            if os.environ.get('DSV41_ROCE_GATHER', '0').strip() not in ('', '0'):
+                from roce_gather import install as install_roce_gather
+                install_roce_gather(module)
+        elif module.__name__ == 'sglang.srt.distributed.parallel_state':
+            # I14-A (C1): GroupCoordinator face -- records group_name while the coordinator
+            # builds (fork: roce_enabled=(group_name == "tp")) and opens the b12x capture
+            # context around graph_capture's yield, inside the pynccl/pymscclpp
+            # change_state contexts (fork: maybe_roce_context). Inert on NCCL arms.
+            if (os.environ.get('DSV41_ROCE_RING', '0').strip() == '1'
+                    and os.environ.get('SGLANG_ROCE_ALLREDUCE', '0').strip() == '1'):
+                from roce_ar import install_parallel_state as install_roce_ar_ps
+                install_roce_ar_ps(module)
+        elif module.__name__ == 'sglang.srt.layers.linear':
+            # EP1f: column-split of ReplicatedLinear layers over the TP group (bit-exact or off).
+            # Gated on DSV41_REPLICATED_SPLIT=<suffix list>, inactive by default.
+            from replicated_split import install as install_replicated_split
+            install_replicated_split(module)
+        elif module.__name__ == 'sglang.srt.managers.schedule_batch':
+            # EP1f: degenerate-loop stop on Req.update_finish_state. Gated on DSV41_LOOP_ABORT,
+            # inactive by default here (the community profile defaults it on).
+            from loop_abort import install as install_loop_abort
+            install_loop_abort(module)
+        elif module.__name__ == (
+            'sglang.srt.speculative.dspark_components.dspark_verify'
+        ):
+            # EP1h: per-step rank-0 broadcast drop / merge / audit (adapter/spec_sync_free.py).
+            # First in this branch so the merge source check reads the engine's own _accept.
+            # Gated on DSV41_SPEC_SYNC_FREE, inactive by default.
+            from spec_sync_free import install_verify as install_spec_sync_free_verify
+            install_spec_sync_free_verify(module)
+            # EP1f: fold the verify results off the persistent buffers the next replay overwrites
+            # (sglang#40919). Gated on DSV41_FOLDED_FENCE, inactive by default.
+            from folded_result_fence import install as install_folded_fence
+            install_folded_fence(module)
+            # EP1o: per-request verify length through the acceptance cutoff.
+            if os.environ.get('DSV41_VERIFY_CAP', '').strip() not in ('', '0', 'off'):
+                from verify_cap import install_verify as install_verify_cap_verify
+                install_verify_cap_verify(module)
+            # F6 件3 cert_head Hook 3 -- run_non_compact 前 step_armed+set_flag(1)
+            # +set_stop; run_compact/run_idle_participation 置 0(全量 exact). 分支末位
+            # =outermost=flag 先于链上一切 wrap 置位(设计: forward 启动前 host 写).
+            if os.environ.get('DSV41_CERT_HEAD', '').strip().lower() not in (
+                    '', '0', 'off', 'false', 'no'):
+                from lm_cert import install_verify as install_lm_cert_verify
+                install_lm_cert_verify(module)
+        elif module.__name__ == (
+            'sglang.srt.speculative.dspark_components.dspark_draft_sampler'
+        ):
+            # EP1h: rank-invariant draft noise (gated on DSV41_SPEC_SYNC_FREE), then eager_glue's
+            # stage cache (gated on DSV41_EAGER_GLUE). eager_glue installs LAST so its wrapper is
+            # the outermost stage_sampling_params -- a hit skips the whole chain, draft_tau's
+            # multiply and spec_sync_free's audit tick included (it re-ticks on the hit path).
+            from spec_sync_free import install_sampler as install_spec_sync_free_sampler
+            install_spec_sync_free_sampler(module)
+            # P1a-3 (doc88 kernel-diff): draft proposal temperature. Unset or 1 = off; value =
+            # tau. Exact for any q (output distribution unchanged, only acceptance moves);
+            # folded sampler only, greedy rows stay argmax. Before eager_glue so a hit skips it.
+            if os.environ.get('DSV41_DRAFT_TAU', '1').strip() not in ('', '1', '1.0'):
+                from draft_tau import install as install_draft_tau
+                install_draft_tau(module)
+            from eager_glue import install_sampler as install_eager_glue_sampler
+            install_eager_glue_sampler(module)
+        elif module.__name__ == (
+            'sglang.srt.speculative.dspark_components.dspark_verify_prune'
+        ):
+            # EP1h: THIS STACK's vcap site is note_confidence's unconditional live-length
+            # broadcast (dspark_verify_prune.py:494). The hook installs a lazy proxy into
+            # _state['tp_group']; it does nothing unless vcap is skipped or audited, and it
+            # raises if the engine already resolved its group (install-too-late = wrong wrap).
+            from spec_sync_free import install_verify_prune as install_spec_sync_free_vp
+            install_spec_sync_free_vp(module)
+        elif module.__name__ == 'sglang.kernels.ops.moe.moe_fused_gate':
+            # EP1o: dead verify rows route to the anchor row's experts -- a remap after
+            # the router, or folded into it under DSV41_ROUTER_LIVE (one launch fewer
+            # per layer). Gated on DSV41_VERIFY_CAP.
+            if os.environ.get('DSV41_VERIFY_CAP', '').strip() not in ('', '0', 'off'):
+                from verify_cap import install_gate as install_verify_cap_gate
+                install_verify_cap_gate(module)
+        elif module.__name__ == (
+            'sglang.srt.speculative.dspark_components.dspark_draft'
+        ):
+            # EP1o: per-step folded-replay note for the vcap glue.
+            if os.environ.get('DSV41_VERIFY_CAP', '').strip() not in ('', '0', 'off'):
+                from verify_cap import install_draft as install_verify_cap_draft
+                install_verify_cap_draft(module)
+            if os.environ.get('DSV41_EAGER_GLUE', '').strip() not in ('', '0', 'off', 'false'):
+                from eager_glue import install_draft as install_eager_glue_draft
+                install_eager_glue_draft(module)
+        elif module.__name__ == (
+            'sglang.srt.speculative.dspark_components.dspark_planner'
+        ):
+            # EP1o: verify-cap aware planning sizes.
+            if os.environ.get('DSV41_VERIFY_CAP', '').strip() not in ('', '0', 'off'):
+                from verify_cap import install_planner as install_verify_cap_planner
+                install_verify_cap_planner(module)
+        elif module.__name__ == (
+            'sglang.srt.layers.attention.deepseek_v4_backend'
+        ):
+            # EP1q: prefill dense-indexer TP row split (doc60; adapter/
+            # spark_prefill_split.py). Self-gated on DSV41_SPARK_PREFILL_TP_SPLIT
+            # (A11 proposal state); refuses to boot without DSV41_IDX_PROTOCOL=1.
+            from spark_prefill_split import install as install_prefill_split
+            install_prefill_split(module)
+            # C0b opt1 backend 半：init_forward_metadata 换 opt1-aware 版（stamp
+            # late_layer_tail_skip；尾元数据仍建，model :4426 无条件读 late_layer_tail）。
+            from skip_nonfinal_decoder import install_backend as install_opt1_backend
+            install_opt1_backend(module)
+            # S1b (R4) landmine 2: rebind this module's from-imported
+            # token_req_indices (dsv41_sparse.py:65 dual-module trap) to the
+            # compact wrap. Self-gated on SGLANG_RAGGED_VERIFY_MODE=compact;
+            # every other boot keeps the engine binding byte-identical.
+            from token_req_compact import install_backend as install_trc_backend
+            install_trc_backend(module)
+        elif module.__name__ == (
+            'sglang.srt.layers.attention.dsv4.dsv41_sparse'
+        ):
+            # S1b (R4) landmine 2: compact ragged-verify x token_req_indices
+            # equal-block crash (A9R 84!=96 at graph capture). Wraps the
+            # DEFINING module; the backend branch above rebinds its from-import.
+            # Self-gated on SGLANG_RAGGED_VERIFY_MODE=compact; refuses to boot
+            # on seam drift (fail-closed, same law as engram_compact).
+            from token_req_compact import install_sparse as install_trc_sparse
+            install_trc_sparse(module)
+        elif module.__name__ == 'sglang.srt.models.deepseek_v4_dspark':
+            # EP1o: conf: policies build the draft confidence head (engine only builds
+            # it in ragged-verify modes). verify_cap_static below gates on a DIFFERENT
+            # key (DSV41_VERIFY_PRUNE) so the two cannot both arm.
+            if os.environ.get('DSV41_VERIFY_CAP', '').strip().startswith('conf:'):
+                from verify_cap import install_dspark as install_verify_cap_dspark
+                install_verify_cap_dspark(module)
+            from verify_cap_static import install
+            install(module)
+            from wo_a_w8 import install_dspark as install_wo_a_w8_dspark
+            install_wo_a_w8_dspark(module)
+            # P1a-1 (doc88 kernel-diff): DSV41_DRAFT_HEAD_FP8_IMPL=tp4 selects the batch-sized
+            # row tiles of draft_head_fp8_tp4.py -- the base file's 16-row tiles re-read the
+            # whole fp8 head per tile, a net self-harm at c8-c12 (M=17-64, +0.46..1.27ms/step).
+            if _tp4_launcher() and os.environ.get('DSV41_DRAFT_HEAD_FP8_IMPL', '').strip() == 'tp4':
+                from draft_head_fp8_tp4 import install as install_draft_head_fp8
+            else:
+                from draft_head_fp8 import install as install_draft_head_fp8
+            install_draft_head_fp8(module)
+            from draft_main_proj import install as install_draft_main_proj
+            install_draft_main_proj(module)
+        elif module.__name__ == 'sglang.srt.models.dspark':
+            from verify_cap_static import install
+            install(module)
+        elif module.__name__ == 'sglang.kernels.ops.layernorm.mhc':
+            # P1a-2 (doc88 kernel-diff): prefill-size hc mix stats in one K walk, bit-identical
+            # to the stock split-K + reduce; first fused call runs stock alongside and falls
+            # back loudly on any bit difference. Engine-source sha256 pins inside the adapter.
+            if os.environ.get('DSV41_HC_FUSED', '0').strip() not in ('0', '', 'off', 'false'):
+                from hc_fused import install as install_hc_fused
+                install_hc_fused(module)
+        elif module.__name__ in (
+            'sglang.srt.mem_cache.deepseek_v4_memory_pool',
+            'sglang.srt.mem_cache.kv_cache_configurator',
+            'sglang.srt.model_executor.pool_configurator',
+            'sglang.kernels.ops.attention.flash_mla_sm120',
+        ):
+            # L10 (fp4-KV port): the four seams of adapter/kv_fp4.py -- layout
+            # selectors, configurator rebinding, pool accounting at V41_FP4
+            # bytes, and the SM120 repack bridge. Gated on DSV41_FP4KV_PORT
+            # (off by default); dispatch by module name is inside kv_fp4, and
+            # each installer self-orders via _ensure_memory_pool_patched.
+            from kv_fp4 import install as install_kv_fp4
+            install_kv_fp4(module)
+        elif module.__name__ == 'sglang.srt.layers.deep_gemm_wrapper.configurer':
+            # L10-r4: main's sparse-MQA logits gate is sm100-only (DEEPGEMM_BLACKWELL);
+            # GB10 is SM121 where the kernels exist (DeepGEMM#324 probe in the same
+            # module). Extends exactly that one symbol; BLACKWELL stays untouched.
+            # Gated on DSV41_DG_SPARSE_SM121, off by default.
+            from deep_gemm_sm121 import install as install_dg_sm121
+            install_dg_sm121(module)
+        elif module.__name__ == (
+            'sglang.srt.layers.attention.dsv4.v41_indexer'
+        ):
+            # G3 (2026-09-30): sparse-pair capability probe at make_candidate_indexer
+            # (refuse -> DenseBlocksBackend pair = paper-approx candidate semantics).
+            # Sparse wiring inert without DSV41_DG_SPARSE_SM121.
+            from sparse_wire import install_v41_indexer
+            install_v41_indexer(module)
+            # R1 (2026-10-03 FIRE-CARD §1.1; recert 2026-10-04): gather consume
+            # seam, same anchor as sparse_wire, installed AFTER it (orig pair ->
+            # DenseBlocks pair -> _ConsumesAs gather consume face). Key off =
+            # zero load, no heavy imports (fail-closed).
+            from seam_mount import install as install_r1_seam
+            install_r1_seam(module)
+        elif module.__name__ == (
+            'sglang.kernels.ops.attention.dsv4.index_logits'
+        ):
+            # G3: T*L budget gate at the dense paged scoring choke point.
+            # ALWAYS-ON per 2026-09-30 user ruling (default 2.0e8 elems; the
+            # 13:26 four-node incident mechanism); DSV41_TL_BUDGET_ELEMS=off disarms.
+            from sparse_wire import install_index_logits
+            install_index_logits(module)
+        elif module.__name__ == (
+            'sglang.srt.layers.attention.dsv4.v41_indexer.sparse_table'
+        ):
+            # G3 break #2: non-chunked publish_decode via from_metadata (v1/v2).
+            from sparse_wire import install_sparse_table
+            install_sparse_table(module)
+        elif module.__name__ == (
+            'sglang.srt.layers.attention.dsv4.v41_indexer.full_topk'
+        ):
+            # G3 break #3: topk_decode deep_gemm_metadata None guard -> _torch_decode.
+            from sparse_wire import install_full_topk
+            install_full_topk(module)
+        elif module.__name__ == (
+            'sglang.srt.layers.attention.dsv4.v41_indexer.scoring'
+        ):
+            # Point-3 (2026-09-30): fork combat key DSV41_DENSE_INDEXER_LOGITS_
+            # BUDGET_BYTES wired onto the main-tree row-chunk budgets
+            # (_DEEP_GEMM 2GiB / _TORCH 1GiB stock -> 128MiB fork 定板).
+            # ALWAYS-ON, same ruling as the T×L gate; =off restores stock.
+            from sparse_wire import install_scoring
+            install_scoring(module)
+            # IH (B-R6, C8 深析): decode_scores 每步层不变前缀上提（8x -> 2x/步）
+            # + int32 slots 瘦身；与上行 sparse_wire 的预算常量互不相交。
+            # 门 DSV41_INDEXER_HOIST=1；首调 eager 对拍，失配永久回退。
+            from indexer_hoist import install_scoring as install_ih_scoring
+            install_ih_scoring(module)
+        elif module.__name__ == (
+            'sglang.srt.managers.tokenizer_manager'
+        ):
+            # INCIDENT-15:17: request-level dense T×L admission gate (always-on,
+            # same law/key as sparse_wire budget gate; >~48K inputs rejected
+            # through the battle-tested ValueError -> HTTP 400 path).
+            from admission_gate import install as install_admission_gate
+            install_admission_gate(module)
+            # knapcio v2.3 A1 移植：decoder SWA bounded replay 下的 prompt-logprob/
+            # full-hidden 请求 400 守卫（堵 main deepseek_v4.py:4359 scheduler 内
+            # ValueError 四 rank 团灭）。check() 以 features flag 为门——现行 boot
+            # 未武装 bounded replay 时是死安全件；P1 卡武装 flag 即自动激活。
+            from replay_guard import install as install_replay_guard
+            install_replay_guard(module)
+            # R1 (2026-10-03 FIRE-CARD §1.2; recert 2026-10-04): form-aware
+            # admission arming. Importing the real v41_indexer HERE fires the
+            # finder's seam branch in THIS process (head main process only --
+            # http_server.py:2891 keeps HTTP server/Engine/TokenizerManager in
+            # one process; scheduler/detokenizer never import tokenizer_manager)
+            # = in-process install + capability probe. Any exception = REFUSED
+            # banner + stock gate intact (fail-closed).
+            if os.environ.get('DSV41_SPARSE_LOCAL_ADMISSION', '').strip().lower() in ('1', 'true', 'yes', 'on'):
+                try:
+                    import sys as _r1_sys
+                    import sglang.srt.layers.attention.dsv4.v41_indexer as _r1_vi  # noqa: F401
+                    import seam_mount as _r1_sm
+                    import admission_r1 as _r1_ar
+                    _r1_ar.install(_r1_sys.modules.get('admission_gate'), _r1_sm.engaged)
+                    print(f'[sparse_local_admission] arm decision: {_r1_ar.evaluate(_r1_sm.engaged)}', flush=True)
+                except Exception as _r1_exc:
+                    print(f'[sparse_local_admission] REFUSED -> stock admission gate intact. why: {type(_r1_exc).__name__}: {_r1_exc}', flush=True)
+        elif module.__name__ == (
+            'sglang.srt.mem_cache.deepseek_v4_memory_pool'
+        ):
+            # G3 break #1b: pin indexer page 64 (SM121 iron law) via memory_pool
+            # anchor; inert without DSV41_DG_SPARSE_SM121.
+            from sparse_wire import install_memory_pool
+            install_memory_pool(module)
+        elif module.__name__ == (
+            'sglang.srt.layers.attention.dsv4.metadata'
+        ):
+            # IH (B-R6, C8 深析): expand_index_page_table int32 瘦身（消 int64
+            # 往返 = census #132/#137）。下方 post_init 补丁原本由 final-else
+            # 服务于本模块，逐字保留（elif 接管后行为不变）。
+            from indexer_hoist import install_metadata as install_ih_metadata
+            install_ih_metadata(module)
+            # V4.1 ratio-1/2 indexers always call the FP4 DeepGEMM kernel.
+            # SM120 needs its split-128 planner even when the legacy FP8
+            # indexer uses the torch path. The upstream guard misses this case.
+            # L10-r7: that force is fork-era (dense-planner world). When main's
+            # sparse logits gate is open (dg_sm121) the native flow owns the
+            # planner with its own 128-page geometry -- forcing here misroutes
+            # decode metadata into the dense builder (assert block_kv==64) and
+            # breaks the paged-v2 topk. Step aside in the sparse world.
+            cls = module.PagedIndexerMetadata
+            original = cls.__post_init__
+            def post_init(self):
+                sm12 = bool(getattr(module, '_IS_SM120', False) or
+                            getattr(module, '_IS_SM121', False))
+                if sm12 and self.compress_ratio in (1, 2):
+                    from sglang.srt.layers.deep_gemm_wrapper.configurer import (
+                        DEEPGEMM_PAGED_SPARSE_MQA_LOGITS as _sparse_on,
+                    )
+                    if not _sparse_on:
+                        self.force_deep_gemm_metadata = True
+                original(self)
+            cls.__post_init__ = post_init
+
+class EngramFinder(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname not in ('sglang.srt.layers.engram',
+                            'sglang.srt.layers.quantization.fp8_utils',
+                            'sglang.srt.layers.linear',
+                            'sglang.srt.managers.schedule_batch',
+                            'sglang.srt.models.deepseek_v4',
+                            'sglang.srt.layers.logits_processor',
+                            'sglang.srt.distributed.communication_op',
+                            'sglang.srt.layers.communicator',
+                            'sglang.srt.layers.dp_attention',
+                            'sglang.kernels.ops.gemm.tiny_gemm',
+                            'sglang.srt.speculative.dspark_components.dspark_verify',
+                            'sglang.srt.speculative.dspark_components.dspark_draft_sampler',
+                            'sglang.srt.speculative.dspark_components.dspark_verify_prune',
+                            'sglang.srt.layers.quantization.fp8',
+                            'sglang.srt.model_executor.model_runner',
+                            'sglang.srt.layers.attention.dsv4.metadata',
+                            'sglang.srt.layers.quantization.'
+                            'mxfp4_flashinfer_cutlass_moe',
+                            'sglang.srt.layers.moe.moe_runner.'
+                            'flashinfer_cutlass',
+                            'sglang.srt.models.deepseek_v4_dspark',
+                            'sglang.srt.models.dspark',
+                            'b12x.comm.roce.roce_oneshot',
+                            'b12x.comm.roce_ring.roce_oneshot',
+                            'sglang.srt.distributed.device_communicators.pynccl',
+                            'sglang.srt.distributed.parallel_state',
+                            'sglang.srt.layers.attention.dsv4.v41_indexer',
+                            'sglang.kernels.ops.attention.dsv4.index_logits',
+                            'sglang.srt.layers.attention.dsv4.v41_indexer.sparse_table',
+                            'sglang.srt.layers.attention.dsv4.v41_indexer.full_topk',
+                            'sglang.srt.layers.attention.dsv4.v41_indexer.index_logits',
+                            'sglang.srt.layers.attention.dsv4.v41_indexer.scoring',
+                            'sglang.srt.managers.tokenizer_manager',
+                            'sglang.srt.managers.scheduler',
+                            'sglang.kernels.ops.moe.moe_fused_gate',
+                            'sglang.srt.speculative.dspark_components.dspark_draft',
+                            'sglang.srt.speculative.dspark_components.dspark_planner',
+                            'sglang.srt.layers.attention.deepseek_v4_backend',
+                            'sglang.srt.layers.attention.dsv4.dsv41_sparse',
+                            'sglang.kernels.ops.layernorm.mhc',
+                            'sglang.srt.mem_cache.deepseek_v4_memory_pool',
+                            'sglang.srt.mem_cache.kv_cache_configurator',
+                            'sglang.srt.model_executor.pool_configurator',
+                            'sglang.kernels.ops.attention.flash_mla_sm120',
+                            'sglang.srt.layers.deep_gemm_wrapper.configurer'):
+            return None
+        spec = importlib.machinery.PathFinder.find_spec(fullname, path)
+        if spec is not None:
+            spec.loader = EngramLoader(spec.loader)
+        return spec
+
+# Two adapters patch the same engine surface: Mxfp4FlashinferCutlassMoEMethod's
+# create_weights / process_weights_after_loading, and FusedOpPool[("none", "flashinfer_mxfp4")].
+# moe_b12x_next refuses to run beside MOE_SM12X/MOE_PAD but says nothing about MOE_B12X, which
+# is what production runs -- so with both gates on, two wrappers stack on the same methods and
+# which one wins depends on install order. Fail loudly instead of guessing.
+_on = lambda k: os.environ.get(k, '').strip().lower() not in ('', '0', 'off', 'false')
+if _on('DSV41_MOE_B12X') and _on('DSV41_MOE_B12X_NEXT'):
+    raise RuntimeError(
+        'DSV41_MOE_B12X and DSV41_MOE_B12X_NEXT both patch the MoE methods of '
+        'Mxfp4FlashinferCutlassMoEMethod and the same FusedOpPool key; enable exactly one. '
+        'The EP1 arm is DSV41_MOE_B12X=0 DSV41_MOE_B12X_NEXT=1.')
+
+if os.environ.get('DSV41_SOURCE'):
+    # EP1d. Unguarded on purpose: this adapter carries the only fix that makes a conf: verify
+    # policy do anything in static mode, so a container that cannot import it must not start --
+    # the alternative failure mode is an arm that reports nothing and looks like a no-op result.
+    import verify_cap_static
+    print(f'[verify-cap-static] {verify_cap_static.summary()}', flush=True)
+    import engram_prefetch
+    print(f'[engram-prefetch] {engram_prefetch.summary()}', flush=True)
+    # EP1f. Unguarded imports on purpose, like EP1d/EP1e: a container whose engines cannot import
+    # an adapter must not start, because the failure mode is otherwise an arm that reports nothing
+    # and looks like a no-op measurement.
+    import wo_a_w8
+    print(f'[wo_a_w8] {wo_a_w8.summary()}', flush=True)
+    import replicated_split
+    print(f'[replicated_split] {replicated_split.summary()}', flush=True)
+    import draft_head_fp8
+    print(f'[draft_head_fp8] {draft_head_fp8.summary()}', flush=True)
+    import draft_main_proj
+    print(f'[draft_main_proj] {draft_main_proj.summary()}', flush=True)
+    import folded_result_fence
+    print(f'[folded_fence] {folded_result_fence.summary()}', flush=True)
+    import loop_abort
+    print(f'[loop_abort] {loop_abort.summary()}', flush=True)
+    # P1a (doc88 kernel-diff): the three ports' gates from the banner -- "off" is tellable from
+    # "on but silent"; tau additionally needs the folded sampler (SGLANG_DSPARK_FOLDED_SAMPLING),
+    # stated here so a silent no-op cannot hide (doc88 §E warning).
+    import draft_head_fp8_tp4
+    print(f'[draft_head_fp8_tp4] impl={os.environ.get("DSV41_DRAFT_HEAD_FP8_IMPL", "(base)")} '
+          f'launcher_tp4={_tp4_launcher()} max_m={draft_head_fp8_tp4.MAX_M}', flush=True)
+    import hc_fused
+    print(f'[hc_fused] gate={os.environ.get("DSV41_HC_FUSED", "(unset)")} '
+          f'min_rows={hc_fused.MIN_ROWS} triton_pin={hc_fused._TRITON}', flush=True)
+    import draft_tau
+    print(f'[draft_tau] tau={draft_tau.TAU} '
+          f'folded={os.environ.get("SGLANG_DSPARK_FOLDED_SAMPLING", "(unset)")}', flush=True)
+    # EP1g. L2 prefetch is gated at import time, so the line states the gate, whether the library
+    # is there, and the per-window budget -- an operator can tell "off" from "on but silent"
+    # without a GPU. `armed=True` with no library would have raised inside install_collectives.
+    import l2_prefetch
+    print(f'[l2_prefetch] gate={os.environ.get("DSV41_L2_PREFETCH", "(unset)")} '
+          f'armed={l2_prefetch.enabled()} '
+          f'mb={os.environ.get("DSV41_L2_PREFETCH_MB", "6")} '
+          f'lib={os.path.exists(os.path.join(os.path.dirname(l2_prefetch.__file__), "libdsv41_l2pf.so"))}',
+          flush=True)
+    import l2pf_attn
+    print(f'[l2pf_attn] gate={os.environ.get("DSV41_L2PF_ATTN", "(unset)")} '
+          f'armed={l2pf_attn.attn_enabled()} '
+          f'master={os.environ.get("DSV41_L2_PREFETCH", "(unset)")}', flush=True)
+    # EP1h. Both gates parse their env at import, so the lines state what parsed -- an operator
+    # can tell "off" from "on but silent" (and from "on but a bad token", which raises here and
+    # takes the sentinel with it) without a GPU.
+    import spec_sync_free
+    print(f'[spec_sync_free] gate={os.environ.get("DSV41_SPEC_SYNC_FREE", "(unset)")} '
+          f'enabled={spec_sync_free.ENABLED} audit={spec_sync_free.AUDIT}', flush=True)
+    import eager_glue
+    print(f'[eager_glue] gate={os.environ.get("DSV41_EAGER_GLUE", "(unset)")} '
+          f'enabled={bool(eager_glue.installed())} '
+          f'parts={",".join(sorted(eager_glue.installed()))}', flush=True)
+    # EP1o. verify_cap parses its env at import (a bad conf: token raises here).
+    import verify_cap
+    print(f'[verify_cap] gate={os.environ.get("DSV41_VERIFY_CAP", "(unset)")} '
+          f'router_live={os.environ.get("DSV41_ROUTER_LIVE", "(unset)")} '
+          f'stride={verify_cap.STRIDE}', flush=True)
+    # F6 件3 cert_head (adapter/lm_cert.py): tri-state gate states itself (0/check/1);
+    # a bad _M/_TILE/_EXACT token raises here at the banner (fail-fast family law),
+    # not at the first verify step.
+    import lm_cert
+    print(f'[lm_cert] {lm_cert.summary()}', flush=True)
+    # EP1q. The split door parses its thresholds here: a bad value fails at the
+    # banner (visible) instead of the first eligible prefill (deep in serving).
+    import spark_prefill_split
+    print(f'[prefill_split] gate={os.environ.get("DSV41_SPARK_PREFILL_TP_SPLIT", "(unset)")} '
+          f'min_ctx={os.environ.get("DSV41_SPARK_PREFILL_TP_MIN_CONTEXT", "32768")} '
+          f'min_rows={os.environ.get("DSV41_SPARK_PREFILL_TP_MIN_ROWS", "1024")} '
+          f'idx_protocol={os.environ.get("DSV41_IDX_PROTOCOL", "(unset)")}', flush=True)
+    import kv_fp4
+    print(f'[kv_fp4] {kv_fp4.summary()}', flush=True)
+    import deep_gemm_sm121
+    print(f'[dg_sm121] {deep_gemm_sm121.summary()}', flush=True)
+    # Sentinel. site.py catches an exception from sitecustomize and keeps going, so a missing or
+    # broken adapter used to leave a PARTIAL banner and a boot that looks armed. The banner is only
+    # complete when this line is last, which makes the failure visible in the boot log. The count
+    # moved 9 -> 11 with EP1h, 11 -> 12 with EP1o, 12 -> 13 with EP1q, 13 -> 16 with fin2,
+    # 16 -> 17 with the fp4-KV port, then 23 -> 24 with engram_compact and 24 -> 25 with
+    # token_req_compact (both S1b R4): a stale count is exactly how a partial banner looks complete.
+    # I14-A: RoCE AR face gates (arm/no-arm visible without a GPU; install() itself
+    # banners REFUSED on a bad TP_SIZE when pynccl loads).
+    print(f'[roce_ar] gates={os.environ.get("DSV41_ROCE_RING", "0")}/'
+          f'{os.environ.get("SGLANG_ROCE_ALLREDUCE", "0")} '
+          f'tp={os.environ.get("TP_SIZE", "(unset)")} '
+          f'max={os.environ.get("SGLANG_ROCE_MAX_SIZE", "(512K)")} '
+          f'gather={os.environ.get("DSV41_ROCE_GATHER", "0")}', flush=True)
+    import admission_gate
+    print(f'[admission_gate] {admission_gate.summary()}', flush=True)
+    import sparse_wire as _sw
+    print(f'[scoring_budget] {_sw.summary()}', flush=True)
+    # S1b (R4): engram compact-verify wrap. Reports armed/mode/seams so a boot
+    # log shows whether the compact fix rode in (armed=0 on static boots).
+    import engram_compact
+    print(f'[engram_compact] {engram_compact.summary()}', flush=True)
+    # S1b (R4) landmine 2: token_req_indices compact wrap. Same self-gate and
+    # armed=0 on static boots; rebound=backend notes the from-import rebind.
+    import token_req_compact
+    print(f'[token_req_compact] {token_req_compact.summary()}', flush=True)
+    # P-SP P0 (prefill comm swap). stage/gate/min_rows/installs in one line:
+    # tells "off" from "comm armed" from "stage1 requested but not implemented"
+    # (the module logs a WARNING for the last one at import).
+    import prefill_sp
+    print(f'[prefill_sp] {prefill_sp.summary()}', flush=True)
+    # IH (B-R6 indexer hoist). gate/groups/steps/counters in one line: tells
+    # "off" from "armed" from "falsified" (verify fail) without a GPU.
+    import indexer_hoist
+    print(f'[indexer_hoist] {indexer_hoist.summary()}', flush=True)
+    # R1 (2026-10-03 FIRE-CARD §1.3; recert 2026-10-04): sparse_local
+    # consume/admission face in the banner (on/off/tier/ctx_cap tellable
+    # without a GPU); gate count 28 -> 29.
+    import seam_mount as _r1_sm_banner
+    import admission_r1 as _r1_adm_banner
+    print(f'[sparse_local] consume={_r1_sm_banner.summary()} | admission={_r1_adm_banner.summary()}', flush=True)
+    print('[ep1f] banner complete: 30 gates reported', flush=True)  # +1 sparse_local (R1); +1 idle_release (FIX-B port); +1 lm_cert (F6 件3)
+    sys.meta_path.insert(0, EngramFinder())
+    try:
+        import tp3_pad
+        tp3_pad.install()
+    except Exception as exc:
+        print(f'DSV41 TP pad not installed: {exc}', flush=True)

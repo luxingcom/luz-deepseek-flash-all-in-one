@@ -1,0 +1,16 @@
+9a7b48dc64b0254bd15238b7d6c5c012  python/sglang/kernels/ops/attention/dsv4/candidate_blocks.py
+c337fa9d4a1b135345d42fb64e38572f  python/sglang/kernels/ops/attention/dsv4/fp4_indexer.py
+736fbde54a1fd717814f5f90d7bff32a  python/sglang/srt/layers/attention/deepseek_v4_backend.py
+fd4200603b3c234e26f6f86cd9d76ba6  python/sglang/srt/layers/attention/dsv4/v41_indexer/dense_blocks.py
+28acc7d10515754498c05d788a36eff2  python/sglang/srt/layers/attention/dsv4/v41_indexer/full_topk.py
+fb3f454431b5cd057fa50c4d904042f5  python/sglang/srt/layers/attention/dsv4/v41_indexer/__init__.py
+239d7f3950b4eec64d47993f09fbfdd2  python/sglang/srt/layers/attention/dsv4/v41_indexer/scoring.py
+45445260bc191dba8bb6d5b5105b514c  python/sglang/srt/layers/attention/dsv4/v41_indexer/sparse_table.py
+8285889847223468da216ca40276e7c6  python/sglang/srt/layers/attention/dsv4/v41_indexer/types.py
+b97918f4547f0df3f226dd0740171634  python/sglang/srt/layers/engram.py
+8acc7b8966417bab342ff0e73e163a31  python/sglang/srt/model_executor/model_runner_components/ngram_embedding_manager.py
+77fc394d7e34ca116b703473acc8205b  python/sglang/srt/utils/common.py
+c0f03d982551dc6cdb05752b3631ef04  test/registered/kernels/ops/attention/test_dense_prefill_indexer.py
+628c77082dda3f051870fc0f920f5342  test/registered/kernels/ops/attention/test_dsv41_prefill_sparse_indexer.py
+1ce1054bc7f24cbb2affea965745bdf7  test/registered/kernels/ops/attention/test_fp4_indexer.py
+8591a1b43f0f8e7af5f85ad0c6af0559  test/registered/unit/layers/test_dsv4_nonpaged_indexer.py
