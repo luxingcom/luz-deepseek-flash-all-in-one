@@ -184,9 +184,10 @@ argv 断言 A8/A9 两旗标，只读 fail-closed）。从零部署全流程见
 >
 > **分支**：[`switch-fabric`](https://github.com/luxingcom/luz-deepseek-flash-all-in-one/tree/switch-fabric)
 > —— 0.3.2 交换机分支差异档（双 rail 交换机拓扑下的 RoCE flat/one-shot 运行时、
-> C 层 fabric 语义键、WG53 历史样本）；差异档见其 `deploy/SWITCH-FABRIC.md`。
-> 0.3.2 的 switched flat 运行时与 CBX1A env 已并入 main 的 reconstruct 包；
-> 环网（4 口 CX-7 hairpin）为 0.3.1 及更早历史形。两形不可混拼。
+> C 层 fabric 语义键、WG53 历史样本 + CBX1A 现役形）；差异档见其
+> `deploy/SWITCH-FABRIC.md`。0.3.2 的 switched flat 运行时与 CBX1A env 已并入
+> main 的 reconstruct 包；环网（4 口 CX-7 hairpin）为 0.3.1 及更早历史形。
+> 两形不可混拼。
 
 ```
 docs/        定版成果：release(0.3.2 RELEASE-NOTE+发布索引)/report(0.3.1 终版报告+TOOLS31 烘焙结果)/

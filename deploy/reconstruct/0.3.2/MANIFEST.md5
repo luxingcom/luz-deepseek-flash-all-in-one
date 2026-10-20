@@ -57,7 +57,7 @@ edb53669320c4b3fb6c717855f6e71a3  ./image/stock16-md5.txt
 ee080dcacf8a81e0cd2d3bef16904083  ./overlay/NOTES.md
 a1e7c3b5f769d89d824c2bc0c9145e0c  ./overlay/deepseek_v4_backend.py
 870e75dcbf86951f8e6a5a0be2fcf86f  ./overlay/overlay-0.3.1-to-0.3.2.patch
-c671923791f9c093d43bd259c3947cb4  ./verify.sh
+5071e42583f986455b9564cc92c78923  ./verify.sh
 01bb010e345eb610308772abf5d612d2  ./weights/DeepSeek-V4.1-Flash-1017.sha256
 18a90d602765893bf6c15b76a891edc2  ./weights/WEIGHTS.md
 ead33f8453c845bed3050a76c4ba5ed1  ./weights/engram-bins-manifest.json

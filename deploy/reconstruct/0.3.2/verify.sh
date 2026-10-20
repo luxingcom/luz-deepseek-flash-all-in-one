@@ -15,6 +15,24 @@ expect_md5() { # path prefix label
   [[ "$got" == "$2"* ]] && pass "$3 ($got)" || bad "$3: got $got want $2*"
 }
 soft_md5() { [[ "$(md5of "$1")" == "$2"* ]]; }
+patch_check() { # dir patch label — per-file: pre-image or already-applied
+  local dir="$1" patch="$2" label="$3" f ok=1 badf=""
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    if ( cd "$dir" && git apply --check --include="$f" "$patch" 2>/dev/null ); then
+      :
+    elif ( cd "$dir" && git apply --check -R --include="$f" "$patch" 2>/dev/null ); then
+      :
+    else
+      ok=0; badf="$badf $f"
+    fi
+  done < <(grep '^+++ b/' "$patch" | sed 's|^+++ b/||')
+  if [[ "$ok" -eq 1 ]]; then
+    pass "$label per-file check (pre-image or already-applied)"
+  else
+    bad "$label target files not at pre/post state:$badf"
+  fi
+}
 
 echo "== 0. kit manifest =="
 if ( cd "$KIT" && md5sum -c MANIFEST.md5 >/dev/null 2>&1 ); then
@@ -107,15 +125,9 @@ mkdir -p "$TMP/adapter/deploy" "$TMP/overlay/deploy/overlay" "$TMP/b12x/deploy/b
 cp -a "$REPO/deploy/adapter" "$TMP/adapter/deploy/adapter"
 cp -a "$REPO/deploy/overlay/o12c1-prod" "$TMP/overlay/deploy/overlay/o12c1-prod"
 cp -a "$REPO/deploy/b12x/b12x" "$TMP/b12x/deploy/b12x/b12x"
-if ( cd "$TMP/adapter" && git apply --check "$KIT/adapter/adapter-0.3.1-to-0.3.2.patch" 2>/dev/null ); then
-  pass "adapter patch applies"
-else bad "adapter patch does not apply"; fi
-if ( cd "$TMP/overlay" && git apply --check "$KIT/overlay/overlay-0.3.1-to-0.3.2.patch" 2>/dev/null ); then
-  pass "overlay patch applies"
-else bad "overlay patch does not apply"; fi
-if ( cd "$TMP/b12x" && git apply --check "$KIT/b12x/b12x-0.3.1-to-0.3.2.patch" 2>/dev/null ); then
-  pass "b12x patch applies"
-else bad "b12x patch does not apply"; fi
+patch_check "$TMP/adapter" "$KIT/adapter/adapter-0.3.1-to-0.3.2.patch" "adapter patch"
+patch_check "$TMP/overlay" "$KIT/overlay/overlay-0.3.1-to-0.3.2.patch" "overlay patch"
+patch_check "$TMP/b12x" "$KIT/b12x/b12x-0.3.1-to-0.3.2.patch" "b12x patch"
 
 if [[ -n "${SGLANG_STOCK:-}" ]]; then
   if ( cd "$SGLANG_STOCK" && md5sum -c "$KIT/image/stock16-md5.txt" >/dev/null 2>&1 ); then

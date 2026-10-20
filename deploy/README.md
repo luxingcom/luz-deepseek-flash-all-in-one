@@ -13,6 +13,12 @@
 > 逐步升级/复现/回退见 **[../UPGRADE-0.3.2.md](../UPGRADE-0.3.2.md)**。
 > 下表的 50/51 键与 md5 为 **0.3.1 历史形**；重建 0.3.2 以 CBX1A + reconstruct 包为准。
 
+> **本分支追加（`switch-fabric`）**：交换机差异档
+> [`SWITCH-FABRIC.md`](SWITCH-FABRIC.md) + `env/PROD-WG53-spec1.env`（53 键历史
+> 样本）；顶层 `adapter/roce_ar.py`=`f61e0183`、`b12x/.../_roce_proxy.c`=`23646e89`
+> 为交换机运行时件（与 main reconstruct 包内同名件逐字节相同）。除此之外的
+> 顶层文件与 main 0.3.2 发布面一致。
+
 > 权威表=`docs/registry/FORM-REGISTRY-031.md`（三形三元组+部署面指纹）；
 > 操作规程=`docs/runbook/OPS-MANUAL-031.md`。本目录=可发布快照，逐件 md5 锚
 > 见下表（与 FORM-REGISTRY §二对表）。
@@ -22,6 +28,7 @@
 | 件 | 键数 | md5 | 状态 |
 |---|---|---|---|
 | `CBX1A-CERTM-spec1.env` | 56 | **0729e18d** | **0.3.2 现役形**（E16B2 键面 + `DSV41_CERT_HEAD_M=6,12,…,48`；与 reconstruct 包内同名件逐字节相同；WCBOOT74 复役形） |
+| `PROD-WG53-spec1.env`（仅 switch-fabric 分支） | 53 | 1e8e4daa | **0.3.1 交换机实测样本**（2026-10-15/16 双 rail 窗；CBX1A 的前身，保留为历史对照/交换机回退一级） |
 | `PROD-R51W5-spec1.env` | 50 | **15767aa6** | **0.3.1 一级回退形**（FL6 转正后自「现役」降级；=48 键 8c8c166d 逐字+FP8/TG 两键；摘第 51 键即自 51 键形回退至此） |
 | `PROD-R51W5-FL6FIX-spec1.env` | 51 | 2ac74586 | **0.3.1 期在役形（历史）**——0.3.2 起现役键面已演进为 CBX1A 56 键；本件保留为 0.3.1 回退/复现样本（FL6-PROMO 窗闭 GREEN：cp30 锚位 99.95%+DE 82.17 实役直证）；机理档=`docs/research/FL6-RECALL-BUG-ANALYSIS-20261013.md` |
 
@@ -72,6 +79,10 @@ md5=[adapter/MANIFEST.md5](adapter/MANIFEST.md5)。
 `7d6f79b0`、`roce_ar.py`=`f61e0183`、`seam_mount.py`=`a65797a5`、
 `sparse_wire.py`=`0067abc4`。产线活件指纹 `b58e49ff`；86/87 件 md5 与产线
 逐字节相同，`build_repack_cuda.sh` 仅注释家目录脱敏（产线 `cd6c7707`）。
+
+> 本分支的顶层 `adapter/roce_ar.py` 已预先覆盖为交换机件 `f61e0183`（0.3.1
+> 基底里唯一的差异件）；其余仍为 0.3.1 基底。按装配说明再覆盖 kit 同名件结果
+> 相同（幂等）。若从 main 的 0.3.1 基底装配，则由 kit 完成这一步。
 
 ## bin/ — r3-boot-arm.sh 部署链
 
