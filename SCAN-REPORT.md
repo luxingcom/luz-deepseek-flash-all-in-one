@@ -90,3 +90,85 @@ strings 全 0；GW_API_KEY 全空值；3 处假值=判别力 fixture 政策保�
 用户名 44 件+GitHub 账号名 1 处→已掩码（`liux***ya`/`lux***com`），受累 md5 清单
 7 份逐行重生成，git 全史 filter-branch 同步重写+tag 重钉。逐类结论表/处置动作/
 产线锚语义声明/范围外注记=**docs/registry/SANITIZATION-20261013.md**。
+
+---
+
+## 0.3.2 tag 清洁门（2026-10-20，`v0.3.2` 打标前）
+
+**受检树**：0.3.2 定版维护 commit `de93725`（`c52a560` 之后的一致性/可用性维护；
+tag `v0.3.2` 指向记录本节的收尾 commit）。**方法**：`git archive` 隔离检出
+（1233 件/91MB），不依赖工作树；密钥面+语法+链接+临时代码全在隔离树重跑。
+
+| # | 检查 | 结果 |
+|---|---|---|
+| T1 | 私钥块 / AWS / GitHub token / OpenAI key / Bearer / URL 内嵌凭据 | **0**（唯一 `scheme://user:pass@` 命中=本报告自身的模式文档行） |
+| T2 | 用户名/邮箱/电话真值 | **0**（仅 `liux***ya`/`lux***com` 掩码形） |
+| T3 | `~/.sudopw` 机制引用 | 28 处，全为机制路径（stdin 喂入、不打印、不入仓）；**零口令值**——沿 2026-10-13 政策保留 |
+| T4 | 赋值型凭据 | 16 处人工复核：全部为本报告自引/判别力 fixture（`test-key-not-a-secret`/`real-secret-here`/`GW_API_KEY` 空值）；零真值 |
+| T5 | 二进制面 | 7 件（NCCL ring-only 库+ncclpin+adapter `.so` 三件）；ELF `strings` 无凭据命中 |
+| T6 | 大件 | 最大 `deploy/nccl/nccl-ringonly/libnccl.so.2.30.7` 60.5MB（<100MB GitHub 单文件上限；历史已在仓） |
+| T7 | 临时/构建残留 | `*.pyc`/`__pycache__`/`*.log`/`*.bak`/`*.orig`/`*.rej` **0** |
+| T8 | shell 语法 | 105 件 `bash -n` **0 fail** |
+| T9 | Python 语法 | 全树 `compile()` **0 error** |
+| T10 | 相对文档链接 | **0 坏链**（修 1 处 b12x 上游 doc 引用） |
+| T11 | 起栈接线闸门自检 | `tools/serve_flags_gate.sh --self-test` R1-R7 **全 PASS** |
+| T12 | 量具自检 | `sd_bench.py --selfcheck` **21/21 PASS** |
+| T13 | 五包 selfcheck | 全包 **RED=0**（cfgmgmt 19/0/12、fabric-net 21/0/8、gateway 16/0/0、selfdiag 21/0/16、selfheal 18/0/11；UNKNOWN=宿主在役件不在隔离树，按 `sc_summary` 红优先于无法判语义 rc=2） |
+| T14 | 版本面一致性 | README=0.3.2 定版+系列总览；致谢计数 111；`deploy/README` 标注混合快照边界；无残留「当前产线在役」旧断言 |
+
+**结论：tag 清洁门 PASS**——零真凭据/零 PII 真值/零临时代码；保留项（`~/.sudopw`
+机制引用、判别力 fixture、内网 IP、在仓 NCCL 二进制）均为已裁定政策面，不因本次
+打标改变。重扫触发律沿前文：任何后续 commit 前重跑 T1-T4。
+
+
+---
+
+## 0.3.2 重建包清洁门（2026-10-20，`v0.3.2-recon` 打标前）
+
+**受检面**：新增 `deploy/reconstruct/0.3.2/`（70 件/1.8MB）+ 同步改动的 8 份文档。
+**方法**：包内 `MANIFEST.md5` + `verify.sh` 全量自验；密钥/用户名/临时代码/语法/
+链接独立复扫。
+
+| # | 检查 | 结果 |
+|---|---|---|
+| R1 | 包内 `MANIFEST.md5` | **69/69 PASS**（MANIFEST 自身不计） |
+| R2 | `verify.sh`（env/adapter/overlay/b12x/image/weights/补丁/负向自检） | **RECON-KIT PASS** |
+| R3 | 私钥块 / GitHub/OpenAI token / sudo 口令 / 赋值型凭据 | **0**（`verify.sh` 自身模式行除外） |
+| R4 | 未掩码家目录（`/home/<8+位小写用户>`） | **0**；`adapter/build_repack_cuda.sh` 注释位=`/home/<deploy-user>` |
+| R5 | 用户点名删除的 aria2 RPC 令牌 / `ms1017` | **0**（带宽优先辅助件未收，非重建闭包） |
+| R6 | shell 语法 | 7 件 `bash -n` **0 fail** |
+| R7 | Python 语法 | 34 件 `.py` `compile()` **0 error**（16 镜像件+engram 工具+包内件） |
+| R8 | 临时/构建残留 | `*.pyc`/`__pycache__`/`*.log`/`*.bak`/`*.rej` **0** |
+| R9 | 大件 | 最大 170KB（`common.py`/overlay backend）；**无二进制、无大文件新增** |
+| R10 | 相对链接（17 份 md） | **0 坏链** |
+| R11 | 补丁可应用性 | adapter/overlay/b12x 对公开 0.3.1 基线 `git apply --check` **PASS**；image 补丁对 `79cafec0` 16 件 **PASS** |
+| R12 | 逐件复算 | adapter 12 件、overlay 1 件、b12x 3 件、image 16 件应用后 md5 **全等产线** |
+
+**结论：重建包清洁门 PASS**。包内零真凭据、零未掩码用户名、零临时件；唯一人工
+差异=`build_repack_cuda.sh` 注释路径脱敏（运行逻辑零改，还原后 md5=cd6c7707）。
+
+---
+
+## 0.3.2 公开升级面清洁门（2026-10-20，`v0.3.2-recon` 之后）
+
+**受检面**：现役 env 公开位 `deploy/env/CBX1A-CERTM-spec1.env`、adapter 0.3.2
+装配账 `deploy/adapter/0.3.2-MANIFEST.md5`/`0.3.2-ASSEMBLY.md`、根档
+`UPGRADE-0.3.2.md`，以及 README/DEPLOY-GUIDE/SPEC6/release note/发布索引/
+CHANGELOG/重建包 README 的同步改动。**方法**：`verify.sh` 全量自验 + 独立
+密钥/PII/链接/语法复扫；不改历史读数。
+
+| # | 检查 | 结果 |
+|---|---|---|
+| S1 | 重建包 `MANIFEST.md5` | **69/69 PASS**（MANIFEST 自身不计） |
+| S2 | `verify.sh` 全量 | **RECON-KIT PASS**（新增顶层 env 同一性 + adapter 87 件装配 md5） |
+| S3 | 顶层现役 env | 56 键 / md5 **0729e18d**；与 kit 内同名件 `cmp` 逐字节相同 |
+| S4 | adapter 装配 | 87 行账；assembled `md5sum -c` **87/87**；86/87 与产线逐字节相同，`build_repack_cuda.sh` 仅注释家目录脱敏 |
+| S5 | 私钥块 / token / sudo 口令 / 未掩码家目录 | **0 真值**（仅政策掩码 `liux***ya` 与 `verify.sh` 自身模式行） |
+| S6 | shell 语法 | `verify.sh` `bash -n` **0 fail** |
+| S7 | 相对文档链接（10 份改动档） | **0 坏链**（修 1 处 `0.3.2-ASSEMBLY.md` 根档相对深度） |
+| S8 | 临时/构建残留 | `*.pyc`/`__pycache__`/`*.rej`/`*.orig` **0**（清 `tools/__pycache__`） |
+| S9 | 文档口径一致性 | README/DEPLOY-GUIDE/SPEC6/release note/发布索引/CHANGELOG 均指向 `UPGRADE-0.3.2.md`、顶层 CBX1A env 与 adapter 装配账；无“待呈裁”现役件表述（历史沿革注记保留） |
+| S10 | 网络形态一致性 | README/DEPLOY-GUIDE/release note 统一为“0.3.2=双 rail 交换机 2 口；环网=0.3.1 历史形”；env 的 switched/flat 键与 boot NCCL 段一致 |
+
+**结论：公开升级面清洁门 PASS**。新增面零真凭据、零未掩码用户名、零临时件；
+示例命令使用 `<repo>`/`<home>` 占位，不依赖部署机私有路径。

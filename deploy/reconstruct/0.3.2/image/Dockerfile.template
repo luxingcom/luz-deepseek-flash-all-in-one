@@ -1,0 +1,10 @@
+# Dockerfile.template — r032c 单 COPY 层配方
+# 由 build-0.3.2-r032c.sh 填充；不要直接 docker build 本模板。
+FROM ${BASE_IMAGE}
+LABEL DSV41_IMAGE_VERSION="0.3.2-r032c" \
+      DSV41_PORT_BASE="520d6d0+fc2795b+391e665(candidate_block_mask)" \
+      DSV41_PORT_SCOPE="minimal-deadlock-fix +bit-preserve-selection-order 16 files" \
+      DSV41_REPLAY_TREE="dab49d96d33839480e30a1d24ac9e6cdb0a9c29d" \
+      DSV41_BASE_DIGEST="${BASE_IMAGE_ID}" \
+      BUILT_AT="2026-10-18T05:20:00Z"
+COPY rootfs/ /sgl-workspace/sglang/

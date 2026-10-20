@@ -1,33 +1,77 @@
-# deploy/ — 0.3.1 定型形部署面（env 键面 + SPEC serve 参 + adapter 现役件 + boot 链）
+# deploy/ — 部署面（0.3.1 历史样本 + 0.3.2 现役环境/重建包）
+
+> **0.3.2 定版注记（2026-10-20）**：本目录保留 0.3.1 定型形样本（历史基线）；
+> **0.3.2 现役形已完整归位**：现役 env=`env/CBX1A-CERTM-spec1.env`（56 键
+> `0729e18d`），其余增量在 [`reconstruct/0.3.2/`](reconstruct/0.3.2/README.md)
+> （adapter 13+4 件、overlay backend `a1e7c3b5`、b12x 3 件、r032c 16 件镜像
+> 补丁/全文/构建配方、1017 权重与 engram 分片台账）。
+> adapter 终态=0.3.1 基底+reconstruct 覆盖，装配账=
+> [`adapter/0.3.2-MANIFEST.md5`](adapter/0.3.2-MANIFEST.md5)（87 个运行时件）。
+> `bin/r3-boot-arm.sh` 已同步 0.3.2 终态参面（SERVER_ARGS 九参含 A8/A9/
+> `--sleep-on-idle`、D15 五门、IMAGE 指针 `0.3.2-r032c`）。0.3.2 全量差异与性能见
+> [../docs/release/0.3.2-RELEASE-NOTE.md](../docs/release/0.3.2-RELEASE-NOTE.md)；
+> 逐步升级/复现/回退见 **[../UPGRADE-0.3.2.md](../UPGRADE-0.3.2.md)**。
+> 下表的 50/51 键与 md5 为 **0.3.1 历史形**；重建 0.3.2 以 CBX1A + reconstruct 包为准。
 
 > 权威表=`docs/registry/FORM-REGISTRY-031.md`（三形三元组+部署面指纹）；
 > 操作规程=`docs/runbook/OPS-MANUAL-031.md`。本目录=可发布快照，逐件 md5 锚
 > 见下表（与 FORM-REGISTRY §二对表）。
 
-## env/ — 两形收录与状态位
+## env/ — 0.3.2 现役 + 0.3.1 历史形
 
 | 件 | 键数 | md5 | 状态 |
 |---|---|---|---|
-| `PROD-R51W5-spec1.env` | 50 | **15767aa6** | **一级回退形**（FL6 转正后自「现役」降级；=48 键 8c8c166d 逐字+FP8/TG 两键；摘第 51 键即自 51 键形回退至此） |
-| `PROD-R51W5-FL6FIX-spec1.env` | 51 | 2ac74586 | **FL6 现役定版**（50 键逐字+第 51 键 DSV41_FL6_RECALL_FIX=1）——**当前产线在役**（服务器在役位名=`PROD-R51W5FL6-spec1.env` 同 md5 异名；FL6-PROMO 窗闭 GREEN：cp30 锚位 99.95%+DE 82.17 实役直证）；机理档=`docs/research/FL6-RECALL-BUG-ANALYSIS-20261013.md` |
+| `CBX1A-CERTM-spec1.env` | 56 | **0729e18d** | **0.3.2 现役形**（E16B2 键面 + `DSV41_CERT_HEAD_M=6,12,…,48`；与 reconstruct 包内同名件逐字节相同；WCBOOT74 复役形） |
+| `PROD-R51W5-spec1.env` | 50 | **15767aa6** | **0.3.1 一级回退形**（FL6 转正后自「现役」降级；=48 键 8c8c166d 逐字+FP8/TG 两键；摘第 51 键即自 51 键形回退至此） |
+| `PROD-R51W5-FL6FIX-spec1.env` | 51 | 2ac74586 | **0.3.1 期在役形（历史）**——0.3.2 起现役键面已演进为 CBX1A 56 键；本件保留为 0.3.1 回退/复现样本（FL6-PROMO 窗闭 GREEN：cp30 锚位 99.95%+DE 82.17 实役直证）；机理档=`docs/research/FL6-RECALL-BUG-ANALYSIS-20261013.md` |
 
-回退链两级（自 50 键在役形）：48 键 PROD-R1INK48L2PF6O12C1（8c8c166d）→
+0.3.2 回退链（相邻级单文件回指）：**CBX1A→E16B2→E16B1→FB54→0.3.1 51 键**；
+E16 链四件在 `reconstruct/0.3.2/env/`，逐级键差见其 `ENV-CHAIN.md`。
+0.3.1 深回退链两级（自 50 键在役形）：48 键 PROD-R1INK48L2PF6O12C1（8c8c166d）→
 47 键 PROD-R1STDLL128L2PF6O12C1（99e7ec92）+深回退 45 键 PROD-R1STDLL128L2PF6
 （34977bf0）——三件随仓收录=`tools/packages/cfgmgmt/payload/env/`（cfgmgmt 包
 回退链库，md5 对表 FORM-REGISTRY-031 §一全中；服务器在役位=~/migrate-assets/
 dsv41/env/）。
 
-## SPEC6-SERVE-REF.md — serve 六参
+## SPEC6-SERVE-REF.md — serve 九参（六参→九参）
 
 50 键定型形 serve 参谱=**SPEC6**（五参基座+swa256），全文与用法见
 [SPEC6-SERVE-REF.md](SPEC6-SERVE-REF.md)。
 
-## adapter/ — 供给面整面快照（B1 收录 2026-10-13）
+## reconstruct/ — 0.3.2 完整重建包（2026-10-20）
 
-**83 件/约 3.0M**（顶层 68+fi_r1/ 6+lib/ 1+overlay/ 3+tests/ 5；sitecustomize 55b1e412
-装载缝+boot 装载闭包 48 件+留役休眠件 10+`.so` 运行库+dspark_sps 表+构建源）。
-收录口径（剔 `*.bak*` 39+变体 1+EP1 陈旧清单 2）与排除名单逐件、FL6 终值注记见
-[adapter/README.md](adapter/README.md)；逐件 md5=[adapter/MANIFEST.md5](adapter/MANIFEST.md5)。
+[`reconstruct/0.3.2/`](reconstruct/0.3.2/README.md) 是 0.3.2 现役形的逐文件重建面，
+补齐 `v0.3.2` tag 时尚未归位的增量：
+
+| 面 | 内容 |
+|---|---|
+| `env/` | CBX1A 56 键 `0729e18d` + FB54/E16B1/E16B2 逐级链 + 键差说明 |
+| `adapter/` | 13 件现役增量 + 4 件旁挂；12 件代码逐字节=产线 md5 |
+| `overlay/` | `deepseek_v4_backend.py` `a1e7c3b5` 全文+补丁 |
+| `b12x/` | `roce_oneshot.py`/`_allgather_cute.py`/`_roce_proxy.c` 现役源码 |
+| `image/` | r032c 16 件全文+`79cafec0→f9d89b02` 补丁+构建脚本+身份四件 |
+| `weights/` | 1017 84 文件 SHA256SUMS + engram 8 分片哈希/生成工具 |
+| `boot/` | 九参、WORKERS、四查与回退 |
+
+自验：`bash deploy/reconstruct/0.3.2/verify.sh`（期望 `RECON-KIT PASS`）。基座镜像
+与权重/engram 属外部大件，包内给身份指纹与校验清单，不分发本体。
+
+## adapter/ — 0.3.1 基底 + 0.3.2 装配账
+
+**0.3.1 基底 83 件/约 3.0M**（顶层 68+fi_r1/ 6+lib/ 1+overlay/ 3+tests/ 5；
+sitecustomize 55b1e412 装载缝+boot 装载闭包 48 件+留役休眠件 10+`.so` 运行库+
+dspark_sps 表+构建源）。收录口径（剔 `*.bak*` 39+变体 1+EP1 陈旧清单 2）与排除
+名单逐件、FL6 终值注记见 [adapter/README.md](adapter/README.md)；逐件
+md5=[adapter/MANIFEST.md5](adapter/MANIFEST.md5)。
+
+**0.3.2 终态**=上述基底 + `reconstruct/0.3.2/adapter/files/` 覆盖，装配后
+**87 个运行时件**（生产记录 89 件，多 2 个宿主 `.bak`）。逐件验收=
+[`adapter/0.3.2-MANIFEST.md5`](adapter/0.3.2-MANIFEST.md5)，装配/落位/回退=
+[`adapter/0.3.2-ASSEMBLY.md`](adapter/0.3.2-ASSEMBLY.md)。关键锚：
+`sitecustomize.py`=`beb131ab`、`kv_fp4.py`=`75062432`、`replicated_split.py`=
+`7d6f79b0`、`roce_ar.py`=`f61e0183`、`seam_mount.py`=`a65797a5`、
+`sparse_wire.py`=`0067abc4`。产线活件指纹 `b58e49ff`；86/87 件 md5 与产线
+逐字节相同，`build_repack_cuda.sh` 仅注释家目录脱敏（产线 `cd6c7707`）。
 
 ## bin/ — r3-boot-arm.sh 部署链
 
@@ -36,11 +80,11 @@ dsv41/env/）。
 
 | 件 | md5 | 用途 |
 |---|---|---|
-| `r3-boot-arm.sh` | c051bb41 | ARM 主 boot 链（env 注入/overlay 挂载/横幅门/池门 9,600,000） |
+| `r3-boot-arm.sh` | 20f22bc6（产线）/ 9ac6e113（公开件） | ARM 主 boot 链（0.3.2 终态参面：SERVER_ARGS 九参/D15 五门/IMAGE r032c/env 注入/overlay 挂载/横幅门/池门 9,600,000）。公开件=产线体+8 行快照头+3 处用户名路径掩码，功能逐字等价；还原命令见 reconstruct 包 README §5 |
 | `r3-boot.sh` | — | 基座 boot（无 ARM 注入面） |
 | `r3-stop.sh` | 5ad87830 | 四机停靴（先存后删律配套） |
 | `r3-watchdog.sh` | — | 水位/健康看护 |
-| `r3-window.sh` | — | 窗口冒烟（环网一句话探针） |
+| `r3-window.sh` | — | 窗口冒烟（拓扑一句话探针） |
 | `r3-gate-env-lint.sh` | 5337c6cf | env 键面 lint 拒绝门（红=拒起） |
 | `r3-gate-assert-lint.sh` / `r3-gate-banner-contract.sh` / `r3-gate-endpoint-lint.sh` | — | 断言/横幅合同/端点 lint 三门 |
 | `boot_mvl41_native.sh` | — | **VL V4.1 原生视觉臂 boot**（零旗启用；S1-S4 三级阶梯全绿收录；用法=DEPLOY-GUIDE §9.1） |

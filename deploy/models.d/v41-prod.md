@@ -7,6 +7,14 @@
 > §一，boot 链实参=`deploy/bin/r3-boot-arm.sh`。§a 权重身份指纹/§b 四机路径/§e 锚带
 > 不受影响（权重未变更）。历史行原样保留（快照不回改律）。**
 
+> **【0.3.2 现役权重注记 2026-10-20】本卡 §a/§b 的 V4.1-Flash 476G 指纹与路径为
+> 0.3.1 历史。0.3.2 现役已切 `DeepSeek-V4.1-Flash-1017`：84 文件 /
+> 510,311,045,870 B；`config.json` sha256 `8be45ce0476004a3…`；四机 rank 映射
+> 01=r0/02=r1/04=r2/03=r3；新 engram=`~/dsv41-engram-1017`（8 分片 /
+> 202,758,065,168 B）。逐文件 SHA256SUMS、NFS 布局、engram 生成工具与哈希=
+> `deploy/reconstruct/0.3.2/weights/`。旧模型/旧 engram 原样保留可回退。§c/§d
+> 的 env/boot 形亦让位于 0.3.2 重建包；本卡余下内容按快照不回改律保留。**
+
 > models.d 注册表卡。字段制=MULTIMODEL-GOV-CARD-20261004 §2.4（案头草案定稿形）；
 > 闭案法源=CD3-LINED-CARDS-20261006 卡二。誊录源=CHECKPOINT-LUZ030-R1-20261005
 > §一/§二/§三（v41 指纹与锚带）+GOV-CARD §1.1/§1.3（四机拓扑/身份指纹）。数字零手誊。

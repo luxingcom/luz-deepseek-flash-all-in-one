@@ -57,5 +57,6 @@ vllm serve "$B12X_FP6_MODEL_DIR" \
 | `B12X_DISABLE_BF16_GEMV` | off | Disable small-N bf16 GEMV routing |
 | `TORCH_COMPILE_DISABLE=1` | — | Required for bit-identical KLD (vLLM Inductor) |
 
-See [docs/mxfp6-vllm-integration.md](../../docs/mxfp6-vllm-integration.md) for
-the full lifecycle and maintainer drop-in instructions.
+See `docs/mxfp6-vllm-integration.md` in the upstream b12x source tree for
+the full lifecycle and maintainer drop-in instructions (that upstream doc is
+not vendored into this delivery snapshot).

@@ -1,7 +1,138 @@
-# CHANGELOG — LuZ 0.3.0 → 0.3.2（在途）
+# CHANGELOG — LuZ 0.3.0 → 0.3.2（0.3.2 收官定版 2026-10-20）
 
 > 提炼自战役仓 git log（`luz-0.3.0-r1`（2026-10-05，32c6acd）之后 632 commits）
 > 与总卡/定稿报告。逐项档锚见 `docs/` 各分档。
+
+## 0.3.2 收官（2026-10-20 定版；v0.3.2）
+
+> 版本叙事+性能终态全表+硬守门+已知局限+回退面六件全档=**`docs/release/0.3.2-RELEASE-NOTE.md`**（release note 正典档）。
+
+**版本叙事（摘要）**：0.3.2=以五目标制（PR 吞吐/DE 质量/C8 多并发定标/512k 长上下文/bug 全清）驱动的性能与质量双线版本：净线重建（网络链路重整）→死锁修复（最小修复集 `520d6d0`+位级保持形 r032c，对拍 7/7 三面全等）→五目标执行链（A6/R1/E16-B1/B2/CBX1A/C13 定标）→收官锁定。池 84 件全部三态处置（留役 10/关案 40/挂 0.3.3 34）。
+
+**变更集（留役 10 件分件价值）**：
+
+- **PR 面**：A6 修复形（indexk page64 遮蔽消除；DE 四型 +8.7~+9.6%/PR +1.0~+3.0%）+R1 转正形（FP4KV 内核 `r1_formal=1`；零形变直证 ±0.2%）——64k 峰档两级抬升至 **6289.3**（+2.3%）。
+- **DE 面**：CBX1A cert M 八元（`DSV41_CERT_HEAD_M=6,12,18,24,30,36,42,48`；c4 +0.7% 正向/c1/c8 零漂）+B18 资格自证；DE-48 五档锚列全齐（c1 88.64 域/c2 128.89/c4 168.35/c8 242.83/c16 357.9 观察位）。
+- **通信面**：E16-B1 包络双键 1179648+B2 compact gather（RoCE gather 消息包络承载）。
+- **服务面**：A8 `--tool-call-parser deepseekv41`+A9 `--enable-cache-report` 接线在役（issue #1/#2 修复）+A10②-a 网关容量四键（issue #3）；SPEC6 九参谱（含 `--sleep-on-idle`）。
+- **工程面**：D12 沉降键面+D15 五门断言族在役；量具正典族（DE-48/pr_ladder7/gid-face-gate）。
+- **bug 账**：21 件=已闭 13+部分闭 5+挂 0.3.3/呈裁 3（全件有处置记录）。
+
+**性能终态（对外主口径；基线=本版本判读线列〔MS1017/A6-ANCHOR-7〕）**：sparkdash 七档 8k→512k=5522.5/6040.2/6271.3/**6289.3**/6048.1/5427.9/4290.0（64k 峰档=判读线基线 6147.3 之上 +2.3%）；DE 五档锚（mt400 正典口径）c1 **88.64 域**/c2 **128.89**/c4 **168.35**/c8 **242.83**/c16 357.9（观察位），per 流比 1.0/0.766/0.488/0.356/0.270；C8 聚合锚 C1 3757.7/C2 2849.8/C4 1571.0（C4/C1=0.418）+A/B 轨定标提案采纳。全表与 512k 斜率读数见 RELEASE-NOTE。
+
+**硬守门零回归声明**：EQ-1 位等跨靴 6/6 逐字｜GSM8K 0.985-0.99（≥0.97）｜needle 600k 3/3｜池红线组（pool 9.6M/chunked 4096/MRR 16/ctx 600000）boot 断言在役｜PR 七档 vs 锚全 IN-BAND｜质量门全绿零回归——0.3.2 终态形（boot `r3-boot-arm.sh` 20f22bc6/adapter b58e49ff/env CBX1A 0729e18d/IMAGE r032c digest `sha256:47f6d91a…ffc4`）为「现役形即终态形」零拆靴零复靴转正。
+
+**已知局限与 0.3.3 待启面**：512k 斜率未达（峰→256k −12.31%/峰→512k −28.65%；A 轨 ≤−6.5% 兑底 0.3.3，治理链挂 0.3.3 头）；c16 收益主张=观察带非成立带（量具弱点注记：mt400 prose c16 均批<16，满批形收益面未覆盖）；band-3 栈级不可观测（census profiler-eager stock 回退，替代证据链在档）；DE B 轨 90 未达（缺口 ~1.4）；0.3.3 待启=全闪 decode 迁移调研线落地+树形适配+池挂 34 件。
+
+**回退面**：镜像双存（r032c 在库+r032 基线；boot IMAGE 单行回指一键复原，1 靴 ≈1.5-2h）；adapter 逐件回拷链（A6 beb131ab→55b1e412／R1 75062432→feaaadd4）；env 回退链 CBX1A→E16B2→FB54→WG53；已执行回退件（B20/E11/B24/B25/L2OFF）零残留横幅自证。
+
+## 0.3.2 定版维护（2026-10-20 定版后；tag `v0.3.2` 面）
+
+> 本节的改动全部在 0.3.2 已推 main（`c52a560`）之后、tag `v0.3.2` 之前落盘，
+> 属**发布面一致性与可用性维护**，不动产线形、不改历史读数。
+
+1. **README 版本面升级**：头档 0.3.1→**0.3.2 定版**；新增「版本系列」总览
+   （0.3.0/0.3.1/0.3.2）与 0.3.2 性能主表（PR 七档/DE 五档锚/C8 聚合/512k/质量）；
+   0.3.1 读数保留为历史基线；镜像表补 `0.3.2-r032c`（digest `47f6d91a…ffc4`）；
+   现役形状态位改为 CBX1A 56 键+SPEC6 九参+adapter `b58e49ff`；致谢计数 110→**111**。
+2. **部署面注记**：`deploy/README.md` 标明 0.3.1 历史样本与 0.3.2 重建包入口；
+   `deploy/bin/r3-boot-arm.sh` 行 md5 更新为 `20f22bc6`（产线）/`9ac6e113`（公开件）；
+   `deploy/SPEC6-SERVE-REF.md` 与 `docs/DEPLOY-GUIDE.md` 加 0.3.2 定版注记。
+3. **issue #4 采纳件**：新增 `tools/serve_flags_gate.sh`——从运行进程 argv /
+   `/get_server_info` 断言 `--tool-call-parser deepseekv41` 与
+   `--enable-cache-report` 真的接线（只读、fail-closed、不经管道取 rc）；
+   内置 R1-R7 反向自检（`--self-test`），测试包装
+   `tests/unit/test_serve_flags_gate.sh`。SPEC6 新增「旗标-能力-生效值」对照表。
+   本件是交付面补充工具，**不改产线 boot 快照**。
+4. **发布索引**：新增 `docs/release/README.md`（版本系列+发布面三层+系列纪律）。
+5. **文档修整**：`deploy/b12x/b12x_next/integration/vllm/README.md` 的
+   上游文档引用由相对链接改为路径说明（上游件未 vendored，原链接为坏链）；
+   `docs/ACKNOWLEDGEMENTS.md` 状态口径补 0.3.2。
+6. **量具可用性修**：`tools/bench/sd_bench.py` 的 `--selfcheck` 不再被
+   `--mode` 的 required 拦住（原状=文档写 `--selfcheck`、实跑先报缺 `--mode`）；
+   非自检路径仍强制 `--mode`。自检 21/21 PASS 复跑。
+7. **tag `v0.3.2` 清洁门**：打 tag 前在定版树上重跑密钥/凭据/PII 全量扫描、
+   103 件 shell + 927 件 Python 语法检查、临时件检查与相对链接检查；
+   结果与保留项见 `SCAN-REPORT.md` §「0.3.2 tag 清洁门」。
+
+## 0.3.2 重建包（2026-10-20 定版后；tag `v0.3.2-recon`）
+
+> `v0.3.2` tag 后核对“公开材料能否完整重建部署环境”，确认 r032c/A6/R1/E16B2/
+> CBX1A 的增量件与 1017 配套尚未入仓。本节=补齐后的重建面；零产线触、零历史
+> 读数改动。
+
+1. **r032c 镜像面**：`deploy/reconstruct/0.3.2/image/` 收录 16 件全文、
+   `79cafec0→f9d89b02` 补丁、公开构建脚本（单 COPY 层+读回+py_compile+import+
+   collection）、IMAGE-IDENTITY、16 件 md5 台账、基座 16 件 md5。
+2. **adapter 面**：13 件现役增量（A6 `sitecustomize.py` beb131ab、R1
+   `kv_fp4.py` 75062432、E16B2 `replicated_split.py` 7d6f79b0、W-E `roce_ar.py`
+   f61e0183、r032c 迁移 9 件）+4 件产线旁挂；12 件代码逐字节=产线 md5。
+3. **overlay/b12x**：`deepseek_v4_backend.py` a1e7c3b5；b12x 三件
+   035c860c/7253717a/23646e89（含 W-E 的 C 层 fabric/TC 语义）。
+4. **env 链**：CBX1A 56 键 0729e18d + E16B2 5877fcb0 + E16B1 d55baa00 + FB54
+   ad635762，附逐级键差与回退序。
+5. **权重/engram**：1017 84 文件 SHA256SUMS（510,311,045,870 B）、NFS/四机秩映射、
+   engram 8 分片 sha256（202,758,065,168 B）+ `pack_engram.py`/打包/分发/校验工具。
+6. **boot/文档**：九参/WORKERS/四查与回退说明；README、DEPLOY-GUIDE、
+   release note §八、发布索引同步指向重建包；不再保留“内部臂件/呈裁位”缺件口径。
+7. **验证**：新增 `deploy/reconstruct/0.3.2/verify.sh`（MANIFEST/env/adapter/
+   overlay/b12x/image/weights/patch apply/敏感面/反向自检），本地结果
+   `RECON-KIT PASS`；补丁在公开 0.3.1 基线上逐件复算到产线 md5。
+8. **边界**：基座镜像（48.6GB）、1017 权重（476G）、engram（189G）属外部大件，
+   不分发；包内给身份指纹与校验清单。
+
+## 0.3.2 公开升级面（2026-10-20；tag `v0.3.2-recon` 后）
+
+> 用户裁定：0.3.2 现役 env（CBX1A 56 键）与 adapter 终态（`b58e49ff`）可公开；
+> 公开仓以 **0.3.1 基底 + 混合快照 + 升级补丁/文档** 承接；`switch-fabric`
+> 分支增量批准（远端头 `84b6732` 起点，不重写历史）。零产线触、零历史读数改动。
+
+1. **现役 env 公开位**：`deploy/env/CBX1A-CERTM-spec1.env`（56 键/`0729e18d`，
+   与 reconstruct 包内同名件逐字节相同）；deploy/README 状态表补 0.3.2 行与
+   回退链 CBX1A→E16B2→E16B1→FB54→0.3.1 51 键。
+2. **adapter 终态装配账**：`deploy/adapter/0.3.2-MANIFEST.md5`（87 个运行时件；
+   86/87 与产线逐字节相同，`build_repack_cuda.sh` 仅注释家目录脱敏）+
+   `deploy/adapter/0.3.2-ASSEMBLY.md`（基底+覆盖、落位、备份、绑定律、回退）。
+3. **升级文档**：新增根档 `UPGRADE-0.3.2.md`——0.3.1→0.3.2 逐步升级、boot 门、
+   PR 七档/DE 五档/质量门的复现命令与参考值、回退与排障；README、DEPLOY-GUIDE、
+   SPEC6、release note §七/§八、发布索引同步指向。
+4. **网络形态校正**：0.3.2 现役=双 rail 交换机（2 口 HCA 部署对 +
+   `B12X_ROCE_TOPOLOGY=switched`/`LUZ_SWITCH_ROCE_FLAT=1`/TC106）；环网 4 口
+   CX-7 标注为 0.3.1 历史形，两形不可混拼。
+5. **switch-fabric 分支**：以 main 0.3.2 为基座合并并更新差异档（WG53 53 键
+   历史样本保留；CBX1A 56 键为 0.3.2 交换机现役形）；远端快进，不 force。
+6. **验证**：`verify.sh` 仍 `RECON-KIT PASS`；adapter 装配 `md5sum -c` 87/87；
+   新增面密钥/PII 扫描与链接检查见 `SCAN-REPORT.md`。
+
+## 0.3.2 死锁修复（2026-10-18 修复体验证毕 → 10-20 r032c 位级保持形终态转正在役）
+
+> 43h 长稳调度死锁（2026-10-16 站点甲；四机同点 `v41_indexer/scoring.py:164` 宿主同步
+> 等待，集合通信从未发起）修复线。最小修复集=上游 `520d6d0`（#41659，含 fc2795b）回移植：
+> prefill/decode 索引器数据构造改整批 host-lengths 构形+async_h2d，消除步级隐含宿主同步。
+
+1. **修复镜像（终态=r032c 位级保持形，产线转正在役）**：`dsv41-sglang-optimized:0.3.2-r032c`
+   （内网 registry；digest `sha256:47f6d91a…ffc4`；=最小修复集 `520d6d0`+候选序**位级保持形**，
+   位级对拍 7/7 三面全等〔logits/hidden/输出 token〕；上靴验收 code 型 128.91=−0.3% 带中——
+   收回 r032b −6.8% 出带+死锁面零复发；2026-10-20 随 0.3.2 终态转正在役，boot IMAGE 指针=r032c）。
+   前形 r032b（digest `sha256:1e2ca8e3…99ec4`；16 件 +1359/−313=r032 15 件+`candidate_block.py`
+   闭包补件；adapter 同批原子切换律——9 件按 XCHECK §4 迁移，W0 形散失后重建版五面验证在档
+   `logs/S-FIX-W0B-20261018/adapter-rebuild/`）在库保留=回退面。
+2. **验收读数（S-FIX-W0B-20261018 窗实测，A 侧基准=MS1017 在役列）**：修复验证面全绿
+   ——G1 单元 122 passed/0 failed；G5 直证步级隐含宿主同步 20→0（py-spy 996 样本 0 帧）；
+   warm 门 6271.0（+1.4% 带内）；四查 15/15；needle 3/3；GSM8K 98.0%（196/200，err=0，
+   与 MS1017 同值）；PR 六档全带内；DE c1 四型 prose 79.48/structured 145.3/json 124.74
+   均带内（−1.1%/−0.9%/−0.6%）；44 项 RoCE parity A/B 双面 44/44+对拍零差。**但 code 型
+   DE 120.45（−6.8%）出带**——复 A 靴归因（1017 现役形复读 128.44=−0.7% 带中，
+   accept_len 佐证 5.33 vs 5.58/5.65）=**修复面回归非环境漂移**（与 XCHECK §5 风险
+   「write_selection 去排序=输出级等价非位级」同向）⇒ **产线留 1017 现役形，r032b
+   在库零部署**；死锁修复本体判绿，code 型性能回归呈裁（候选方向=候选序位级保持形
+   回移植）。A0 第 1 采无升级触发（prose −1.1%，分型 accept 全 ≥2.8 门槛）。
+   （历史读数引注不改；code 型出带的终局解=上位 r032c 位级保持形〔条目 1〕，
+   「产线留 1017 形」为 r032b 窗时点态，已由 r032c 终态转正承接。）
+3. **站点规避+取证包随包**：`docs/deploy/DEADLOCK-MITIGATION-AND-FORENSICS-20261018.md`
+   ——修复到位前「复现即重启」口径+升级前窗口建议+py-spy dump/record/top 三件套用法
+   （`scoring.py:164` vs `ncclCommInit*` 判别）+`/proc/<pid>/task/*/stack` 与环网
+   ethtool 差分（区分链路停滞 vs 从未开工）+NCCL INFO 低开销窗指引。
 
 ## 0.3.2 前置线（2026-10-15/16）：net-rebuild 修复 + 交换机方案适配
 
@@ -126,3 +257,11 @@
 4. **五包 VERSION 指纹全量重钉**（脱敏仓实算；修 SANITIZATION 掩码批后 VERSION
    陈值潜伏漂移+selfdiag F4 锚重钉 f2f10cb6+cfgmgmt regen 源路径 ${HOME} 化——
    五包 selfcheck RED=0 复跑全绿）。
+
+## 0.3.0 基线（2026-10-05 检查点；系列起点）
+
+- **R1 检查点封存**：`luz-0.3.0-r1`（commit `32c6acd`）=系列基线——36 键 env
+  `b7e318e0`+sitecustomize 七件 `91adc83d`+池 9.6M 门；后续 0.3.1 在此基线上
+  完成 FL6 召回修复转正与 VL 双臂。
+- 0.3.0 无独立公开发布包；其形态与读数作为 0.3.1 的对照基线保留在
+  `docs/report/` 与 `docs/registry/FORM-REGISTRY-031.md` 的历史引注中。

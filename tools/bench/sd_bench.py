@@ -337,7 +337,8 @@ def selfcheck():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=("de", "pr"), required=True)
+    ap.add_argument("--mode", choices=("de", "pr"), required=False,
+                    help="de/pr；--selfcheck 时可不填")
     ap.add_argument("--type", choices=DE_TYPES, default="prose")
     ap.add_argument("--concurrency", type=int, default=1)
     ap.add_argument("--max-tokens", type=int, default=400)
@@ -355,6 +356,8 @@ def main():
     a = ap.parse_args()
     if a.selfcheck:
         return selfcheck()
+    if not a.mode:
+        ap.error("--mode 必填（仅 --selfcheck 时可省）")
     if a.concurrency not in ALLOWED_CONC:
         return print(f"concurrency 必须是 {ALLOWED_CONC}", file=sys.stderr) or 2
     key = ""

@@ -1,0 +1,18 @@
+--- a/python/sglang/srt/layers/attention/dsv4/v41_indexer/sparse_table.py
++++ b/python/sglang/srt/layers/attention/dsv4/v41_indexer/sparse_table.py
+@@ -188,13 +188,8 @@
+         # The block-selection chain reads logits after the main stream moves on.
+         logits.record_stream(self.alt_stream)
+         # TODO(candidate): one kernel for both selections below (dense logits read once)
+-        topk_transform_paged_v2(
+-            logits,
+-            seq_lens,
+-            metadata.page_table,
+-            inputs.out_page_indices,
+-            metadata.compressed_page_size,
+-            metadata.topk_metadata,
++        topk_transform_paged_from_metadata(
++            logits, metadata, inputs.out_page_indices
+         )
+         # per row: block count for the block top-k, sparse-row length for the consumers
+         with torch.cuda.stream(self.alt_stream):

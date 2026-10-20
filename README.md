@@ -1,15 +1,48 @@
 # LuZ-deepseek-flash-all-in-one
 
-**LuZ-0.3.1** —— DeepSeek-V4.1-Flash @ **4×NVIDIA DGX Spark（GB10，SM121）TP4
-内部 RoCE 环网**全栈优化一体化交付（基于 SGLang 上游 `main-79cafec0` 的自有
+**LuZ-0.3.2（2026-10-20 定版）** —— DeepSeek-V4.1-Flash @ **4×NVIDIA DGX Spark（GB10，SM121）TP4
+双 rail RoCE（0.3.2 现役=交换机 flat 形；环网为 0.3.1 历史形）**全栈优化一体化交付（基于 SGLang 上游 `main-79cafec0` 的自有
 优化层，许可注记见 [NOTICE](NOTICE) / [LICENSE](LICENSE)）。
+
+> **0.3.2 定版档**：[release note 正典](docs/release/0.3.2-RELEASE-NOTE.md) ·
+> [系列 CHANGELOG](CHANGELOG.md) · [发布索引](docs/release/README.md) ·
+> [重建包](deploy/reconstruct/0.3.2/README.md) · **[升级指南](UPGRADE-0.3.2.md)**。
+> 现役形=CBX1A 56 键 env + SPEC6 九参 + IMAGE `0.3.2-r032c`
+> （digest `sha256:47f6d91a…ffc4`）。0.3.1 为前代定版（tag `v0.3.1`），
+> 其读数在下方保留为历史基线。
+
+## 版本系列
+
+| 版本 | 定版 | 主线 | 档 |
+|---|---|---|---|
+| **0.3.0** | 2026-10-05 | R1 检查点封存：36 键 env `b7e318e0`+sitecustomize 七件 `91adc83d`+池 9.6M 基线（tag 前基线） | [CHANGELOG](CHANGELOG.md) |
+| **0.3.1** | 2026-10-13 定型 / 10-14 发布 | FL6 召回修复转正（51 键）+VL 双臂+网关链；交付镜像 `0.3.1-r3` | tag [`v0.3.1`](https://github.com/luxingcom/luz-deepseek-flash-all-in-one/releases/tag/v0.3.1) · [CHANGELOG](CHANGELOG.md) |
+| **0.3.2** | 2026-10-20 | 净线重建→死锁修复（`520d6d0`+r032c 位级保持形）→五目标执行链→收官转正；池 84 件三态处置 | tag `v0.3.2` · [RELEASE-NOTE](docs/release/0.3.2-RELEASE-NOTE.md) · [重建包](deploy/reconstruct/0.3.2/README.md) · [升级指南](UPGRADE-0.3.2.md) |
 
 ---
 
-## 一、三大模型完整性能测试报告（0.3.1 定版读数）
+## 一、性能报告（0.3.2 定版主表 + 0.3.1 历史基线）
 
-> 全量档=`docs/report/031-FINAL-PERF-REPORT-20261009.md`（v2 定稿）；定型形
-> 服务口径读数承接 QA31 定型窗（`docs/quality/0.3.1-RELEASE-QUALITY.md` T2）。
+> 0.3.2 全量档=[release note](docs/release/0.3.2-RELEASE-NOTE.md)（五目标成绩单/
+> PR 七档/DE 五档锚/C8 定标/512k 斜率/硬守门）；历史 0.3.1 全量档=
+> `docs/report/031-FINAL-PERF-REPORT-20261009.md`（v2 定稿）+QA31 定型窗
+> （`docs/quality/0.3.1-RELEASE-QUALITY.md` T2）。
+
+### V4.1-Flash 0.3.2 定版（现役形 CBX1A 56 键+SPEC6 九参+r032c）
+
+| 指标 | 读数 | 对照/判 |
+|---|---|---|
+| **PR 七档（sparkdash 主口径，tok/s）** | 8k **5522.5** / 16k **6040.2** / 32k **6271.3** / 64k **6289.3** / 128k **6048.1** / 256k **5427.9** / 512k **4290.0** | 64k 峰档=判读线基线 6147.3 之上 **+2.3%**；A 轨 6600 差 4.7% |
+| **DE 五档锚（mt400 正典，agg_med）** | c1 **88.62**（锚 88.64 域）/ c2 **128.89** / c4 **168.35** / c8 **242.83** / c16 357.9（观察位） | DE prose A 轨 ≥84 **达成**；per 流比 1.0/0.766/0.488/0.356/0.270 |
+| **C8 聚合锚（liter）** | C1 **3757.7** / C2 **2849.8** / C4 **1571.0**（C4/C1=**0.418**） | 定标交付；A/B 轨定标提案已采纳，数值改善判读位=0.3.3 |
+| **512k 斜率** | 峰→256k **−12.31%** / 峰→512k **−28.65%** | A 轨 ≤−6.5% 未达，0.3.3 兑底 |
+| **质量/硬守门** | GSM8K **0.985-0.99** / needle 600k **3/3** / EQ-1 位等 **6/6** / 池 **9.6M** | 全绿零回归 |
+
+> 口径声明：全部读数=本仓自研 `sd_bench`/DE-48 量具，基线=本版本判读线列
+> （MS1017/A6-ANCHOR-7）；DE 一律 mt400 正典口径（83/73/80 三系互不可比）。
+> 外部数字带外，不作判读依据。详见 [release note](docs/release/0.3.2-RELEASE-NOTE.md)。
+
+> **0.3.1 历史基线读数**（下表）：服务口径承接 QA31 定型窗（`docs/quality/0.3.1-RELEASE-QUALITY.md` T2）。
 >
 > **基准与口径来源**：全部读数出自自研 **`sd_bench`**（`tools/bench/`，headless 复刻），
 > 测量口径逐文件对齐社区基准 **sparkDash**（[MiaAI-Lab/sparkDash](https://github.com/MiaAI-Lab/sparkDash)）
@@ -18,7 +51,7 @@
 > [docs/registry/BENCHMARK-SOURCE.md](docs/registry/BENCHMARK-SOURCE.md)**（定义源件
 > md5 表/工具谱系/对表结论/使用纪律）。
 
-### V4.1-Flash（主模型，0.3.1 定型形=50 键+SPEC6+W5 件；FL6 转正后现役=51 键，DE 82.17 见 §三）
+### V4.1-Flash（0.3.1 定型形=50 键+SPEC6+W5 件；FL6 转正后 51 键，历史基线）
 
 | 指标 | 读数 | 对照 |
 |---|---|---|
@@ -48,12 +81,21 @@
 | 网关 VL 车道 | 8002→8899 转正态第二实例在役（rc3.8.4+V1-V5 生产验证全绿：并发阶梯 429+Retry-After/大 body 四档 200 逐字对照/61.4MiB RSS 峰/断路 <10s 恢复/注入豁免字节平权/img16MB +24.8ms 呈裁带）；GW_API_KEY 已迁 EnvironmentFile 0600+轮换 47 字符（A10） |
 | （历史）vLLM 基座读数 | STDVL-K6CG-R1 形 prose **63.16** / code **112.93**（decode-CG 杠杆 +79.7%/+73.6%；vLLM 基座已退役=单基座交付律，读数留档对照） |
 
-### 0.3.1 特性构成
+### 0.3.2 特性构成（沿 0.3.1 基座 + 本期增量）
 
-R1 FP4-KV in-kernel（八件面）+ W5 stage2 MXFP8/出口直聚（两键）+ E3-A SWA
+0.3.1 基座：R1 FP4-KV in-kernel（八件面）+ W5 stage2 MXFP8/出口直聚（两键）+ E3-A SWA
 召回 N=256（SPEC6 第六参）+ O12 调度间隙（三键）+ LL128 NCCL 协议（三键）+
-FL6 召回修复（**51 键转正在役定版**，见 §三；FL6 面回退两级=摘键休眠/摘接线）。
+FL6 召回修复（51 键定型，见 §三；FL6 面回退两级=摘键休眠/摘接线）。
 键面回退链 51→50→48→47 键四级。
+
+0.3.2 增量（留役 10 件）：**A6 修复形**（indexk page64 遮蔽消除；DE 四型
++8.7~+9.6%）+**R1 转正形**（FP4KV 内核 `r1_formal=1`，零形变 ±0.2%）——64k 峰档
+两级抬升至 6289.3；**CBX1A cert M 八元**（`DSV41_CERT_HEAD_M=6,12,18,24,30,36,42,48`）
++B18 资格自证；**E16-B1 包络双键 1179648 + E16-B2 compact gather**（通信面）；
+**A8/A9 服务参接线**（`--tool-call-parser deepseekv41`/`--enable-cache-report`，
+issue #1/#2）+**A10②-a 网关容量四键**（issue #3）；**SPEC6 九参谱**（含
+`--sleep-on-idle`）+**D12 沉降键面+D15 五门断言族**。现役 env=CBX1A **56 键**
+（`0729e18d`），IMAGE `0.3.2-r032c`。
 
 ---
 
@@ -65,7 +107,12 @@ FL6 召回修复（**51 键转正在役定版**，见 §三；FL6 面回退两�
 | 镜像 | 用途 | 体量 | sha256 指纹 |
 |---|---|---|---|
 | `192.168.0.202:5000/lmsysorg/sglang:main-79cafec0` | **现役基座**（V4.1 文本+VL 原生视觉+0731 形+V4.0exp overlay 复原臂；运行期注入 adapter/overlay/env） | 48.6GB | `sha256:0f075735a6bf913a7cc1cd7ece4f526ae8af70fc5b88fdc02d9efe92a61cf3ae` |
+| `192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c` | **0.3.2 现役优化镜像**（死锁最小修复集 `520d6d0`+位级保持形；boot IMAGE 指针） | — | `sha256:47f6d91ada98…e2ffc4`（内网 registry manifest digest） |
 | `dsv41-sglang-optimized:0.2.9-ep1q2-fin2` | 优化烘焙谱系（0.2.9 现值；ep1u-fin/ep1q2f 前代） | 47.3GB | `sha256:f51d0f2ac9b47adfe4e1052682624ecd7b9ef7dbe20ebf98c4c01b1380f43b8f` |
+
+> **0.3.2 分发面注记**：`0.3.2-r032c` 为内网 registry 在役镜像（公开仓不携带
+> 镜像 tar；大文件不走 GitHub Release）。0.3.1-r3 网盘包（下节）保留为前代
+> 离线分发面；0.3.2 的离线包如需另行制作，以 release note 的镜像 digest 为准。
 
 > **历史注记（vLLM 两形，VL 线已切 SGLang 单基座——单基座交付律，不随网盘分发）**：
 > `vllm/vllm-openai:LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-VL-S1-20260910b`
@@ -98,16 +145,26 @@ load/校验/身份核对细则=包内 `README-DIST.md`。GitHub Releases=发布�
 
 ---
 
-## 三、快速上手与 FL6 状态位
+## 三、快速上手与现役形状态位（0.3.2）
 
-**形三元组**=env 键面（`deploy/env/`）+SPEC serve 六参（`deploy/SPEC6-SERVE-REF.md`）
-+adapter/overlay 面（`deploy/adapter/`、`deploy/overlay/`）——三件齐一才可 boot；
-**boot 四查**=health 200/printenv 四机逐字/横幅直读/面指纹四机全等。从零部署
-全流程见 **[docs/DEPLOY-GUIDE.md](docs/DEPLOY-GUIDE.md)**。
+**形三元组**=env 键面（`deploy/env/`）+SPEC serve 九参（`deploy/SPEC6-SERVE-REF.md`）
++adapter/overlay 面（`deploy/adapter/`、`deploy/overlay/`）——三件齐一才可 boot。
+**0.3.2 现役形**=env **CBX1A 56 键**（`0729e18d`，公开位
+`deploy/env/CBX1A-CERTM-spec1.env`）+SPEC6 九参+adapter **`b58e49ff`**（89 件记录；
+0.3.1 基底 + reconstruct 覆盖后 87 个运行时件，装配账
+`deploy/adapter/0.3.2-MANIFEST.md5`）+overlay backend `a1e7c3b5`+IMAGE `0.3.2-r032c`。
+**精确重建包**=`deploy/reconstruct/0.3.2/`（CBX1A env、adapter 13+4 件、r032c
+16 件补丁+构建配方、1017 权重/engram 台账；自验 `verify.sh` 期望 `RECON-KIT PASS`）。
+**升级与复现**=**[UPGRADE-0.3.2.md](UPGRADE-0.3.2.md)**（0.3.1 基底+混合快照的逐步
+升级、性能复现判据、回退与排障）。
+**boot 四查**=health 200/printenv 四机逐字/横幅直读/面指纹四机全等；另加
+**起栈接线闸门** `tools/serve_flags_gate.sh`（issue #4 采纳件：从运行进程
+argv 断言 A8/A9 两旗标，只读 fail-closed）。从零部署全流程见
+**[docs/DEPLOY-GUIDE.md](docs/DEPLOY-GUIDE.md)**。
 
-**FL6 召回修复（51 键，转正在役定版）**：FL6-PROMO 转正窗已闭 GREEN——产线现役
-=51 键修复形 **ENV51 `PROD-R51W5FL6-spec1.env`（2ac74586，服务器在役位名；仓内
-异名同值件=`deploy/env/PROD-R51W5-FL6FIX-spec1.env`）+sitecustomize 55b1e412
+**FL6 召回修复（0.3.1 期，51 键历史定版）**：FL6-PROMO 转正窗已闭 GREEN——0.3.1
+产线现役=51 键修复形 **ENV51 `PROD-R51W5FL6-spec1.env`（2ac74586，服务器在役位名；
+仓内异名同值件=`deploy/env/PROD-R51W5-FL6FIX-spec1.env`）+sitecustomize 55b1e412
 +fl6_recall.py b87cbb5e 四机全等**+SPEC6+overlay o12c1-prod；8899=200 在役健康。
 实役直证：**cp30 召回锚位 99.95%+DE 82.17**。回退链两级：一级=摘第 51 键（键关
 =sitecustomize 休眠逐字原版行为，不动 adapter 面）；二级=摘接线（按
@@ -126,27 +183,31 @@ load/校验/身份核对细则=包内 `README-DIST.md`。GitHub Releases=发布�
 > 本仓通信栈=该仓硬件转发层+NCCL 层 + 本仓 `deploy/nccl/`（ring-only 库+ncclpin 在役件）。
 >
 > **分支**：[`switch-fabric`](https://github.com/luxingcom/luz-deepseek-flash-all-in-one/tree/switch-fabric)
-> —— 交换机方案适配（双 rail 交换机拓扑下的 RoCE flat/one-shot 运行时、C 层 fabric
-> 语义键、交换机形态 env 样本）；差异档见其 `deploy/SWITCH-FABRIC.md`。`main` 保持
-> 环网方案形态，两方案差异件互不污染。
+> —— 0.3.2 交换机分支差异档（双 rail 交换机拓扑下的 RoCE flat/one-shot 运行时、
+> C 层 fabric 语义键、WG53 历史样本）；差异档见其 `deploy/SWITCH-FABRIC.md`。
+> 0.3.2 的 switched flat 运行时与 CBX1A env 已并入 main 的 reconstruct 包；
+> 环网（4 口 CX-7 hairpin）为 0.3.1 及更早历史形。两形不可混拼。
 
 ```
-docs/        定版成果：report(终版性能报告+TOOLS31 烘焙结果)/runbook(OPS-MANUAL)/registry(FORM-REGISTRY)/
-             quality(RELEASE-QUALITY 含 T2-VL 注记行)/research(FL6+红带+VL-NATIVE 三档：RESULT/
-             WINCARD/SGVISION 调查)/DEPLOY-GUIDE(含 §9 VL 面部署)/
-             ACKNOWLEDGEMENTS(定版 110 条：上游谱系/社区同行/官方资产/外部对照/工具田野)
-deploy/      服务面全集：env(两形+VL 四臂)/bin(r3 链+VL 双臂 boot+冒烟量具)/adapter(现役件)/
-             overlay(o12c1-prod 29 件+v4vl-79cafec0 复原树 28 件)/
+docs/        定版成果：release(0.3.2 RELEASE-NOTE+发布索引)/report(0.3.1 终版报告+TOOLS31 烘焙结果)/
+             runbook(OPS-MANUAL)/registry(FORM-REGISTRY)/quality(RELEASE-QUALITY)/research(FL6+红带+
+             VL-NATIVE 三档)/DEPLOY-GUIDE(含 §9 VL 面部署)/
+             ACKNOWLEDGEMENTS(定版 111 条：上游谱系/社区同行/官方资产/外部对照/工具田野)/
+             deploy/DEADLOCK-MITIGATION-AND-FORENSICS-20261018(0.3.2 死锁规避+py-spy 取证包)
+deploy/      服务面全集：env(0.3.1 历史形+CBX1A 现役+VL 四臂)/bin(r3 链+VL 双臂 boot+冒烟量具)/
+             reconstruct/0.3.2(现役形逐文件重建包：env/adapter/overlay/b12x/image/weights/boot)/
+             adapter(0.3.1 基底+0.3.2 装配账)/overlay(o12c1-prod 29 件+v4vl-79cafec0 复原树 28 件)/
              nccl(ring-only 库+ncclpin)/b12x(计算树)/kit(guard/instruments)/models.d(权重注册卡)/sentinel
 tools/       全树工具：packages(五包+_lib+_bake；gateway 含 VL 车道两件)/boot-with-slotlock/census 面板族/
-             judge/boot_sentinel/量具与门禁脚本/patches/ssh-password-login 运维件
-tests/       fl6-recall(双臂 6 测)/unit(b12x/row_store)/whitebox(14 件矩阵)
+             judge/boot_sentinel/量具与门禁脚本/serve_flags_gate(issue #4 起栈接线闸门)/patches/运维件
+tests/       fl6-recall(双臂 6 测)/unit(b12x/row_store/serve_flags_gate)/whitebox(14 件矩阵)
 ```
 
-CHANGELOG（0.3.0→0.3.2 在途）· SCAN-REPORT（密钥扫描）· NOTICE/LICENSE（许可）
+CHANGELOG（0.3.0→0.3.2 定版）· SCAN-REPORT（密钥扫描+0.3.2 tag 清洁门）· NOTICE/LICENSE（许可）·
+[UPGRADE-0.3.2](UPGRADE-0.3.2.md)（0.3.1→0.3.2 升级/性能复现/回退）
 
 ---
 
 ## 五、致谢（ACKNOWLEDGEMENTS）
 
-**110 条借鉴源全收录**（上游 SGLang 及 PR 谱系 26/社区同行 60/官方资产 5/外部配置对照 10/工具田野情报 9）——每条带来源+借鉴内容+使用状态（采纳在役/判负留库/参照对比/政策依据）+档案锚；**判负件与反向不吸收同样如实收录**（用户点名「无论好坏、无论是否用到」）：**[docs/ACKNOWLEDGEMENTS.md](docs/ACKNOWLEDGEMENTS.md)**。
+**111 条借鉴源全收录**（上游 SGLang 及 PR 谱系 26/社区同行 61/官方资产 5/外部配置对照 10/工具田野情报 9）——每条带来源+借鉴内容+使用状态（采纳在役/判负留库/参照对比/政策依据）+档案锚；**判负件与反向不吸收同样如实收录**（用户点名「无论好坏、无论是否用到」）：**[docs/ACKNOWLEDGEMENTS.md](docs/ACKNOWLEDGEMENTS.md)**。

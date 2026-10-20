@@ -1,0 +1,95 @@
+{
+ "model": "/data/models/DeepSeek-V4.1-Flash-1017",
+ "tp": 4,
+ "layers": [
+  1,
+  14
+ ],
+ "num_embeddings": [
+  384006168,
+  384016682
+ ],
+ "bins": [
+  {
+   "layer": 1,
+   "rank": 0,
+   "lo": 0,
+   "hi": 96001542,
+   "rows": 384006168,
+   "size": 25344411184,
+   "sha256": "f6e91330e19ba5c8147415d67d7ef2f25f52251c486e6ebae9bb0eb17445277c",
+   "spot_bad": 0
+  },
+  {
+   "layer": 1,
+   "rank": 1,
+   "lo": 96001542,
+   "hi": 192003084,
+   "rows": 384006168,
+   "size": 25344411184,
+   "sha256": "e7c8a3551bcbbdaa942fe295602f8d2f30776d1f2bb9ba4068effff8bf5b674c",
+   "spot_bad": 0
+  },
+  {
+   "layer": 1,
+   "rank": 2,
+   "lo": 192003084,
+   "hi": 288004626,
+   "rows": 384006168,
+   "size": 25344411184,
+   "sha256": "d67ecbf4da7f08eb78dcd82cd753f74db8f601626279cb2e11dfd7b6b83f82bb",
+   "spot_bad": 0
+  },
+  {
+   "layer": 1,
+   "rank": 3,
+   "lo": 288004626,
+   "hi": 384006168,
+   "rows": 384006168,
+   "size": 25344411184,
+   "sha256": "bb51c4a7c998819c42e00e8726ad7ce0cb913b1994d39b34e0cc85f67bd5ed4d",
+   "spot_bad": 0
+  },
+  {
+   "layer": 14,
+   "rank": 0,
+   "lo": 0,
+   "hi": 96004170,
+   "rows": 384016682,
+   "size": 25345104976,
+   "sha256": "445dfae2b7004df02f570c8d40985222d9373795b02a425dd9e96b1b49d8ac22",
+   "spot_bad": 0
+  },
+  {
+   "layer": 14,
+   "rank": 1,
+   "lo": 96004170,
+   "hi": 192008341,
+   "rows": 384016682,
+   "size": 25345105240,
+   "sha256": "4b9f5c3995da22463ea67ae3e160f95deec045517c96744b3fd9f86161101e7c",
+   "spot_bad": 0
+  },
+  {
+   "layer": 14,
+   "rank": 2,
+   "lo": 192008341,
+   "hi": 288012511,
+   "rows": 384016682,
+   "size": 25345104976,
+   "sha256": "abadf7f0f422da3c01779935f25da54bee6ebb0cd077813092a616ca72e18fa4",
+   "spot_bad": 0
+  },
+  {
+   "layer": 14,
+   "rank": 3,
+   "lo": 288012511,
+   "hi": 384016682,
+   "rows": 384016682,
+   "size": 25345105240,
+   "sha256": "0906516f83cec66f234e39c0ee6f145b942c3fa28b22ba420f408ca19ee29d15",
+   "spot_bad": 0
+  }
+ ],
+ "failures": []
+}
