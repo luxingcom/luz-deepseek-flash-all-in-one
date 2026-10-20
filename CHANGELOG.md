@@ -26,6 +26,36 @@
 
 **回退面**：镜像双存（r032c 在库+r032 基线；boot IMAGE 单行回指一键复原，1 靴 ≈1.5-2h）；adapter 逐件回拷链（A6 beb131ab→55b1e412／R1 75062432→feaaadd4）；env 回退链 CBX1A→E16B2→FB54→WG53；已执行回退件（B20/E11/B24/B25/L2OFF）零残留横幅自证。
 
+## 0.3.2 定版维护（2026-10-20 定版后；tag `v0.3.2` 面）
+
+> 本节的改动全部在 0.3.2 已推 main（`c52a560`）之后、tag `v0.3.2` 之前落盘，
+> 属**发布面一致性与可用性维护**，不动产线形、不改历史读数。
+
+1. **README 版本面升级**：头档 0.3.1→**0.3.2 定版**；新增「版本系列」总览
+   （0.3.0/0.3.1/0.3.2）与 0.3.2 性能主表（PR 七档/DE 五档锚/C8 聚合/512k/质量）；
+   0.3.1 读数保留为历史基线；镜像表补 `0.3.2-r032c`（digest `47f6d91a…ffc4`）；
+   现役形状态位改为 CBX1A 56 键+SPEC6 九参+adapter `b58e49ff`；致谢计数 110→**111**。
+2. **部署面注记**：`deploy/README.md` 标明混合快照（boot 参面=0.3.2 终态，
+   env/adapter=0.3.1 样本；0.3.2 臂件归位=呈裁位）；`deploy/bin/r3-boot-arm.sh`
+   行 md5 更新为 `20f22bc6`；`deploy/SPEC6-SERVE-REF.md` 与
+   `docs/DEPLOY-GUIDE.md` 加 0.3.2 定版注记。
+3. **issue #4 采纳件**：新增 `tools/serve_flags_gate.sh`——从运行进程 argv /
+   `/get_server_info` 断言 `--tool-call-parser deepseekv41` 与
+   `--enable-cache-report` 真的接线（只读、fail-closed、不经管道取 rc）；
+   内置 R1-R7 反向自检（`--self-test`），测试包装
+   `tests/unit/test_serve_flags_gate.sh`。SPEC6 新增「旗标-能力-生效值」对照表。
+   本件是交付面补充工具，**不改产线 boot 快照**。
+4. **发布索引**：新增 `docs/release/README.md`（版本系列+发布面三层+系列纪律）。
+5. **文档修整**：`deploy/b12x/b12x_next/integration/vllm/README.md` 的
+   上游文档引用由相对链接改为路径说明（上游件未 vendored，原链接为坏链）；
+   `docs/ACKNOWLEDGEMENTS.md` 状态口径补 0.3.2。
+6. **量具可用性修**：`tools/bench/sd_bench.py` 的 `--selfcheck` 不再被
+   `--mode` 的 required 拦住（原状=文档写 `--selfcheck`、实跑先报缺 `--mode`）；
+   非自检路径仍强制 `--mode`。自检 21/21 PASS 复跑。
+7. **tag `v0.3.2` 清洁门**：打 tag 前在定版树上重跑密钥/凭据/PII 全量扫描、
+   103 件 shell + 927 件 Python 语法检查、临时件检查与相对链接检查；
+   结果与保留项见 `SCAN-REPORT.md` §「0.3.2 tag 清洁门」。
+
 ## 0.3.2 死锁修复（2026-10-18 修复体验证毕 → 10-20 r032c 位级保持形终态转正在役）
 
 > 43h 长稳调度死锁（2026-10-16 站点甲；四机同点 `v41_indexer/scoring.py:164` 宿主同步
@@ -179,3 +209,11 @@
 4. **五包 VERSION 指纹全量重钉**（脱敏仓实算；修 SANITIZATION 掩码批后 VERSION
    陈值潜伏漂移+selfdiag F4 锚重钉 f2f10cb6+cfgmgmt regen 源路径 ${HOME} 化——
    五包 selfcheck RED=0 复跑全绿）。
+
+## 0.3.0 基线（2026-10-05 检查点；系列起点）
+
+- **R1 检查点封存**：`luz-0.3.0-r1`（commit `32c6acd`）=系列基线——36 键 env
+  `b7e318e0`+sitecustomize 七件 `91adc83d`+池 9.6M 门；后续 0.3.1 在此基线上
+  完成 FL6 召回修复转正与 VL 双臂。
+- 0.3.0 无独立公开发布包；其形态与读数作为 0.3.1 的对照基线保留在
+  `docs/report/` 与 `docs/registry/FORM-REGISTRY-031.md` 的历史引注中。

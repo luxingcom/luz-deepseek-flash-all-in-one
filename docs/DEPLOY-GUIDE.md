@@ -1,6 +1,11 @@
-# DEPLOY-GUIDE — LuZ-0.3.1 从零部署指南（4×DGX Spark GB10 TP4 RoCE 环网）
+# DEPLOY-GUIDE — 从零部署指南（4×DGX Spark GB10 TP4 RoCE 环网）
 
-> 目标：在四台 DGX Spark（GB10）上从零复原 LuZ-0.3.1 定型形生产栈。
+> 目标：在四台 DGX Spark（GB10）上从零复原 LuZ 生产栈。
+> **0.3.2 定版注记（2026-10-20）**：本指南的形定义/键面/指纹以 **0.3.1 定型形**
+> 为基线（历史锚），部署步骤仍适用；0.3.2 的增量面=SPEC6 九参（本文引用处按
+> 九参理解）+IMAGE `0.3.2-r032c`（digest `47f6d91a…ffc4`）+现役 env CBX1A
+> 56 键（内部臂件，公开仓归位=呈裁）。0.3.2 全量差异见
+> [release/0.3.2-RELEASE-NOTE.md](release/0.3.2-RELEASE-NOTE.md)。
 > 规程法源=`docs/runbook/OPS-MANUAL-031.md`（boot/复原/回退三章）；形权威表=
 > `docs/registry/FORM-REGISTRY-031.md`（三形三元组+部署面指纹）。
 

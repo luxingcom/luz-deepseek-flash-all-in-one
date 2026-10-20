@@ -1,4 +1,10 @@
-# SPEC6 — 0.3.1 定型形 serve 参谱（六参→九参）
+# SPEC6 — serve 参谱（六参→九参；0.3.2 定版形）
+
+> **0.3.2 定版注记（2026-10-20）**：九参谱为 0.3.2 终态在役形（boot
+> `r3-boot-arm.sh` `20f22bc6`）；本文档的 50 键引用为 0.3.1 键面历史锚，
+> 0.3.2 现役 env=CBX1A 56 键（内部臂件）。起栈接线有效性由
+> [`tools/serve_flags_gate.sh`](../tools/serve_flags_gate.sh) 从运行进程 argv
+> 直证（issue #4 采纳件）。
 
 > 法源：FORM-REGISTRY-031 §一（50 键行）+KV-LIFE desk/lib.sh:11+E3A §六。
 > C0 定型臂 serve=SPEC6（COMBO 冻结窗卡 §三）；SPEC7（六参+`--chunked-prefill-size
@@ -56,6 +62,28 @@
   `--json-model-override-args '{"candidate_topk_blocks": 2048}'`、
   `--fp8-gemm-backend flashinfer_cutlass`）为 boot 链固定面，不属 SPEC 参谱
   （r3-boot-arm.sh 内嵌，逐行注释在档）。
+
+## 旗标-能力-生效值对照表（issue #4）
+
+> 判据纪律：**断言"正在跑的进程 argv/运行时自省"，不断言源码或 env 里的静态串**。
+> 只证"镜像支持"=假绿；接线漏了 `/health` 仍 200。闸门实现=
+> [`tools/serve_flags_gate.sh`](../tools/serve_flags_gate.sh)（只读、fail-closed、
+> 含 R1-R7 反向自检）。
+
+| 能力 | 必需旗标 | 生效值怎么读 | 缺了会怎样 |
+|---|---|---|---|
+| 工具调用成型 | `--tool-call-parser deepseekv41`（连写；`deepseek-v41` 是 reasoning parser 写法，不通用） | 容器内 `/proc/1/cmdline`；或 `/get_server_info` 的 `tool_call_parser` | DSML 以纯文本吐出，`/health` 仍 200（静默降级） |
+| 缓存用量上报 | `--enable-cache-report` | 同上；`/get_server_info` 的 `enable_cache_report` | `usage.prompt_tokens_details.cached_tokens` 恒 `null`，面板缓存命中恒 0% |
+| 排队上限 | `--max-queued-requests 32` | argv 值 | 并发/背压行为偏离定型形 |
+| 空闲降 CPU | `--sleep-on-idle` | argv 存在 | 空闲期 CPU 忙转（第九参，2026-10-16 入谱） |
+
+用法（head 与 worker 必须各查——角色差异 R7）：
+
+```bash
+tools/serve_flags_gate.sh --container r3boot-head --container r3boot-worker
+tools/serve_flags_gate.sh --api http://127.0.0.1:30000
+tools/serve_flags_gate.sh --self-test    # R1-R7 判别力回归
+```
 
 ## 与 env 键面的配对律
 
