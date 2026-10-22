@@ -173,7 +173,7 @@ fi
 
 # ── host ring + kernel ──────────────────────────────────────────────────────
 for h in "${HOSTS[@]}"; do
-  if out=$(run_on "$h" "bash /usr/local/sbin/roce-ring-apply.sh check" 2>&1); then
+  if out=$(run_on "$h" "RX_TARGET=$PROD_RX_RING FW_TARGET=$PROD_NIC_FW_ALLOW LOSSLESS_BUFFER=$PROD_LOSSLESS_BUFFER bash /usr/local/sbin/roce-ring-apply.sh check" 2>&1); then
     record PASS "ring:$h" "rx=$PROD_RX_RING"
   else
     record FAIL "ring:$h" "$(tr '\n' ' ' <<<"$out")"

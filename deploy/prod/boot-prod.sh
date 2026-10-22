@@ -94,7 +94,7 @@ done
 log "kernel allowlist OK"
 
 for h in "${HOSTS[@]}"; do
-  run_on "$h" "bash /usr/local/sbin/roce-ring-apply.sh check" >/dev/null \
+  run_on "$h" "RX_TARGET=$PROD_RX_RING FW_TARGET=$PROD_NIC_FW_ALLOW LOSSLESS_BUFFER=$PROD_LOSSLESS_BUFFER bash /usr/local/sbin/roce-ring-apply.sh check" >/dev/null \
     || die "$h NIC profile drift (ring/firmware/lossless buffer/PFC); run: sudo /usr/local/sbin/roce-ring-apply.sh apply (engine stopped)"
 done
 log "RX ring $PROD_RX_RING OK on all hosts"
