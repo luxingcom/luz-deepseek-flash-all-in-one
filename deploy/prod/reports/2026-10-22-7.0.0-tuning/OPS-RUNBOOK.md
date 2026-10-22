@@ -108,7 +108,7 @@ bash ~/migrate-assets/prod/selfcheck-prod.sh --post-boot
 - 禁止栈运行时写 ring/buffer/PFC。
 - 禁止绕过 `boot-prod.sh` 起栈。
 - 禁止未审批修改 netplan、`oom-gate-monitor`、`r3-watchdog-worker`。
-- 禁止把 sudo 密码、API key 写入日志、报告、仓库或命令行参数。
+- 禁止把 sudo 密码、模型凭据 写入日志、报告、仓库或命令行参数。
 - 禁止为手动风扇关闭 Secure Boot。
 
 ## 8. 交接签字

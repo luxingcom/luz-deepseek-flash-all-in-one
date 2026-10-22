@@ -59,7 +59,7 @@ BOOT_RC=0
 
 | 项目 | 变更前 | 当前 | 范围 | 结果 |
 |---|---|---|---|---|
-| NIC lossless buffer | 固件默认 `458496` | `523296` | 四机 16 口 | 已读回；PR/DE 无持续增益，按用户决定保留余量 |
+| NIC lossless buffer | 固件默认 `458496` | `523296` | 四机 16 口 | 已读回；PR 无持续增益；DE 维持锚点附近，按用户决定保留余量 |
 | RX ring | 4096（已测试值） | 4096 | 四机 16 口 | 保留，不随固件默认回落到 1024 |
 | GPU 软件锁频 | `gb10-clock-cap.service` 执行 `nvidia-smi -lgc 0,2400` | unit disabled/inactive，已 `-rgc`，无频率上限 | 四机 | EC 自动调节，负载约 2.45 GHz |
 | 手动风扇覆盖 | `nvfancontrol` 单元 disabled、模块未加载 | 保持未加载，EC auto | 四机 | 模块因 Secure Boot/MOK 无法加载；EC auto 正常 |
@@ -105,7 +105,7 @@ bd732d4 fix(prod): pass pinned NIC targets into selfcheck and preflight
 | buffer 恢复 523296 | 5743.7 | 3910.3 | 5760 |
 | 131072 empty-cache 测试后回退 8192（最终靴） | 5797.1 | 3891.2 | 5797 |
 
-单次 PR 波动约 ±5%，三组差异落在噪声范围内；**buffer 恢复没有带来可重复的 prefill/DE 增益**。它仍按用户要求保留，原因是 PFC prio3/prio5 在交换网络下需要原有的突发吸收余量，而不是因为它能解释本次回归。
+单次 PR 波动约 ±5%，三组差异落在噪声范围内；**buffer 恢复没有带来可重复的 prefill 增益**。它仍按用户要求保留，原因是 PFC prio3/prio5 在交换网络下需要原有的突发吸收余量，而不是因为它能解释本次回归。
 
 ### 4.3 结论
 
@@ -416,7 +416,7 @@ CTN_PREFIX=r3prod R3_STOP_VERIFY=1 bash ~/migrate-assets/bin/r3-stop.sh
 - 禁止在栈运行时写 NIC ring/buffer/PFC。
 - 禁止绕过 `boot-prod.sh` 直接起栈。
 - 禁止未审批修改 netplan、`oom-gate-monitor`、`r3-watchdog-worker`。
-- 禁止把 sudo 密码、API key 写入日志、报告、仓库或命令行参数。
+- 禁止把 sudo 密码、模型凭据 写入日志、报告、仓库或命令行参数。
 - 禁止为了手动风扇关闭 Secure Boot；MOK 只能在控制台按安全流程注册。
 
 ---
