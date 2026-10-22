@@ -1,0 +1,9 @@
+# Registry tags removed 2026-10-22 (dsv41-sglang-optimized)
+# Each DELETE returned HTTP 202. Kept: 0.3.2-r032c, 0.3.2-baseline-20261022 (both sha256:47f6d91a...ffc4).
+0.3.1      sha256:79e701ab4658013ce51855cc8ed97b09f892b20287bebd58b204934a1267cfd5  202
+0.3.1-r2   sha256:7546a993bbf241e910c2f688c1ba25d253b1371b1219de61505ce33f1f9b5e44  202
+0.3.1-r3   sha256:f8095fa8d6ed867a9b40c5a90dbadd942bf12d80443d0b8db76ae24a36e415c1  202
+0.3.2-r032 sha256:bd281e6f94b55755ca297003de982ca7a993729051ba16b5748d14928ea631f5  202
+0.3.2-r032b sha256:1e2ca8e3ea7fe4aada77d2111fd135f653a469c6e60a98962eb4e85367399ec4  202
+# Garbage collection: registry garbage-collect --delete-untagged, exit 0.
+# /data/registry: 117,763,058,813 B -> 55,573,437,978 B.

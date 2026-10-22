@@ -10,8 +10,10 @@ and are listed separately below with their SHA256 values.
 
 | Path | Bytes | SHA256 |
 |---|---:|---|
+| `ARCHIVE-INDEX.md` | 6585 | `38d62c275ac65738f05aeacc8ed1637ec402ecc8d72b53da973a9f66978a9684` |
+| `CLEANUP-20261022.md` | 5844 | `7dae588908a1b4b36806a94377fdaf8347c9107cc0d9a2ed7ee55d8abbd0d4e7` |
 | `IMAGE-IDENTITY.json` | 3741 | `fd92056ad17b201fc21fa9bf02402b6fbc1afc328acd9723e8b6aba7d90d1033` |
-| `README.md` | 5590 | `f4a7b7c5760fb7176974fe9d63ec85657396dfacca9dc11e8b5d746f80164b41` |
+| `README.md` | 6270 | `5986a4cbfbf328aba52f7042be0dfba5e95f4d402ee7350601c38cc25ef4a008` |
 | `RESTORE.sh` | 1749 | `fcb78080d799a67548617a65a0510aa80b03b22ce71bfcb40f6d1f1829ab7fe4` |
 | `deploy/migrate-assets.EXCLUDED.txt` | 428 | `fb45eeb560893ca304b9cf090125a21c6e6189f1b8d48e461ee1398906ef2c13` |
 | `deploy/migrate-assets.FILES.txt` | 59012 | `684a969457de4a86127747eb4d5aa2f1b35a4e605c0e33acdf47c090286b936c` |
@@ -22,6 +24,7 @@ and are listed separately below with their SHA256 values.
 | `registry/image-inspect-dgxspark01.json` | 1810 | `b014acf55e6211eb811080d708b187fe4ebad071632cbad14a234635cfd5e142` |
 | `registry/image-inspect-dgxspark02.json` | 1628 | `d44c3bcb4c2b051ed0336f8c1cd55f988520e68e834fe32059d090b844e4bf5e` |
 | `registry/index-r032c.json` | 857 | `47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4` |
+| `registry/removed-tags-20261022.txt` | 739 | `dcaf8e840ff13fd06e307b2b22b965c5d3ee15ce22fc3546b5958082a9ed0ffc` |
 | `runtime-summary.md` | 3195 | `21b1891fe14a73908b770080d5f086cca6ad286765496c825beaea737d194f10` |
 
 ## External assets on DGXspark02

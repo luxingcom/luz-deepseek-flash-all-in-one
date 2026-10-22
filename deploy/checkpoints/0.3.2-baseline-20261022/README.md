@@ -95,6 +95,19 @@ repo at tag `v0.3.2-baseline-20261022`.
 - **Two root-owned 300-byte files** under `migrate-assets/flashinfer-golden/work/0.6.18/sm121/` were excluded from the assets tar because they are unreadable to the deploy user. They are regenerable JIT metadata; the exclusion list is in `deploy/migrate-assets.EXCLUDED.txt`.
 - **Old 0.3.1/0.3.2-r032/r032b images and their archives** are handled by the cluster archive/cleanup pass, not by this checkpoint.
 
+## Archive and cleanup closure (2026-10-22)
+
+The pre-0.3.2 archive consolidation and the old image/tag/cache cleanup completed
+on 2026-10-22. The 0.3.2 baseline image identity above is unchanged.
+
+- Historical sources are consolidated on `DGXspark02:~/cluster-archive-20261022/`
+  (290,063,676,566 bytes, 92,931 files); per-directory checksums and the retained
+  paths are in [`ARCHIVE-INDEX.md`](ARCHIVE-INDEX.md).
+- Removed images, registry tags, GC result, cache cleanup and host disk changes are
+  in [`CLEANUP-20261022.md`](CLEANUP-20261022.md).
+- The registry now keeps only `0.3.2-r032c` and `0.3.2-baseline-20261022`, both at
+  OCI index digest `sha256:47f6d91a…ffc4`.
+
 ## Verification
 
 ```bash
