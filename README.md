@@ -10,6 +10,11 @@
 > 现役形=CBX1A 56 键 env + SPEC6 九参 + IMAGE `0.3.2-r032c`
 > （digest `sha256:47f6d91a…ffc4`）。0.3.1 为前代定版（tag `v0.3.1`），
 > 其读数在下方保留为历史基线。
+>
+> **2026-10-22 基线回滚点**：r032c 固化为 registry tag
+> `0.3.2-baseline-20261022`（OCI index `sha256:47f6d91a…ffc4`），离线镜像、
+> 运行时快照与恢复脚本见
+> [checkpoint](deploy/checkpoints/0.3.2-baseline-20261022/README.md)。
 
 ## 版本系列
 

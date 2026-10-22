@@ -3,6 +3,18 @@
 > 提炼自战役仓 git log（`luz-0.3.0-r1`（2026-10-05，32c6acd）之后 632 commits）
 > 与总卡/定稿报告。逐项档锚见 `docs/` 各分档。
 
+## 0.3.2 基线回滚点（2026-10-22；tag `v0.3.2-baseline-20261022`）
+
+- 以 r032c OCI index `sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4`
+  作为唯一 0.3.2 基线；registry 新增 tag `0.3.2-baseline-20261022`。
+- 离线 `docker save` tar `image-r032c-arm64.tar`（33,591,321,600 B；
+  SHA256 `3d168db1…f624a`）与 OCI index/arm64 manifest/config digest 一并存档。
+- 01 head（containerd overlayfs）与 02–04 worker（overlay2）的本地 image ID
+  差异仅为 storage backend：index digest `47f6d91a…` vs config digest
+  `ef64dec3…`，内容同一。
+- 基线文档、恢复脚本、运行时快照与 `migrate-assets`/git bundle 备份见
+  `deploy/checkpoints/0.3.2-baseline-20261022/`。
+
 ## 0.3.2 收官（2026-10-20 定版；v0.3.2）
 
 > 版本叙事+性能终态全表+硬守门+已知局限+回退面六件全档=**`docs/release/0.3.2-RELEASE-NOTE.md`**（release note 正典档）。

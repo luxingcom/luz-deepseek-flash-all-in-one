@@ -1,0 +1,5 @@
+# Files excluded from deploy/migrate-assets.tar.zst (2026-10-22)
+# Reason: root-owned 300-byte JIT metadata files, unreadable to the deploy user.
+# They are regenerable FlashInfer golden-work metadata, not runtime code.
+migrate-assets/flashinfer-golden/work/0.6.18/sm121/7e31ba14c240a509/rank_tp0_pp0_dp0.json 300 root:root
+migrate-assets/flashinfer-golden/work/0.6.18/sm121/472a7346d01ee0ea/rank_tp0_pp0_dp0.json 300 root:root

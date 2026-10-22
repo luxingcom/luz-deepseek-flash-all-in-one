@@ -1,0 +1,33 @@
+{
+  "Architecture": "arm64",
+  "Config": {
+    "Labels": {
+      "BUILT_AT": "2026-10-18T05:20:00Z",
+      "DSV41_BASE_DIGEST": "80e1ea8979c5",
+      "DSV41_IMAGE_VERSION": "0.3.2-r032c",
+      "DSV41_PORT_BASE": "520d6d0+fc2795b+391e665(candidate_block_mask)",
+      "DSV41_PORT_SCOPE": "minimal-deadlock-fix +bit-preserve-selection-order 16 files",
+      "DSV41_REPLAY_TREE": "dab49d96d33839480e30a1d24ac9e6cdb0a9c29d",
+      "ai.sglang.build.commit": "79cafec013d0a01c782d7a4bc902ef32a8941ba8",
+      "ai.sglang.build.url": "https://github.com/sgl-project/sglang/actions/runs/36503112572",
+      "ai.sglang.image.tag": "lmsysorg/sglang:nightly-dev-20260929-79cafec0",
+      "com.nvidia.cudnn.version": "9.14.0.64-1",
+      "maintainer": "NVIDIA CORPORATION <cudatools@nvidia.com>",
+      "org.opencontainers.image.revision": "79cafec013d0a01c782d7a4bc902ef32a8941ba8",
+      "org.opencontainers.image.source": "https://github.com/sgl-project/sglang",
+      "org.opencontainers.image.url": "https://github.com/sgl-project/sglang/actions/runs/36503112572",
+      "org.opencontainers.image.version": "lmsysorg/sglang:nightly-dev-20260929-79cafec0"
+    }
+  },
+  "Created": "2026-10-18T05:15:37.406789635Z",
+  "Id": "sha256:ef64dec3d74b577bfcc8f54cc940b87d92701a9d9c3bb3c6c1214133c5e605b2",
+  "Os": "linux",
+  "RepoDigests": [
+    "192.168.0.202:5000/dsv41-sglang-optimized@sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4"
+  ],
+  "RepoTags": [
+    "192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-baseline-20261022",
+    "192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c"
+  ],
+  "Size": 33221760806
+}

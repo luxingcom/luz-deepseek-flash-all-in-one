@@ -1,0 +1,8 @@
+HTTP/1.1 201 Created
+Docker-Content-Digest: sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4
+Docker-Distribution-Api-Version: registry/2.0
+Location: http://127.0.0.1:5000/v2/dsv41-sglang-optimized/manifests/sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4
+X-Content-Type-Options: nosniff
+Date: Thu, 22 Oct 2026 01:10:23 GMT
+Content-Length: 0
+

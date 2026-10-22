@@ -1,0 +1,89 @@
+{
+  "baseline": "0.3.2-baseline-20261022",
+  "decision_date": "2026-10-22",
+  "source_tag": "192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c",
+  "baseline_tag": "192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-baseline-20261022",
+  "registry": "192.168.0.202:5000",
+  "repository": "dsv41-sglang-optimized",
+  "created": "2026-10-18T05:15:37.406789635Z",
+  "platform": {
+    "os": "linux",
+    "architecture": "arm64"
+  },
+  "oci_index_digest": "sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4",
+  "arm64_manifest_digest": "sha256:ad7e362f4fe74cc0706bc13d77839909e0742669b4291b0ac58374967dc2b57e",
+  "config_digest": "sha256:ef64dec3d74b577bfcc8f54cc940b87d92701a9d9c3bb3c6c1214133c5e605b2",
+  "layers": 71,
+  "compressed_size_bytes": 14439524460,
+  "uncompressed_size_bytes": 33221760806,
+  "image_tar": {
+    "file": "image-r032c-arm64.tar",
+    "bytes": 33591321600,
+    "sha256": "3d168db1dd7852e752b2c4a45534a20cc6c66f8cd276c7341acf7b72b45f624a"
+  },
+  "labels": {
+    "BUILT_AT": "2026-10-18T05:20:00Z",
+    "DSV41_BASE_DIGEST": "80e1ea8979c5",
+    "DSV41_IMAGE_VERSION": "0.3.2-r032c",
+    "DSV41_PORT_BASE": "520d6d0+fc2795b+391e665(candidate_block_mask)",
+    "DSV41_PORT_SCOPE": "minimal-deadlock-fix +bit-preserve-selection-order 16 files",
+    "DSV41_REPLAY_TREE": "dab49d96d33839480e30a1d24ac9e6cdb0a9c29d",
+    "ai.sglang.build.commit": "79cafec013d0a01c782d7a4bc902ef32a8941ba8",
+    "ai.sglang.build.url": "https://github.com/sgl-project/sglang/actions/runs/36503112572",
+    "ai.sglang.image.tag": "lmsysorg/sglang:nightly-dev-20260929-79cafec0",
+    "org.opencontainers.image.revision": "79cafec013d0a01c782d7a4bc902ef32a8941ba8",
+    "org.opencontainers.image.source": "https://github.com/sgl-project/sglang",
+    "org.opencontainers.image.version": "lmsysorg/sglang:nightly-dev-20260929-79cafec0"
+  },
+  "hosts": {
+    "dgxspark01": {
+      "role": "head",
+      "container": "r3prod-head",
+      "local_image_id": "sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4",
+      "local_id_kind": "oci_index_digest",
+      "storage_driver": "overlayfs",
+      "api_port": 8899,
+      "health": "200"
+    },
+    "dgxspark02": {
+      "role": "worker+registry",
+      "container": "r3prod-worker",
+      "local_image_id": "sha256:ef64dec3d74b577bfcc8f54cc940b87d92701a9d9c3bb3c6c1214133c5e605b2",
+      "local_id_kind": "config_digest",
+      "storage_driver": "overlay2",
+      "api_port": 30000,
+      "health": "200"
+    },
+    "dgxspark03": {
+      "role": "worker",
+      "container": "r3prod-worker",
+      "local_image_id": "sha256:ef64dec3d74b577bfcc8f54cc940b87d92701a9d9c3bb3c6c1214133c5e605b2",
+      "local_id_kind": "config_digest",
+      "storage_driver": "overlay2",
+      "api_port": 30000,
+      "health": "200"
+    },
+    "dgxspark04": {
+      "role": "worker",
+      "container": "r3prod-worker",
+      "local_image_id": "sha256:ef64dec3d74b577bfcc8f54cc940b87d92701a9d9c3bb3c6c1214133c5e605b2",
+      "local_id_kind": "config_digest",
+      "storage_driver": "overlay2",
+      "api_port": 30000,
+      "health": "200"
+    }
+  },
+  "supersedes": [
+    "192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032",
+    "192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032b",
+    "192.168.5.187:5000/dsv41-sglang-optimized:0.3.1",
+    "192.168.5.187:5000/dsv41-sglang-optimized:0.3.1-r2",
+    "192.168.5.187:5000/dsv41-sglang-optimized:0.3.1-r3"
+  ],
+  "checks": {
+    "registry_manifest_put": "HTTP 201 Created, Docker-Content-Digest sha256:47f6d91ada…",
+    "registry_manifest_get": "HTTP 200 OK, Docker-Content-Digest sha256:47f6d91ada…",
+    "image_tar_sha256": "sha256sum -c OK",
+    "image_tar_listing": "tar -tf OK, OCI layout with 71 layer blobs"
+  }
+}

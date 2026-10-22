@@ -1,0 +1,5 @@
+HTTP/1.1 200 OK
+Content-Length: 857
+Content-Type: application/vnd.oci.image.index.v1+json
+Docker-Content-Digest: sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4
+X-Content-Type-Options: nosniff
