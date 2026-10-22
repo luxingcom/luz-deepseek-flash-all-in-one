@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodic RoCE host profile check
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=false
+
+[Install]
+WantedBy=timers.target

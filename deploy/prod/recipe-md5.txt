@@ -1,0 +1,8 @@
+da98467d3fd7d5019ea025b3d5273a20  dsv41_recipe.py
+eb01751c5a63403e4a1f4941ee984170  recipe_lib/deepseek_recipe.libs/libopencv_core-917defc8.so.412
+f84e117886a4dbdda803f828668729bb  recipe_lib/deepseek_recipe.libs/libopencv_imgcodecs-726ad522.so.412
+3cd5eb82440ad892dd321d1613bf4236  recipe_lib/deepseek_recipe.libs/libopencv_imgproc-c6249594.so.412
+973f0dbdcd4a16533dc2e8ced9766f7d  recipe_lib/deepseek_recipe/__init__.py
+23e4508e8e89e6fb5811438743c61822  recipe_lib/deepseek_recipe/_native.abi3.so
+0f2bdb7111c949e1bec532e036c79912  recipe_lib/deepseek_recipe/_native.pyi
+d41d8cd98f00b204e9800998ecf8427e  recipe_lib/deepseek_recipe/py.typed
