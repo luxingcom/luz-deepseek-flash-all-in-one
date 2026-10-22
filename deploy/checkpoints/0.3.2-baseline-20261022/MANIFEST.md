@@ -10,7 +10,7 @@ and are listed separately below with their SHA256 values.
 
 | Path | Bytes | SHA256 |
 |---|---:|---|
-| `ARCHIVE-INDEX.md` | 6585 | `38d62c275ac65738f05aeacc8ed1637ec402ecc8d72b53da973a9f66978a9684` |
+| `ARCHIVE-INDEX.md` | 7045 | `f8ee1cf4d7de49699175b7b18936e533a102ba19bb7c618afd7733a5679fda6e` |
 | `CLEANUP-20261022.md` | 5844 | `7dae588908a1b4b36806a94377fdaf8347c9107cc0d9a2ed7ee55d8abbd0d4e7` |
 | `IMAGE-IDENTITY.json` | 3741 | `fd92056ad17b201fc21fa9bf02402b6fbc1afc328acd9723e8b6aba7d90d1033` |
 | `README.md` | 6270 | `5986a4cbfbf328aba52f7042be0dfba5e95f4d402ee7350601c38cc25ef4a008` |
