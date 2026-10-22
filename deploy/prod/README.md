@@ -4,6 +4,12 @@
 生产不再回退到 6.17；以下值是在 7.0.0 内核上逐项核过、并由
 `boot-prod.sh` fail-closed 校验的当前基线。
 
+## 工作报告与运维交接
+
+- 完整工作报告：`reports/2026-10-22-7.0.0-tuning/WORK-REPORT-2026-10-22.md`
+- 运维交接清单：`reports/2026-10-22-7.0.0-tuning/OPS-RUNBOOK.md`
+- 证据副本与校验和：`reports/2026-10-22-7.0.0-tuning/evidence/`
+
 ## 当前基线
 
 | 项 | 值 |
@@ -68,8 +74,9 @@ bash ~/migrate-assets/prod/selfcheck-prod.sh --perf       # 只跑 warm
   更新前记录一致，未改。
 
 ### GPU / EC
-- 负载 64k：SM ~2476 MHz、72°C、55 W、96% util；`SW Power Cap`、
-  `HW Thermal Slowdown` 均 Not Active。512k 连续负载最高 ~86°C。
+- 负载采样：SM 中位约 2.45–2.46 GHz（最高 2.483 GHz），温度中位
+  80–82°C（三组最高 86°C），功耗中位 66–67 W（峰值约 71 W），95–96% util；
+  `SW Power Cap`、`HW Thermal Slowdown` 均 Not Active。
 - EC 自动风扇正常；但 `nvfancontrol` 的 DKMS 模块在 Secure Boot 下加载失败：
   `insmod: Key was rejected by service`。模块已为 7.0.0 编译，签名密钥
   `dgxspark01 Secure Boot Module Signature key` 不在 MOK 列表，

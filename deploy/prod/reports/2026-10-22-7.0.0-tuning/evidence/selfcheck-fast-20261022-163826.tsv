@@ -1,0 +1,36 @@
+PASS	stack	r3prod-head running
+PASS	health	HTTP 200
+PASS	server_info	tok=9600000 ctx=600000 mrr=16
+PASS	model_id	deepseek-v4.1-flash
+PASS	env:dgxspark01	56 keys; missing/mismatch=0
+PASS	env:dgxspark02	56 keys; missing/mismatch=0
+PASS	env:dgxspark03	56 keys; missing/mismatch=0
+PASS	env:dgxspark04	56 keys; missing/mismatch=0
+PASS	argv	all SPEC6/SPEC1 args present
+PASS	overlay	28 overlay mounts
+PASS	in_container_md5	serving_chat=3151a2edf2c21e4d3492dff5bbc6ec10 recipe=da98467d3fd7d5019ea025b3d5273a20
+PASS	banner	banner29=4 kv_fp4=on lm_cert=built prefill_sp=armed
+PASS	ring:dgxspark01	rx=4096
+PASS	ring:dgxspark02	rx=4096
+PASS	ring:dgxspark03	rx=4096
+PASS	ring:dgxspark04	rx=4096
+PASS	kernel:dgxspark01	7.0.0-1019-nvidia
+PASS	kernel:dgxspark02	7.0.0-1019-nvidia
+PASS	kernel:dgxspark03	7.0.0-1019-nvidia
+PASS	kernel:dgxspark04	7.0.0-1019-nvidia
+PASS	adapter:dgxspark01	fingerprint=c41b1a45 files=97
+PASS	adapter:dgxspark02	fingerprint=c41b1a45 files=97
+PASS	adapter:dgxspark03	fingerprint=c41b1a45 files=97
+PASS	adapter:dgxspark04	fingerprint=c41b1a45 files=97
+PASS	nic:dgxspark01	fw=28.50.1002 lossless_buf=523296 trust=dscp
+PASS	nic:dgxspark02	fw=28.50.1002 lossless_buf=523296 trust=dscp
+PASS	nic:dgxspark03	fw=28.50.1002 lossless_buf=523296 trust=dscp
+PASS	nic:dgxspark04	fw=28.50.1002 lossless_buf=523296 trust=dscp
+PASS	gpu_clock:dgxspark01	cap_unit=disabled/inactive max_sm=3003MHz (EC auto)
+PASS	gpu_clock:dgxspark02	cap_unit=disabled/inactive max_sm=3003MHz (EC auto)
+PASS	gpu_clock:dgxspark03	cap_unit=disabled/inactive max_sm=3003MHz (EC auto)
+PASS	gpu_clock:dgxspark04	cap_unit=disabled/inactive max_sm=3003MHz (EC auto)
+PASS	fan_policy:dgxspark01	EC auto (nvfancontrol module unloaded)
+PASS	fan_policy:dgxspark02	EC auto (nvfancontrol module unloaded)
+PASS	fan_policy:dgxspark03	EC auto (nvfancontrol module unloaded)
+PASS	fan_policy:dgxspark04	EC auto (nvfancontrol module unloaded)
