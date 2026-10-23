@@ -1,0 +1,16 @@
+Explanation: production lock: kernel 6.17.0-1031-nvidia and NVIDIA 580.173.02
+Package: linux-image-6.17.0-1031-nvidia linux-headers-6.17.0-1031-nvidia linux-modules-6.17.0-1031-nvidia linux-modules-nvidia-580-6.17.0-1031-nvidia linux-nvidia-6.17-headers-6.17.0-1031 linux-nvidia-6.17-tools-6.17.0-1031 linux-tools-6.17.0-1031-nvidia
+Pin: version 6.17.0-1031.31
+Pin-Priority: 1001
+
+Package: nvidia-utils-580 nvidia-compute-utils-580 libnvidia-cfg1-580 libnvidia-common-580 libnvidia-compute-580 libnvidia-decode-580 libnvidia-encode-580 libnvidia-extra-580 libnvidia-fbc1-580 libnvidia-gl-580 libnvidia-gpucomp-580 nvidia-persistenced
+Pin: version 580.173.02-1ubuntu1
+Pin-Priority: 1001
+
+Package: nvidia-kernel-common-580 nvidia-kernel-source-580-open
+Pin: version 580.178.04-0ubuntu0.24.04.1
+Pin-Priority: 1001
+
+Package: nvidia-firmware-580-580.173.02
+Pin: version 580.173.02-0ubuntu0.24.04.1
+Pin-Priority: 1001

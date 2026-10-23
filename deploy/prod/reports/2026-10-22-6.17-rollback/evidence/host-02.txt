@@ -1,0 +1,27 @@
+host=dgxspark02
+utc=2026-10-23T00:07:03Z
+kernel=6.17.0-1031-nvidia
+system=running
+failed_units=0
+roce_timer=active
+roce_check_result=success
+roce_last_exit=Fri 2026-10-23 00:05:19 UTC
+grub_default=GRUB_DEFAULT="1>2"
+grubenv_next_entry=next_entry=
+nvidia=NVIDIA GB10, 580.173.02, 2392 MHz, 3003 MHz, 68, 15.83 W, 0 %
+kmod_nvidia=580.173.02
+pkg=libnvidia-cfg1-580:arm64=580.173.02-1ubuntu1
+pkg=libnvidia-common-580=580.173.02-1ubuntu1
+pkg=libnvidia-compute-580:arm64=580.173.02-1ubuntu1
+pkg=libnvidia-decode-580:arm64=580.173.02-1ubuntu1
+pkg=libnvidia-encode-580:arm64=580.173.02-1ubuntu1
+pkg=libnvidia-extra-580:arm64=580.173.02-1ubuntu1
+pkg=libnvidia-fbc1-580:arm64=580.173.02-1ubuntu1
+pkg=libnvidia-gl-580:arm64=580.173.02-1ubuntu1
+pkg=libnvidia-gpucomp-580:arm64=580.173.02-1ubuntu1
+pkg=nvidia-compute-utils-580=580.173.02-1ubuntu1
+pkg=nvidia-persistenced=580.173.02-1ubuntu1
+pkg=nvidia-utils-580=580.173.02-1ubuntu1
+nvidia_holds=18
+containers=1
+nic_check=PASS

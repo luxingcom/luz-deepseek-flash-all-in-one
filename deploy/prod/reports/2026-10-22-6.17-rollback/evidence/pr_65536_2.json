@@ -1,0 +1,14 @@
+{
+ "label": "sd",
+ "pr": [
+  {
+   "target": 65536,
+   "prompt_tokens": 65548,
+   "ttft_s": 10.236,
+   "tok_s": 6403.5,
+   "prompt_chars": 262143,
+   "chars_per_token": 3.999,
+   "filler": "repeated"
+  }
+ ]
+}

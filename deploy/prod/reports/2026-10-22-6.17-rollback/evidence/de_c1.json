@@ -1,0 +1,65 @@
+{
+ "label": "sd",
+ "de": [
+  {
+   "type": "prose",
+   "conc": 1,
+   "per": 90.36,
+   "per_all": [
+    90.36
+   ],
+   "agg": 90.36,
+   "completion": [
+    400
+   ]
+  },
+  {
+   "type": "prose",
+   "conc": 1,
+   "per": 90.51,
+   "per_all": [
+    90.51
+   ],
+   "agg": 90.51,
+   "completion": [
+    400
+   ]
+  },
+  {
+   "type": "prose",
+   "conc": 1,
+   "per": 91.71,
+   "per_all": [
+    91.71
+   ],
+   "agg": 91.71,
+   "completion": [
+    400
+   ]
+  },
+  {
+   "type": "prose",
+   "conc": 1,
+   "per": 91.64,
+   "per_all": [
+    91.64
+   ],
+   "agg": 91.64,
+   "completion": [
+    400
+   ]
+  },
+  {
+   "type": "prose",
+   "conc": 1,
+   "per": 91.68,
+   "per_all": [
+    91.68
+   ],
+   "agg": 91.68,
+   "completion": [
+    400
+   ]
+  }
+ ]
+}

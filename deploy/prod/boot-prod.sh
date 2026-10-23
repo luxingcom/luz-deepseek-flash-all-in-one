@@ -90,8 +90,16 @@ for h in "${HOSTS[@]}"; do
     *" $k "*) ;;
     *) die "$h kernel $k not in allowlist [$PROD_KERNEL_ALLOW]" ;;
   esac
+  drv=$(run_on "$h" "nvidia-smi --query-gpu=driver_version --format=csv,noheader,nounits 2>/dev/null | head -1" || true)
+  kmod=$(run_on "$h" "modinfo -k \$(uname -r) -F version nvidia 2>/dev/null" || true)
+  [[ "$drv" == "$PROD_NVIDIA_DRIVER_ALLOW" ]] \
+    || die "$h NVIDIA userspace $drv != $PROD_NVIDIA_DRIVER_ALLOW (API mismatch risk)"
+  [[ "$kmod" == "$PROD_NVIDIA_DRIVER_ALLOW" ]] \
+    || die "$h nvidia.ko $kmod != $PROD_NVIDIA_DRIVER_ALLOW for $k (userspace/module mismatch)"
+  run_on "$h" 'bash /usr/local/sbin/version-lock.sh check' >/dev/null 2>&1 \
+    || die "$h version lock drift (kernel/driver holds, APT pins, or GRUB_DEFAULT=1>2); run: sudo /usr/local/sbin/version-lock.sh apply"
 done
-log "kernel allowlist OK"
+log "kernel + NVIDIA driver + version lock OK ($PROD_NVIDIA_DRIVER_ALLOW)"
 
 for h in "${HOSTS[@]}"; do
   run_on "$h" "RX_TARGET=$PROD_RX_RING FW_TARGET=$PROD_NIC_FW_ALLOW LOSSLESS_BUFFER=$PROD_LOSSLESS_BUFFER bash /usr/local/sbin/roce-ring-apply.sh check" >/dev/null \

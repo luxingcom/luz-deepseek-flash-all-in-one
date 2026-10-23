@@ -1,0 +1,18 @@
+{
+  "base": "http://127.0.0.1:8899",
+  "model": "deepseek-v4.1-flash",
+  "nq": 20,
+  "max_tokens": 1024,
+  "temperature": 0.6,
+  "shots": 8,
+  "concurrency": 1,
+  "accuracy_content": 1.0,
+  "correct_content": 20,
+  "accuracy_marker": 1.0,
+  "correct_marker": 20,
+  "err": 0,
+  "median_ct": 141,
+  "median_elapsed": 2.31,
+  "elapsed_s": 51.4,
+  "ts": "2026-10-22 23:57:33"
+}

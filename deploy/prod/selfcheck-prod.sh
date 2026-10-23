@@ -185,6 +185,18 @@ for h in "${HOSTS[@]}"; do
     *" $k "*) record PASS "kernel:$h" "$k" ;;
     *) record FAIL "kernel:$h" "$k not allowed" ;;
   esac
+  drv=$(run_on "$h" "nvidia-smi --query-gpu=driver_version --format=csv,noheader,nounits 2>/dev/null | head -1" 2>/dev/null || true)
+  kmod=$(run_on "$h" "modinfo -k \$(uname -r) -F version nvidia 2>/dev/null" 2>/dev/null || true)
+  if [[ "$drv" == "$PROD_NVIDIA_DRIVER_ALLOW" && "$kmod" == "$PROD_NVIDIA_DRIVER_ALLOW" ]]; then
+    record PASS "driver:$h" "userspace=$drv module=$kmod"
+  else
+    record FAIL "driver:$h" "userspace=${drv:-?} module=${kmod:-?} != $PROD_NVIDIA_DRIVER_ALLOW"
+  fi
+  if out=$(run_on "$h" 'bash /usr/local/sbin/version-lock.sh check' 2>&1); then
+    record PASS "version_lock:$h" "$(tail -1 <<<"$out")"
+  else
+    record FAIL "version_lock:$h" "$(tail -1 <<<"$out")"
+  fi
 done
 
 # ── functional recipe probe ─────────────────────────────────────────────────

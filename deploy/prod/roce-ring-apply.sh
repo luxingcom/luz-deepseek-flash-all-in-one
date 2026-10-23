@@ -16,7 +16,9 @@
 # Modes:
 #   check             read-only; exit 1 if any pinned value differs
 #   apply             set the profile (only safe while the engine is stopped)
-#   heal-if-down      apply only if no r3prod/r3boot container is running
+#   heal-if-down      apply only if no r3prod/r3boot container is running;
+#                     while the stack is up, fall back to read-only check so a
+#                     healthy running stack does not mark the timer unit failed
 #
 # The script never changes TX ring, MTU, link state, DSCP map, or rate limits.
 set -uo pipefail
@@ -67,10 +69,13 @@ esac
 
 if [[ "$MODE" == "heal-if-down" ]]; then
   if stack_up; then
-    echo "[nic] stack is up; refusing to write (heal-if-down)" >&2
-    exit 1
+    # Never write while the engine is running.  A healthy profile must still
+    # exit 0; real drift is reported by the same read-only checks below.
+    echo "[nic] stack is up; read-only check (no write)" >&2
+    MODE=check
+  else
+    MODE=apply
   fi
-  MODE=apply
 fi
 
 for dev in $DEVS; do
