@@ -1,0 +1,26 @@
+{
+  "schema": "yoco-l1-meta-v1",
+  "kind": "visible_window",
+  "case_id": "04_vw_window_matrix_w1",
+  "description": "Window matrix degenerate W=1: causal window is the token itself; span windows are [span_start, span_end) with left-shift 0 (max(0,left-0)=left keeps lo=max(0,pos-0-left)=span floor).",
+  "swa_window": 1,
+  "chunk": 32,
+  "expect": "match",
+  "padded_num_tokens": 96,
+  "requests": [
+    {
+      "seq_len": 48,
+      "prefix_len": 16,
+      "extend_len": 32,
+      "req_pool_index": 0,
+      "image_offsets": [[20, 30]]
+    },
+    {
+      "seq_len": 32,
+      "prefix_len": 0,
+      "extend_len": 32,
+      "req_pool_index": 1,
+      "image_offsets": [[0, 31]]
+    }
+  ]
+}

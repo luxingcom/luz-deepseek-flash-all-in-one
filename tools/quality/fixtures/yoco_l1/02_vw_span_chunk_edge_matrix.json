@@ -1,0 +1,64 @@
+{
+  "schema": "yoco-l1-meta-v1",
+  "kind": "visible_window",
+  "case_id": "02_vw_span_chunk_edge_matrix",
+  "description": "Image-span placement matrix at chunk/W edges (INV-03 4.2: span start/end at 0 / W-1 / W / chunk-1 / chunk / chunk+1). Chunk boundary at prefix=256, W=128 (production SWA_WINDOW, deepseek_v4_backend.py:141). Includes a whole-request span, an old prefix-resident span (causal rows), and batch-level padding rows.",
+  "swa_window": 128,
+  "chunk": 256,
+  "expect": "match",
+  "padded_num_tokens": 1877,
+  "requests": [
+    {
+      "seq_len": 512,
+      "prefix_len": 256,
+      "extend_len": 256,
+      "req_pool_index": 0,
+      "image_offsets": [[256, 380]],
+      "boundary_probes": [256, 300, 380, 381]
+    },
+    {
+      "seq_len": 512,
+      "prefix_len": 256,
+      "extend_len": 256,
+      "req_pool_index": 1,
+      "image_offsets": [[400, 511]],
+      "boundary_probes": [511, 512]
+    },
+    {
+      "seq_len": 384,
+      "prefix_len": 0,
+      "extend_len": 384,
+      "req_pool_index": 2,
+      "image_offsets": [[0, 200]]
+    },
+    {
+      "seq_len": 200,
+      "prefix_len": 0,
+      "extend_len": 200,
+      "req_pool_index": 3,
+      "image_offsets": [[0, 199]]
+    },
+    {
+      "seq_len": 512,
+      "prefix_len": 256,
+      "extend_len": 256,
+      "req_pool_index": 4,
+      "image_offsets": [[376, 400]]
+    },
+    {
+      "seq_len": 512,
+      "prefix_len": 256,
+      "extend_len": 256,
+      "req_pool_index": 5,
+      "image_offsets": [[384, 385]]
+    },
+    {
+      "seq_len": 512,
+      "prefix_len": 256,
+      "extend_len": 256,
+      "req_pool_index": 6,
+      "image_offsets": [[10, 100]],
+      "non_image_offsets": [[300, 340]]
+    }
+  ]
+}

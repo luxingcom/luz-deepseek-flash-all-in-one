@@ -17,6 +17,15 @@
 
 判别力自检（纪律：新量具必须喂坏输入看它因正确理由变红）：
   --selfcheck  断言 c1 提示逐字节、PR 构造、坏端点必红。
+
+T33-03 Phase 0 双口径（033 任务书 v2.1 §T33-03；附录 D）：
+  committed_decode_tps = (completion−1)/(t_last−t_first) —— 真实提交 token（=原 per/agg 同式）；
+  full_accept_equiv_tps = committed×(1+nextn)/accept_len —— 全接受等效口径，副标签，
+    仅与官方/旧表（DeepInfer avg_sps×req×(1+nextn)/cp）可比，不得当真实吞吐报。
+  --capture-spec 开：body 才加 return_spec_tokens_details + chat_template_kwargs.thinking=False
+    （钉 thinking；缺 sglext 必红不静默）；默认关 ⇒ 请求体逐字节不变（selfcheck 断言）。
+  --legacy-csv：输出裁回旧 schema 键序（回退面；INV-02 §6.9 旧管道兼容）。
+  --replay：离线回放既有 JSON（旧/新 schema）验闭合，零请求零产线触。
 """
 import argparse
 import json
@@ -63,6 +72,12 @@ DE_CODE_WARMUP_PROMPT = _code_task("warmup_noop", "def warmup_noop(x): return x 
 DE_TYPES = ("structured", "prose", "code", "json")
 ALLOWED_CONC = (1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 24, 32)
 FILLER_UNIT = " the"
+
+# ── T33-03 Phase 0 双口径常量（附录 D：committed 与 full-acceptance 分列不得互推）──
+NEXTN_DEFAULT = 5  # 投机 γ（DSPARK 静态 nextn=5，INV-02 §6.3）；SPEC=0 臂双口径置 null 不判读
+DE_ROW_LEGACY_KEYS = ("type", "conc", "per", "per_all", "agg", "completion")  # --legacy-csv 键序
+PR_ROW_LEGACY_KEYS = ("target", "prompt_tokens", "ttft_s", "tok_s",
+                      "prompt_chars", "chars_per_token", "filler")
 
 
 def de_prompt(type_: str, n: int):
@@ -199,14 +214,31 @@ class Client:
         self.h = {"Authorization": f"Bearer {key}"} if key else {}
         self.timeout = timeout_s
 
-    def stream(self, prompt, max_tokens, temperature=0.0, top_p=1.0):
-        """返回 dict(t_first, t_last, completion, prompt_tokens)。SSE 解析：
-        first = 第一个带非空 delta 内容的 chunk 墙钟；last = 最后一个 chunk 墙钟。"""
+    @staticmethod
+    def build_body(prompt, max_tokens, temperature=0.0, top_p=1.0,
+                   extra_body=None, capture_spec=False):
+        """请求体构造（唯一出口）。默认=旧版逐字节（键序含）；capture_spec 只在
+        显式开时追加双口径/钉 thinking 两键；extra_body 只叠加显式键。"""
         body = {"messages": [{"role": "user", "content": prompt}],
                 "max_tokens": max_tokens, "temperature": temperature, "top_p": top_p,
                 "stream": True, "stream_options": {"include_usage": True}}
+        if capture_spec:  # T33-03：per-request spec 遥测 + thinking 钉 off（默认关=字节不变）
+            body["return_spec_tokens_details"] = True
+            body["chat_template_kwargs"] = {"thinking": False}
+        if extra_body:
+            body.update(extra_body)
+        return body
+
+    def stream(self, prompt, max_tokens, temperature=0.0, top_p=1.0,
+               extra_body=None, capture_spec=False):
+        """返回 dict(t_first, t_last, completion, prompt_tokens, reasoning_tokens,
+        cached_tokens, spec)。SSE 解析：first = 第一个带非空 delta 内容的 chunk 墙钟；
+        last = 最后一个 chunk 墙钟。reasoning/cached 取 usage.*_tokens_details（缺=None 不造 0）；
+        spec 取末次 sglext.spec_tokens_details（仅 capture_spec 请求才有）。"""
+        body = self.build_body(prompt, max_tokens, temperature, top_p, extra_body, capture_spec)
         t_first = t_last = None
         completion = prompt_tokens = None
+        reasoning = cached = spec = None
         t0 = time.perf_counter()
         r = requests.post(f"{self.base}/chat/completions", json=body, headers=self.h,
                           stream=True, timeout=self.timeout)
@@ -232,53 +264,290 @@ class Client:
                 completion = u.get("completion_tokens")
                 prompt_tokens = u.get("prompt_tokens")
                 t_last = t_last or now
+                pd = u.get("prompt_tokens_details")
+                if isinstance(pd, dict) and pd.get("cached_tokens") is not None:
+                    cached = pd["cached_tokens"]      # A9 --enable-cache-report 面（KV 前缀缓存）
+                cd = u.get("completion_tokens_details")
+                if isinstance(cd, dict) and cd.get("reasoning_tokens") is not None:
+                    reasoning = cd["reasoning_tokens"]  # thinking 未钉缺省的探针（E5 判读位）
+            sg = j.get("sglext")
+            if isinstance(sg, dict) and sg.get("spec_tokens_details"):
+                spec = sg["spec_tokens_details"]
         if t_first is None or completion is None:
             raise RuntimeError(f"no visible delta or usage (first={t_first is not None}, completion={completion})")
         return {"t_first": t_first, "t_last": t_last, "completion": completion,
-                "prompt_tokens": prompt_tokens, "t_req": t0}
+                "prompt_tokens": prompt_tokens, "t_req": t0,
+                "reasoning_tokens": reasoning, "cached_tokens": cached, "spec": spec}
 
 
-def run_de(c: Client, type_, conc, max_tokens, warmups, runs):
+def run_de(c: Client, type_, conc, max_tokens, warmups, runs,
+           capture_spec=False, nextn=NEXTN_DEFAULT):
     # warmup：先发热身请求（code 型用 warmup_noop，防 JIT/前缀缓存混入）
     for _ in range(warmups):
-        c.stream(de_warmup_prompt(type_), 32)
+        c.stream(de_warmup_prompt(type_), 32, capture_spec=capture_spec)
     results = []
     for _ in range(runs):
         prompts = de_prompt(type_, conc)
         out = [None] * conc
 
         def work(i):
-            out[i] = c.stream(prompts[i], max_tokens)
+            out[i] = c.stream(prompts[i], max_tokens, capture_spec=capture_spec)
 
         th = [threading.Thread(target=work, args=(i,)) for i in range(conc)]
         for t in th:
             t.start()
         for t in th:
             t.join()
+        if capture_spec and any((o.get("spec") if isinstance(o, dict) else None) is None for o in out):
+            # INV-02 §6.8-7：sglext 被网关剥离/缺字段必须红，禁止静默当 0 出双口径数
+            missing = sum(1 for o in out if not (isinstance(o, dict) and o.get("spec")))
+            raise RuntimeError(f"capture_spec=on 但 {missing}/{conc} 流缺 sglext.spec_tokens_details"
+                               "（网关剥离或缺字段）——禁止静默出数")
         per = [(o["completion"] - 1) / (o["t_last"] - o["t_first"]) for o in out]
         agg = sum(o["completion"] - 1 for o in out) / (max(o["t_last"] for o in out) - min(o["t_first"] for o in out))
-        results.append({"type": type_, "conc": conc, "per": round(sorted(per)[len(per) // 2], 2),
-                        "per_all": [round(x, 2) for x in per], "agg": round(agg, 2),
-                        "completion": [o["completion"] for o in out]})
+        reqs = per_request_rows(out, per, nextn)
+        row = {"type": type_, "conc": conc, "per": round(sorted(per)[len(per) // 2], 2),
+               "per_all": [round(x, 2) for x in per], "agg": round(agg, 2),
+               "completion": [o["completion"] for o in out]}
+        row.update(dual_caliber_block(out, reqs, agg, nextn))
+        results.append(row)
     return results
 
 
-def run_pr(c: Client, sizes, warm_tokens=512, gen_tokens=8, filler="repeated"):
-    c.stream(build_pr_prompt(warm_tokens, uuid.uuid4().hex[:8], filler), gen_tokens)  # warmup
+# ── T33-03 Phase 0 双口径记账（committed 与 full-acceptance 两独立字段，不互相推导）──
+def per_request_rows(out, per, nextn):
+    """per-request 闭合行：gen=completion−1（首 token 出自 prefill）、accepted/b/proposed
+    出自 sglext（b=verify 步数，每步含 1 golden token）。无 spec（capture off / SPEC=0）
+    ⇒ 引擎侧闭合量=None 不造数；committed 仍可算（=per 原式）。"""
+    rows = []
+    for o, p in zip(out, per):
+        sp = (o.get("spec") or {}) if isinstance(o, dict) else {}
+        vc = sp.get("spec_verify_ct")
+        acc = sp.get("spec_num_correct_drafts")
+        prop = sp.get("spec_num_proposed_drafts")
+        gen = o["completion"] - 1
+        if vc:  # 引擎账在：闭合行成形
+            accept_len = gen / vc
+            rate = (acc / prop) if prop else None
+            fae = p * (1 + nextn) / accept_len if accept_len > 0 else None
+            rows.append({"completion": o["completion"], "generated": gen,
+                         "accepted": acc, "b": vc, "proposed": prop,
+                         "accept_len": round(accept_len, 4),
+                         "accept_rate": round(rate, 4) if rate is not None else None,
+                         "verified_len": round(prop / vc, 4) if prop is not None else None,
+                         "committed_decode_tps": round(p, 2),
+                         "full_accept_equiv_tps": round(fae, 2) if fae is not None else None,
+                         "reasoning_tokens": o.get("reasoning_tokens"),
+                         "cached_tokens": o.get("cached_tokens"),
+                         "gen_eq_accepted_plus_b": (acc + vc == gen) if acc is not None else None})
+        else:
+            rows.append({"completion": o["completion"], "generated": gen,
+                         "accepted": None, "b": None, "proposed": None,
+                         "accept_len": None, "accept_rate": None, "verified_len": None,
+                         "committed_decode_tps": round(p, 2), "full_accept_equiv_tps": None,
+                         "reasoning_tokens": o.get("reasoning_tokens"),
+                         "cached_tokens": o.get("cached_tokens"),
+                         "gen_eq_accepted_plus_b": None})
+    return rows
+
+
+def dual_caliber_block(out, reqs, agg, nextn):
+    """run 行级双口径汇总 + closure 恒等式块。
+    Σ(completion−1)=Σgenerated（客户端-引擎闭合，±1 容差=流末步截断/舍入）；
+    gen=accepted+b（逐流，禁 bonus 重复计数）；accept_len=1+γ·rate 仅整窗满发 draft 时
+    严格成立（proposed=γ·b），否则记 mode=truncated 不强判。"""
+    sum_cm1 = sum(o["completion"] - 1 for o in out)
+    rsum = None if any(o.get("reasoning_tokens") is None for o in out) \
+        else sum(o["reasoning_tokens"] for o in out)
+    ksum = None if any(o.get("cached_tokens") is None for o in out) \
+        else sum(o["cached_tokens"] for o in out)
+    with_spec = [q for q in reqs if q["b"]]
+    base = {"nextn": nextn, "committed_decode_tps": round(agg, 2),
+            "reasoning_tokens": rsum, "cached_tokens": ksum, "per_request": reqs}
+    if not with_spec:  # capture off / SPEC=0：双口径 spec 面=None（附录 D：不与 spec 臂混比）
+        base.update({"full_accept_equiv_tps": None, "accept_rate": None,
+                     "avg_verified_len": None,
+                     "closure": {"sum_completion_minus_1": sum_cm1, "sum_generated": None,
+                                 "identity_sum_completion_eq_generated": None,
+                                 "identity_gen_eq_accepted_plus_b": None,
+                                 "identity_accept_len": None,
+                                 "accept_len_identity_mode": None}})
+        return base
+    sum_gen = sum(q["generated"] for q in reqs)
+    sum_acc = sum(q["accepted"] for q in with_spec)
+    sum_b = sum(q["b"] for q in with_spec)
+    sum_prop = sum(q["proposed"] for q in with_spec if q["proposed"] is not None)
+    accept_len = sum_gen / sum_b if sum_b else None
+    rate = sum_acc / sum_prop if sum_prop else None
+    fae = agg * (1 + nextn) / accept_len if accept_len else None
+    full_prop = all(q["proposed"] is not None and q["proposed"] == nextn * q["b"]
+                    for q in with_spec)
+    if full_prop and rate is not None:
+        id_len = abs(accept_len - (1 + nextn * rate)) <= 1e-6
+        mode = "exact"
+    else:
+        id_len = None  # 流末步 draft 未满发：1+γ·rate 分母失真，不强判（口径注记位）
+        mode = "truncated"
+    base.update({"full_accept_equiv_tps": round(fae, 2) if fae is not None else None,
+                 "accept_rate": round(rate, 4) if rate is not None else None,
+                 "avg_verified_len": round(sum_prop / sum_b, 4) if sum_b else None,
+                 "closure": {"sum_completion_minus_1": sum_cm1, "sum_generated": sum_gen,
+                             "sum_accepted": sum_acc, "sum_b": sum_b, "sum_proposed": sum_prop,
+                             "identity_sum_completion_eq_generated": abs(sum_cm1 - sum_gen) <= 1,
+                             "identity_gen_eq_accepted_plus_b":
+                                 all(q["gen_eq_accepted_plus_b"] for q in with_spec),
+                             "identity_accept_len": id_len,
+                             "accept_len_identity_mode": mode}})
+    return base
+
+
+def run_pr(c: Client, sizes, warm_tokens=512, gen_tokens=8, filler="repeated",
+           capture_spec=False):
+    c.stream(build_pr_prompt(warm_tokens, uuid.uuid4().hex[:8], filler), gen_tokens,
+             capture_spec=capture_spec)  # warmup
     rows = []
     for n in sizes:
         salt = uuid.uuid4().hex[:8]
         prompt = build_pr_prompt(n, salt, filler)
-        o = c.stream(prompt, gen_tokens)
+        o = c.stream(prompt, gen_tokens, capture_spec=capture_spec)
         ttft = o["t_first"] - o["t_req"]
         pt = o["prompt_tokens"] or n
+        # T33-03：PR 双口径=total（tok_s 原式不变）+ cached/uncached 拆分（cached_tokens
+        # 是 KV 前缀缓存【A9 --enable-cache-report】，不是 Engram 行缓存；缺=None 不造 0）
+        ct = o.get("cached_tokens")
         rows.append({"target": n, "prompt_tokens": pt, "ttft_s": round(ttft, 3),
                      "tok_s": round(pt / ttft, 1) if ttft > 0 else None,
                      # 行级 cpt 记录位（PR-ANCHOR-AUDIT §四.2-4 三要素；探针侧只读不猜）
                      "prompt_chars": len(prompt),
                      "chars_per_token": round(len(prompt) / pt, 3) if pt else None,
-                     "filler": filler})
+                     "filler": filler,
+                     "cached_tokens": ct,
+                     "uncached_tokens": (pt - ct) if ct is not None else None,
+                     "uncached_tok_s": round((pt - ct) / ttft, 1)
+                     if (ct is not None and ttft > 0) else None,
+                     "reasoning_tokens": o.get("reasoning_tokens")})
     return rows
+
+
+def strip_legacy_rows(data):
+    """--legacy-csv：输出裁回旧 schema 键序（回退面；INV-02 §6.9 旧管道/旧锚可比性）。"""
+    out = {"label": data.get("label")}
+    if "de" in data:
+        out["de"] = [{k: r[k] for k in DE_ROW_LEGACY_KEYS} for r in data["de"]]
+    if "pr" in data:
+        out["pr"] = [{k: r[k] for k in PR_ROW_LEGACY_KEYS} for r in data["pr"]]
+    return out
+
+
+# ── 离线回放（T33-03 实施阶段 2：r032c/6.17 既有日志闭合验证；零请求零产线触）──
+def check_de_row(row, nextn=NEXTN_DEFAULT):
+    """旧/新 schema 通用的 per-row 闭合检查。返回 (ok, notes)。
+    旧 schema（无 per_request）验可推导恒等式：流数闭合、per=median(per_all)、
+    c1 时 agg==per（同式退化）、agg ≤ conc×min(per_all)（共同窗上限=最慢流定窗）。"""
+    notes = []
+
+    def bad(m):
+        notes.append(m)
+
+    conc, per_all, comps = row.get("conc"), row.get("per_all"), row.get("completion")
+    per, agg = row.get("per"), row.get("agg")
+    if not (isinstance(conc, int) and conc >= 1):
+        return False, ["conc 非法"]
+    if not per_all or not comps:
+        return False, ["缺 per_all/completion"]
+    if len(per_all) != conc or len(comps) != conc:
+        bad(f"流数不闭合：len(per_all)={len(per_all)} len(completion)={len(comps)} conc={conc}")
+    med = sorted(per_all)[len(per_all) // 2]
+    if per is None or abs(per - med) > 0.011:
+        bad("per≠median(per_all)")
+    if conc == 1:
+        if agg is None or abs(agg - per) > 0.011:
+            bad("c1 应 agg==per（同式退化恒等）")
+    elif agg is None or agg > conc * min(per_all) + 0.01 + 0.005 * conc:
+        bad(f"agg={agg} > conc×min(per_all)≈{round(conc * min(per_all), 2)}（窗口闭合上限）")
+    sum_cm1 = sum(c - 1 for c in comps)
+    reqs = row.get("per_request")
+    if reqs is not None:
+        if len(reqs) != conc:
+            bad("per_request 行数≠conc")
+        for q in reqs:
+            if q.get("generated") != q["completion"] - 1:
+                bad("generated≠completion−1（per_request 行）")
+            if q.get("b"):
+                if q.get("gen_eq_accepted_plus_b") is not True:
+                    bad("gen≠accepted+b（bonus 重复计数/丢计数）")
+                al = q["generated"] / q["b"]
+                if abs((q.get("accept_len") or 0) - al) > 0.011:
+                    bad("accept_len≠generated/b")
+                if q.get("proposed") == nextn * q["b"] and q.get("accept_rate") is not None:
+                    if abs(al - (1 + nextn * q["accept_rate"])) > 1e-3:
+                        bad("accept_len≠1+γ·rate（整窗满发 draft）")
+        cl = row.get("closure") or {}
+        sg = cl.get("sum_generated")
+        if sg is not None:
+            if abs(sum_cm1 - sg) > 1:
+                bad(f"Σ(completion−1)={sum_cm1} ≠ Σgenerated={sg}")
+            if cl.get("identity_sum_completion_eq_generated") is not True:
+                bad("closure.identity_sum 非 true")
+    return not notes, notes
+
+
+def check_pr_row(row):
+    """PR 行闭合：tok_s=prompt_tokens/TTFT（total 口径）、chars_per_token=chars/tokens；
+    cached 在场时 uncached=prompt−cached、uncached_tok_s=uncached/TTFT。"""
+    notes = []
+
+    def bad(m):
+        notes.append(m)
+
+    pt, ttft = row.get("prompt_tokens"), row.get("ttft_s")
+    if not pt or not ttft:
+        return False, ["缺 prompt_tokens/ttft_s"]
+    tol = pt / (ttft * ttft) * 0.0005 + 0.06  # ttft 存 3 位小数 + tok_s 存 1 位的舍入界
+    if row.get("tok_s") is not None and abs(row["tok_s"] - pt / ttft) > tol:
+        bad("tok_s ≠ prompt_tokens/TTFT")
+    if row.get("prompt_chars") and row.get("chars_per_token") is not None:
+        if abs(row["chars_per_token"] - row["prompt_chars"] / pt) > 0.0015:
+            bad("chars_per_token ≠ chars/tokens")
+    ct = row.get("cached_tokens")
+    if ct is not None:
+        if row.get("uncached_tokens") != pt - ct:
+            bad("uncached_tokens ≠ prompt−cached")
+        ut = row.get("uncached_tok_s")
+        if ut is not None:
+            utol = (pt - ct) / (ttft * ttft) * 0.0005 + 0.06
+            if abs(ut - (pt - ct) / ttft) > utol:
+                bad("uncached_tok_s ≠ uncached/TTFT")
+    return not notes, notes
+
+
+def replay(paths, nextn=NEXTN_DEFAULT):
+    """离线回放：解析既有 sd_bench/de_c48 JSON（旧或新 schema），验证 per-request 闭合
+    与字段自洽。零网络、零产线触（0 靴口径验证件）。"""
+    total = failed = 0
+    for path in paths:
+        with open(path) as fp:
+            d = json.load(fp)
+        de, pr = d.get("de") or [], d.get("pr") or []
+        rows = [("de", r) for r in de] + [("pr", r) for r in pr]
+        if not rows:
+            print(f"REPLAY SKIP {path}: 无 de/pr 行")
+            continue
+        pbad = []
+        for kind, r in rows:
+            total += 1
+            ok, notes = check_de_row(r, nextn) if kind == "de" else check_pr_row(r)
+            if not ok:
+                failed += 1
+                pbad.append((kind, notes))
+        status = "PASS" if not pbad else "FAIL"
+        print(f"REPLAY {status} {path}: de={len(de)} pr={len(pr)}"
+              + ("" if not pbad else f" 首错={pbad[0][1][:2]}"))
+        for kind, notes in pbad:
+            for m in notes:
+                print(f"  [{kind}] {m}")
+    print(f"REPLAY {'PASS' if failed == 0 else 'FAIL'} rows={total} failed={failed}")
+    return 0 if failed == 0 else 1
 
 
 def selfcheck():
@@ -326,6 +595,115 @@ def selfcheck():
     need("## Part" in body_r and any(c.isdigit() for c in body_r), "real 具文档结构（章节+数字）")
     pr3r = build_pr_prompt(4096, "ffff5678", "real")
     need(pr1r.split("OK.\n", 1)[1] != pr3r.split("OK.\n", 1)[1], "real 跨 salt 不同文本")
+
+    # ── 7. T33-03 Phase 0：默认请求体逐字节不变（硬门；capture_spec 只在显式开时加键）──
+    legacy_body = {"messages": [{"role": "user", "content": DE_PROSE_PROMPT}],
+                   "max_tokens": 400, "temperature": 0.0, "top_p": 1.0,
+                   "stream": True, "stream_options": {"include_usage": True}}
+    b0 = Client.build_body(DE_PROSE_PROMPT, 400)
+    need(json.dumps(b0) == json.dumps(legacy_body) and list(b0) == list(legacy_body),
+         "默认 body 与旧版逐字节同（键序含，requests json= 序列化等价）")
+    b1 = Client.build_body(DE_PROSE_PROMPT, 400, capture_spec=True)
+    need(set(b1) == set(legacy_body) | {"return_spec_tokens_details", "chat_template_kwargs"}
+         and b1["return_spec_tokens_details"] is True
+         and b1["chat_template_kwargs"] == {"thinking": False},
+         "capture_spec body 恰加两键（thinking 钉 off + spec 遥测）")
+    b2 = Client.build_body(DE_PROSE_PROMPT, 400, extra_body={"x": 1})
+    need(set(b2) == set(legacy_body) | {"x"}, "extra_body 只叠加显式键")
+
+    # ── 8. 双口径恒等式（合成样本，零请求；INV-02 §7 反例 1 同数）──
+    # completion=321, b=100, γ=5 ⇒ gen=320, accepted=220, proposed=500,
+    # accept_len=3.2, rate=0.44, 1+5×0.44=3.2；committed=80 ⇒ full-accept=80×6/3.2=150
+    class _SpecClient:
+        """确定性合成客户端（离线复刻 Client.stream 契约；spec 计数内部自洽）。"""
+
+        def __init__(self, completion=321, accepted=220, b=100, prop=500, rate=80.0,
+                     no_spec=False):
+            self.completion, self.accepted, self.b, self.prop, self.rate = \
+                completion, accepted, b, prop, rate
+            self.no_spec = no_spec  # True=模拟网关剥离 sglext（坏输入面）
+
+        def stream(self, prompt, max_tokens, temperature=0.0, top_p=1.0,
+                   extra_body=None, capture_spec=False):
+            dur = (self.completion - 1) / self.rate
+            t0 = 100.0
+            o = {"t_first": t0, "t_last": t0 + dur, "completion": self.completion,
+                 "prompt_tokens": 64, "t_req": t0 - 0.05,
+                 "reasoning_tokens": 0, "cached_tokens": 0}
+            if capture_spec and not self.no_spec:
+                o["spec"] = {"spec_verify_ct": self.b,
+                             "spec_num_correct_drafts": self.accepted,
+                             "spec_num_proposed_drafts": self.prop,
+                             "spec_accept_length": (self.completion - 1) / self.b,
+                             "spec_accept_rate": self.accepted / self.prop}
+            return o
+
+    rows4 = run_de(_SpecClient(), "prose", 4, 321, 0, 1, capture_spec=True, nextn=5)
+    r = rows4[0]
+    need(all(abs(q["accept_len"] - 3.2) < 1e-6 and abs(q["accept_rate"] - 0.44) < 1e-6
+             for q in r["per_request"]), "accept_len=3.2/rate=0.44（合成对表）")
+    need(all(q["gen_eq_accepted_plus_b"] is True for q in r["per_request"]),
+         "gen=accepted+b（per-request 恒等；gen=320=220+100）")
+    need(abs(r["committed_decode_tps"] - 320.0) < 0.05
+         and abs(r["agg"] - 320.0) < 0.05, "committed=agg 同式（4×80 流共同窗）")
+    need(abs(r["full_accept_equiv_tps"] - 600.0) < 0.05,
+         "full-accept=600=320×6/3.2（副标签，不得当真实吞吐）")
+    need(r["closure"]["sum_completion_minus_1"] == 1280
+         and r["closure"]["sum_generated"] == 1280
+         and r["closure"]["identity_sum_completion_eq_generated"] is True,
+         "Σ(completion−1)=Σgenerated=1280（客户端-引擎闭合）")
+    need(r["closure"]["identity_gen_eq_accepted_plus_b"] is True, "closure 恒等式 b 面")
+    need(r["closure"]["identity_accept_len"] is True
+         and r["closure"]["accept_len_identity_mode"] == "exact",
+         "accept_len=1+γ·rate（整窗满发 draft：proposed=γ·b）")
+    # 重复计数反例（INV-02 §7 反例 1：accepted 把 golden 再算 ⇒ 2560≠1280 必红）
+    bad_rows = run_de(_SpecClient(accepted=220 + 320), "prose", 4, 321, 0, 1,
+                      capture_spec=True, nextn=5)[0]
+    need(bad_rows["closure"]["identity_gen_eq_accepted_plus_b"] is False,
+         "bonus 重复计数必红（gen≠accepted+b）")
+    # 截断步（proposed<γ·b）恒等式不强判、只注记
+    tr = run_de(_SpecClient(prop=499), "prose", 1, 321, 0, 1, capture_spec=True, nextn=5)[0]
+    need(tr["closure"]["identity_accept_len"] is None
+         and tr["closure"]["accept_len_identity_mode"] == "truncated",
+         "流末步截断：accept_len 恒等式注记不强判")
+    # 缺 sglext（capture on，模拟网关剥离）必须红不静默；默认路径 spec 面=None 不造数
+    try:
+        run_de(_SpecClient(no_spec=True), "prose", 1, 321, 0, 1, capture_spec=True)
+        need(False, "缺 sglext（capture on）必须红")
+    except RuntimeError as e:
+        need("sglext" in str(e), f"缺 sglext 红不静默（{str(e)[:48]}…）")
+    plain = run_de(_SpecClient(), "prose", 1, 321, 0, 1)[0]
+    need(plain["full_accept_equiv_tps"] is None and plain["accept_rate"] is None
+         and plain["avg_verified_len"] is None
+         and plain["closure"]["identity_sum_completion_eq_generated"] is None
+         and plain["committed_decode_tps"] == plain["agg"],
+         "默认路径：spec 面 None 不造数；committed=agg 同式照出")
+
+    # ── 9. --legacy-csv 键序与离线回放判别力（合成 + 坏输入必红）──
+    leg = strip_legacy_rows({"label": "sd", "de": [plain]})
+    need(list(leg["de"][0]) == list(DE_ROW_LEGACY_KEYS),
+         "--legacy-csv 行=旧键序（type,conc,per,per_all,agg,completion）")
+    ok8 = {"type": "prose", "conc": 8, "per": 32.58,
+           "per_all": [31.98, 33.88, 32.82, 31.79, 32.58, 31.14, 35.07, 31.79],
+           "agg": 249.1, "completion": [400] * 8}
+    need(check_de_row(ok8)[0], "旧 schema 行闭合（6.17 证据 de_c8 run1 同数）")
+    need(not check_de_row({**ok8, "agg": 260.0})[0], "agg 超共同窗上限必红")
+    need(not check_de_row({**ok8, "per": 40.0})[0], "per≠median(per_all) 必红")
+    need(not check_de_row({**ok8, "conc": 8, "per_all": ok8["per_all"][:7]})[0],
+         "流数不闭合必红")
+    prow = {"target": 131072, "prompt_tokens": 131083, "ttft_s": 21.161, "tok_s": 6194.6,
+            "prompt_chars": 524287, "chars_per_token": 4.0, "filler": "repeated"}
+    need(check_pr_row(prow)[0], "PR 行闭合（tok_s=prompt_tokens/TTFT）")
+    need(not check_pr_row({**prow, "tok_s": 9999.0})[0], "PR tok_s 虚假必红")
+    need(not check_pr_row({**prow, "cached_tokens": 50000, "uncached_tokens": 123})[0],
+         "PR uncached≠prompt−cached 必红")
+    bad_req_row = {**ok8, "per_request": [
+        {"completion": 321, "generated": 320, "accepted": 540, "b": 100, "proposed": 500,
+         "accept_len": 3.2, "accept_rate": 0.44, "verified_len": 5.0,
+         "committed_decode_tps": 80.0, "full_accept_equiv_tps": 150.0,
+         "reasoning_tokens": 0, "cached_tokens": 0, "gen_eq_accepted_plus_b": False}]}
+    need(not check_de_row(bad_req_row)[0], "per_request 重复计数必红（回放面）")
+
     try:  # 坏端点必须因正确理由红
         Client("http://127.0.0.1:1/v1", "k", 2).stream(DE_PROSE_PROMPT, 32)
         need(False, "坏端点必须红")
@@ -352,12 +730,25 @@ def main():
     ap.add_argument("--key-file", default="state/api-key")
     ap.add_argument("--label", default="sd")
     ap.add_argument("--json-out")
+    ap.add_argument("--capture-spec", action="store_true",
+                    help="T33-03 双口径采集：body 加 return_spec_tokens_details 与 "
+                         "chat_template_kwargs.thinking=False（钉 thinking）；缺 sglext 必红。"
+                         "默认关=请求体与旧版逐字节相同")
+    ap.add_argument("--nextn", type=int, default=NEXTN_DEFAULT,
+                    help="投机 nextn（γ，DSPARK 静态=5）；full_accept_equiv_tps="
+                         "committed×(1+γ)/accept_len（副标签）")
+    ap.add_argument("--legacy-csv", action="store_true",
+                    help="输出裁回旧 schema 键序（回退面/旧管道兼容；不影响请求体）")
+    ap.add_argument("--replay", nargs="+", metavar="FILE",
+                    help="离线回放既有 JSON（旧/新 schema 通吃）验证闭合；零请求零产线触")
     ap.add_argument("--selfcheck", action="store_true")
     a = ap.parse_args()
     if a.selfcheck:
         return selfcheck()
+    if a.replay:
+        return replay(a.replay, nextn=a.nextn)
     if not a.mode:
-        ap.error("--mode 必填（仅 --selfcheck 时可省）")
+        ap.error("--mode 必填（仅 --selfcheck/--replay 时可省）")
     if a.concurrency not in ALLOWED_CONC:
         return print(f"concurrency 必须是 {ALLOWED_CONC}", file=sys.stderr) or 2
     key = ""
@@ -367,8 +758,12 @@ def main():
         pass
     c = Client(a.base_url, key, timeout_s=max(120, a.max_tokens * 8))
     data = {"label": a.label,
-            "de": run_de(c, a.type, a.concurrency, a.max_tokens, a.warmups, a.runs)} if a.mode == "de" \
-        else {"label": a.label, "pr": run_pr(c, a.sizes, filler=a.pr_filler)}
+            "de": run_de(c, a.type, a.concurrency, a.max_tokens, a.warmups, a.runs,
+                         capture_spec=a.capture_spec, nextn=a.nextn)} if a.mode == "de" \
+        else {"label": a.label, "pr": run_pr(c, a.sizes, filler=a.pr_filler,
+                                             capture_spec=a.capture_spec)}
+    if a.legacy_csv:
+        data = strip_legacy_rows(data)
     print(json.dumps(data, ensure_ascii=False))
     if a.json_out:
         open(a.json_out, "w").write(json.dumps(data, ensure_ascii=False, indent=1))

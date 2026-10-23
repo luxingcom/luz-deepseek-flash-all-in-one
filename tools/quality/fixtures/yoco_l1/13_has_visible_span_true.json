@@ -1,0 +1,24 @@
+{
+  "schema": "yoco-l1-meta-v1",
+  "kind": "has_visible_span",
+  "case_id": "13_has_visible_span_true",
+  "description": "has_visible_window_span (dsv4_visible_window.py:63-73): True iff some request's extend chunk contains a full image span; here r1 contributes, r0's span is prefix-resident.",
+  "swa_window": 128,
+  "chunk": 256,
+  "requests": [
+    {
+      "seq_len": 512,
+      "prefix_len": 256,
+      "extend_len": 256,
+      "req_pool_index": 0,
+      "image_offsets": [[10, 90]]
+    },
+    {
+      "seq_len": 512,
+      "prefix_len": 256,
+      "extend_len": 256,
+      "req_pool_index": 1,
+      "image_offsets": [[300, 400]]
+    }
+  ]
+}
