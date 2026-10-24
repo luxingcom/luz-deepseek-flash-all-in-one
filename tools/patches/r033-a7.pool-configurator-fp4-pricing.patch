@@ -1,0 +1,51 @@
+# R033-A7 pool_configurator V41_FP4 low-ratio pricing patch -- 0.3.3 FI-LAND A-batch (S0 desk batch, 2026-10-25)
+# 呈裁件（未应用）：F3 烘制窗 S0 步对 replay 树面 git apply（见 S0-DESK-BATCH-20261025.md 应用操作单）。
+# 法源（冻结设计=唯一语义法源）：
+#   S-FIS0-RESULT-20261018.md §二-A7 关键保留项：stock :1263 _compressed_bytes_per_full_token 用布局盲
+#   self.kv_bytes=584（:994）计价 ratio-1/2；不移植则 v41 下账式=(584+68)*2.5*41/40（档名 1683.63 变体）
+#   -> 自推容量 ~8.5M < pin 9.6M -> 池缩红线破；A-batch 必含"ratio-1/2 按解析布局页价（V41_FP4 288）计价"
+#   补丁（现 kv_fp4.py:290-335 逻辑移植）。
+#   INV-06-FI-B25.md §6.1 F3 行断言①：A7 计价 288（import pool_configurator 按 v41 布局干跑
+#   _compressed_bytes_per_full_token=288 派生值，禁 1683.63 变体）。
+#   F4-BAKE-PLAN-20261025.md §1.1.1 #5 / §1.3 S0 步；首靴 L2 行=912.25。
+# 目标（镜像 COPY 层，stock 79cafec0 基底；非 16 件移植面成员，基底 md5 b31e0726cef636fbb291e85e735662dc）:
+#   python/sglang/srt/model_executor/pool_configurator.py
+# 移植范围注记：移植 kv_fp4.py 闭包的计价语义核（select->resolve->page_bytes->(kv_b+low_ratio_index_bytes)/ratio）；
+#   fork 的 SM120 桥断言不移植（属 R1 桥面机器，非池账语义；R1 旁挂照旧）。
+# 行为注记：解析链与 stock _get_paged_kv_bytes_per_token 同链（同失败面，零新增失败模式）；
+#   V4 模式下 ratio-1/2 计价从 584 变页距解析值 585（"按解析布局页价"逐字语义；产线 V4 形=fork 模式走
+#   adapter 自带池账，不经本路径）。
+# 回退：git apply -R（r033 镜像面回退=整镜像回 r032c，R1 级）。
+--- a/python/sglang/srt/model_executor/pool_configurator.py
+--- a/python/sglang/srt/model_executor/pool_configurator.py
++++ b/python/sglang/srt/model_executor/pool_configurator.py
+@@ -1261,7 +1261,28 @@
+         """Compressed KV (+ indexer) bytes one full token adds per layer of `ratio`;
+         compress state is priced per SWA slot (c4) or as fixed bytes (c128, ratio 2)."""
+         if ratio in (1, 2):
+-            return (self.kv_bytes + self.low_ratio_index_bytes) / ratio
++            # A7 (FI-LAND, S-FIS0-RESULT-20261018 SS2-A7): price the low-ratio
++            # compressed pools at the parsed compressed layout's page bytes --
++            # V41_FP4 = 288 B/token under SGLANG_DSV4_KV_LAYOUT=v41 (option
++            # auto resolves fp4 for ratio 1/2) -- instead of the layout-blind
++            # main-row width self.kv_bytes (584). Ported from the R1 adapter
++            # pool accounting (kv_fp4.py install_pool_configurator; resolution
++            # chain identical to _get_paged_kv_bytes_per_token below). Without
++            # this the v41 ledger line is kv_bytes-derived and the
++            # self-derived capacity falls below the 9,600,000 pin
++            # (pool-shrink red line); with it:
++            # (288 + 68) x 2.5 x 41/40 = 912.25, matching the in-service
++            # adapter-patched ledger bit-for-bit.
++            from sglang.srt.mem_cache.deepseek_v4_memory_pool import (
++                resolve_compressed_kv_layout,
++                select_dsv4_kv_layout,
++            )
++
++            layout, compressed_option = select_dsv4_kv_layout()
++            layout = resolve_compressed_kv_layout(layout, ratio, compressed_option)
++            page_size = self.page_size // ratio
++            kv_b = layout.page_bytes(page_size) / page_size
++            return (kv_b + self.low_ratio_index_bytes) / ratio
+         if ratio == 4:
+             c4_frac = 1 / (4 * self.c4_shrink_factor)
+             return (

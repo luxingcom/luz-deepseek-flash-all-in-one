@@ -1,0 +1,173 @@
+# R033-A2 FI-LAND 0.7.2 native writer/reader wiring patch (overlay backend face) -- 0.3.3 A-batch (S0 desk batch, 2026-10-25)
+# 呈裁件（未应用）：D31 裁定=A2 落 overlay 面（接线点 deepseek_v4_backend.py 被 overlay 28 源逐字节覆盖，
+#   镜像侧改必被盖死）。应用窗与步骤见 S0-DESK-BATCH-20261025.md 应用操作单（镜像侧一致性同步=F3 S3 staging）。
+# 法源（冻结设计=唯一语义法源）：
+#   S-FIS0-RESULT-20261018.md §二-A2：dsv41_fp8_quantize_pack_sparse_mla_cache(latent_kv,*,kv_layout)/
+#   ..._append_...(latent_kv, slot_mapping, cache) 签名容器实证；接线点=backend store 路径
+#   （:3058-3073 现有 set_extra_key_buffer_fused V41_FP4 分支同构位）；写入正确性由 S1/F2 G-k 值级对拍承载。
+#   F4-BAKE-PLAN-20261025.md §1.1.1 #6（D31 裁定落 overlay 面）/ §1.2 断言③：
+#   backend 调用面 kv_scale_format="ue8m0_g32" 字面在位 + extra_fp4 显式 + 禁 infer 路径（无静默模式）。
+#   INV-06-FI-B25.md §6.1 F3 行"ue8m0_g32 显式；无静默模式"。
+#   F1 实证（T33-06-F1-STAGING-REPORT.md §5）：native dispatch 逐字形
+#   pa(q, main_v41_v[pbs256·528B FP8], idx, ..., kv_scale_format="ue8m0_g32", extra_kv_cache=..., extra_fp4=True)
+#   七形状全受理。
+# 目标（D31：交付仓 overlay 源文件=部署面 backend a1e7c3b5f769d89d824c2bc0c9145e0c 的同步源）:
+#   deploy/reconstruct/0.3.2/overlay/deepseek_v4_backend.py
+#   （同一补丁逐字节适用于镜像旁证面 deploy/reconstruct/0.3.2/image/files/python/sglang/srt/layers/attention/deepseek_v4_backend.py——
+#     两面基底 md5 同为 a1e7c3b5；F3 S3 staging 同步保持一致性）
+# 接线三处：①模块级 _dsv41_fi072_native_available() 探针（0.7.2-only 符号 import，fail-closed 缓存）；
+#   ②store_cache 主池 V41 写入面=dsv41_fp8_quantize_append_sparse_mla_cache（0.7.2 写入器=§1.4 带同源量化族；
+#     同构位注记：冻结文 :3058-3073 为 extra 池 V41_FP4 分支，fp8 写入器格式对应主池，故落其同构的主池 store 位；
+#     extra 池 V41_FP4 写入维持 stock 融合核（kernel rotates tail + rounds once）与 R1/adapter 桥面不动）；
+#   ③_forward_attention SM120 读面=0.7.2 直呼 _sparse_mla_sm120_paged_attention，pbs256 视图原生直传（A3 已证受理），
+#     kv_scale_format="ue8m0_g32" + extra_fp4=True 显式（stock wrapper 丢未知 kwargs 且 split 常量为 V4 几何，不可承载）。
+# 断言落位：ue8m0_g32 显式（grep 字面在位）+ extra_fp4 显式 + 无 infer 路径（显式传参，非默认推断）。
+# 回退：git apply -R（overlay 单文件回拷 .bak 同效；I.2#7 重锚回退同 W6 制式）。
+--- a/deploy/reconstruct/0.3.2/overlay/deepseek_v4_backend.py
+--- a/deploy/reconstruct/0.3.2/overlay/deepseek_v4_backend.py
++++ b/deploy/reconstruct/0.3.2/overlay/deepseek_v4_backend.py
+@@ -33,6 +33,31 @@
+ from sglang.kernels.ops.attention.dsv4.metadata_kernel import (
+     fill_all_compressed_indices,
+ )
++
++
++# A2 (FI-LAND, S-FIS0-RESULT-20261018 SS2-A2 / INV-06 SS6.1 F3 row): whether
++# the flashinfer 0.7.2 DSV4_1 native writer/reader face is importable in this
++# process (dsv41_fp8_quantize_append_sparse_mla_cache and the DSV4_1 decode
++# envelope are 0.7.2-only symbols; the import probe fails closed on 0.6.18).
++# Probed once, cached; runtime correctness is borne by the F2 staging G-k
++# value-level pair-run.
++_DSV41_FI072_NATIVE = None
++
++
++def _dsv41_fi072_native_available() -> bool:
++    global _DSV41_FI072_NATIVE
++    if _DSV41_FI072_NATIVE is None:
++        try:
++            from flashinfer.mla._sparse_mla_sm120 import (  # noqa: F401
++                _DECODE_DSV4_1_DISPATCH,
++                _sparse_mla_sm120_paged_attention,
++                dsv41_fp8_quantize_append_sparse_mla_cache,
++            )
++
++            _DSV41_FI072_NATIVE = True
++        except Exception:
++            _DSV41_FI072_NATIVE = False
++    return _DSV41_FI072_NATIVE
+ from sglang.kernels.ops.attention.dsv4.metadata_kernel import (
+     init_compression_metadata as _init_compression_metadata_triton,
+ )
+@@ -3270,7 +3295,31 @@
+         self, layer_id: int, swa_k: torch.Tensor, forward_batch: ForwardBatch
+     ) -> None:
+         swa_loc = self.get_swa_out_cache_loc(forward_batch)
+-        self.token_to_kv_pool.set_swa_key_buffer_radix_fused(
++        pool = self.token_to_kv_pool
++        if pool.kv_layout is KVLayout.V41 and _dsv41_fi072_native_available():
++            # A2 (FI-LAND, S-FIS0-RESULT-20261018 SS2-A2): the main (SWA)
++            # 528B DSV4_1 cache is written through the 0.7.2 device writer
++            # (per-32 UE8M0 groups -- the quantizer family the G-k band was
++            # derived from), wired at the store-path position isomorphic to
++            # the existing set_extra_key_buffer_fused V41_FP4 branch
++            # (:3058-3073). The stock fused-store fallback below is kept for
++            # non-0.7.2 stacks (probe-gated; both faces write the same 528B
++            # DSV4_1 ABI).
++            from flashinfer.mla._sparse_mla_sm120 import (
++                dsv41_fp8_quantize_append_sparse_mla_cache,
++            )
++
++            raw = pool.get_swa_raw_buffer(layer_id)
++            assert raw.dim() == 2, (
++                "A2 writer wiring expects the 2D paged raw SWA buffer"
++            )
++            dest = (raw if raw.dtype == torch.uint8 else raw.view(torch.uint8))[
++                :,
++                : pool.swa_kv_pool.page_size * pool.get_swa_key_bytes_per_token(),
++            ]
++            dsv41_fp8_quantize_append_sparse_mla_cache(swa_k, swa_loc, dest)
++            return
++        pool.set_swa_key_buffer_radix_fused(
+             layer_id=layer_id,
+             swa_loc=swa_loc,
+             cache_k=swa_k,
+@@ -3459,6 +3508,79 @@
+                 )
+ 
+             if get_platform().is_sm120:
++                if (
++                    token_to_kv_pool.kv_layout is KVLayout.V41
++                    and _dsv41_fi072_native_available()
++                ):
++                    # A2 (FI-LAND, S-FIS0-RESULT-20261018 SS2-A2 / INV-06
++                    # SS6.1 F3 row): the DSV4_1 formats are reachable only
++                    # explicitly -- 0.7.2 never infers ue8m0_g32 from widths
++                    # -- and the stock flash_mla_with_kvcache_sm120 drops
++                    # unknown kwargs (its pbs256->64 split constants are V4
++                    # geometry), so the V41 face calls the 0.7.2 entry
++                    # directly with the F1 leg-B-proven native dispatch form:
++                    # pbs256 528B FP8 main + pbs256 288B FP4 extra views
++                    # passed natively, kv_scale_format="ue8m0_g32" and
++                    # extra_fp4=True explicit (no inference path).
++                    from flashinfer.mla._sparse_mla_sm120 import (
++                        _sparse_mla_sm120_paged_attention,
++                    )
++                    from sglang.kernels.ops.attention.flash_mla_sm120 import (
++                        SM120_DECODE_MAX_TOKENS,
++                    )
++
++                    # The 64-head pad only serves the decode kernel's h_q
++                    # specialization; the prefill kernel takes any h_q, so
++                    # drop it (same rule as the stock branch below).
++                    real_heads = layer.tp_q_head_num
++                    if q.shape[0] > SM120_DECODE_MAX_TOKENS:
++                        if q.shape[-2] > real_heads:
++                            q = q[..., :real_heads, :].contiguous()
++                        if attn_sink is not None and attn_sink.shape[0] > real_heads:
++                            attn_sink = attn_sink[:real_heads]
++
++                    q2 = q.squeeze(1) if q.ndim == 4 else q
++                    swa_u8 = (
++                        swa_k_cache
++                        if swa_k_cache.dtype == torch.uint8
++                        else swa_k_cache.view(torch.uint8)
++                    )
++                    extra_u8 = (
++                        extra_k_cache
++                        if extra_k_cache is None or extra_k_cache.dtype == torch.uint8
++                        else extra_k_cache.view(torch.uint8)
++                    )
++                    native_out = q2.new_empty(
++                        (q2.shape[0], q2.shape[1], self.head_dim_v),
++                        dtype=torch.bfloat16,
++                    )
++                    native_lse = torch.empty(
++                        (q2.shape[0], q2.shape[1]),
++                        dtype=torch.float32,
++                        device=q2.device,
++                    )
++                    _sparse_mla_sm120_paged_attention(
++                        q2,
++                        swa_u8,
++                        swa_page_indices.squeeze(1)
++                        if swa_page_indices.dim() == 3
++                        else swa_page_indices,
++                        native_out,
++                        native_lse,
++                        self.softmax_scale,
++                        topk_length=swa_topk_lengths,
++                        attn_sink=attn_sink,
++                        extra_kv_cache=extra_u8,
++                        extra_indices=extra_indices.squeeze(1)
++                        if extra_indices is not None and extra_indices.dim() == 3
++                        else extra_indices,
++                        extra_topk_length=extra_topk_lengths,
++                        kv_scale_format="ue8m0_g32",
++                        extra_fp4=True,
++                        mid_out=None,
++                        mid_lse=None,
++                    )
++                    return native_out
+                 from sglang.kernels.ops.attention.flash_mla_sm120 import (
+                     SM120_DECODE_MAX_TOKENS,
+                     flash_mla_with_kvcache_sm120,

@@ -1,0 +1,57 @@
+# R033-A1 V41 layout SM121 unlock patch -- 0.3.3 FI-LAND A-batch (S0 desk batch, 2026-10-25)
+# 呈裁件（未应用）：F3 烘制窗 S0 步对 replay 树面 git apply（见 docs/plan/033-W1/S0-DESK-BATCH-20261025.md 应用操作单）。
+# 法源（冻结设计=唯一语义法源）：
+#   S-FIS0-RESULT-20261018.md §二-A1 三点冻结：① is_sm100 (major==10)->(10,12)（GB10=SM121 major12）；
+#   ② 能力探针=0.7.2 _execution.KV_SCALE_FORMATS ⊇ {ue8m0_g32} + envelope (32,512) membership（CPU 可静态读）；
+#   ③ 部署面=.env.tp4 KV_LAYOUT v41 + guards envpin（部署面动作，非本补丁）。
+#   INV-06-FI-B25.md §6.1 F3 行断言②：A1 解禁（is_sm100 判定 SM121->True 静态探针）。
+#   F4-BAKE-PLAN-20261025.md §1.1.1 #4 / §1.3 S0 步。
+# 目标（镜像 COPY 层，stock 79cafec0 基底；非 16 件移植面成员，基底 md5 a065ddfc49e9d4b9e3d2739e7e44b488）:
+#   python/sglang/srt/mem_cache/deepseek_v4_memory_pool.py
+# 断言落位：A1 解禁=is_sm100 对 major 12 判 True（静态探针，单测 test_r033_abatch_patches.py::test_a1_...）。
+# 行为注记：探针在 0.6.18 面缺 DSV4_1 符号/缺 ue8m0_g32 -> False（fail-closed，auto 维持 V4，零回退风险）；
+#   mode=v41 显式路径下探针 False 仅告警仍返回 V41（stock 语义不变）。
+# 回退：git apply -R（r033 镜像面回退=整镜像回 r032c，R1 级）。
+--- a/python/sglang/srt/mem_cache/deepseek_v4_memory_pool.py
+--- a/python/sglang/srt/mem_cache/deepseek_v4_memory_pool.py
++++ b/python/sglang/srt/mem_cache/deepseek_v4_memory_pool.py
+@@ -159,13 +159,23 @@
+ 
+ 
+ def flashmla_supports_v41_kv_layouts() -> bool:
+-    """Whether the installed FlashMLA decode kernel reads the V41 / V41_FP4
+-    formats; its docstring lists the bytes-per-token it detects."""
++    """A1 (FI-LAND, S-FIS0-RESULT-20261018 SS2-A1 frozen point 2): the V41 /
++    V41_FP4 capability probe against the installed flashinfer sparse-MLA
++    stack -- "ue8m0_g32" must be an explicit KV scale format (0.7.2-only;
++    upstream never infers it from widths) and the DSV4_1 decode envelope
++    must admit the (heads=32, topk=512) TP4 shape. Both are static-readable
++    without a GPU (0.7.2 _policy.py init-time-probe contract). Replaces the
++    sgl_kernel docstring "528" probe: native V41 reads exist only on the
++    0.7.2 DSV4_1 path this probe gates (0.6.18 lacks ue8m0_g32/DSV4_1, so
++    the probe fails closed there and auto mode keeps the V4 layout)."""
+     try:
+-        from sgl_kernel.flash_mla import flash_mla_with_kvcache
++        from flashinfer.mla._sparse_mla_sm120 import (
++            _DECODE_DSV4_1_DISPATCH,
++            _KV_SCALE_FORMATS,
++        )
+     except Exception:
+         return False
+-    return "528" in (flash_mla_with_kvcache.__doc__ or "")
++    return "ue8m0_g32" in _KV_SCALE_FORMATS and (32, 512) in _DECODE_DSV4_1_DISPATCH
+ 
+ 
+ def select_dsv4_kv_layout() -> Tuple[KVLayout, Optional[str]]:
+@@ -179,7 +189,10 @@
+     is_sm100 = (
+         torch.cuda.is_available()
+         and torch.version.cuda is not None
+-        and torch.cuda.get_device_capability()[0] == 10
++        # A1 (FI-LAND, S-FIS0-RESULT-20261018 SS2-A1 frozen point 1): GB10 is
++        # SM121 (capability major 12); the V41 layouts unlock on the
++        # SM100/SM103-or-SM121 family (frozen: major==10 -> major in (10,12)).
++        and torch.cuda.get_device_capability()[0] in (10, 12)
+     )
+     supported = flashmla_supports_v41_kv_layouts()
+     if mode == "auto":
