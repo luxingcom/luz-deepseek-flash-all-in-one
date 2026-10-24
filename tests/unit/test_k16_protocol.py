@@ -725,32 +725,45 @@ def test_recipe_rebase_anchor_semantics():
 
 @pytest.mark.skipif(not os.path.isfile(RECIPE_BASE), reason="recipe 基源不可读（migrate-assets）")
 def test_recipe_rebase_applies_clean_and_compiles(tmp_path):
-    """自建临时基底（3151a2ed 形，不入库）：干净应用 + 应用产物 md5 pin + py_compile。"""
+    """双态不变量（W6 前置批 2026-10-24；D16 后靴路径 01 已应用 recipe 重基件）：
+    基 md5==3151a2ed（呈裁未应用）→ 自建临时基底（不入库）：dry-run + 干净应用
+    + 应用产物 md5 pin；基 md5==9b60a463（已应用态）→ 直验现役件不变量；
+    两态共用 sentinel 在位 + py_compile 门；其他值 → fail 并报实测值（防漂移静默）。"""
     import hashlib
     import subprocess as sp
 
     base_bytes = open(RECIPE_BASE, "rb").read()
     md5 = hashlib.md5(base_bytes).hexdigest()
-    assert md5 == RECIPE_BASE_MD5, f"recipe 基漂移: {md5} != {RECIPE_BASE_MD5}"
     target = tmp_path / "deploy" / "overlay" / "o12c1-prod"
     target.mkdir(parents=True)
     (target / "serving_chat.py").write_bytes(base_bytes)
 
-    dry = sp.run(
-        ["patch", "-p1", "--dry-run", "-i", PATCH_PATH_RECIPE],
-        cwd=tmp_path, capture_output=True, text=True,
-    )
-    assert dry.returncode == 0, dry.stdout + dry.stderr
-    apply = sp.run(
-        ["patch", "-p1", "-i", PATCH_PATH_RECIPE],
-        cwd=tmp_path, capture_output=True, text=True,
-    )
-    assert apply.returncode == 0, apply.stdout + apply.stderr
+    if md5 == RECIPE_BASE_MD5:
+        # 呈裁未应用态：临时基底 dry-run 后干净应用，产物须命中 9b60a463 pin
+        dry = sp.run(
+            ["patch", "-p1", "--dry-run", "-i", PATCH_PATH_RECIPE],
+            cwd=tmp_path, capture_output=True, text=True,
+        )
+        assert dry.returncode == 0, dry.stdout + dry.stderr
+        apply = sp.run(
+            ["patch", "-p1", "-i", PATCH_PATH_RECIPE],
+            cwd=tmp_path, capture_output=True, text=True,
+        )
+        assert apply.returncode == 0, apply.stdout + apply.stderr
 
-    applied = (target / "serving_chat.py").read_bytes()
-    got = hashlib.md5(applied).hexdigest()
-    assert got == RECIPE_APPLIED_MD5, f"应用产物 md5 漂移: {got}"
-    src = applied.decode("utf-8")
+        applied = (target / "serving_chat.py").read_bytes()
+        got = hashlib.md5(applied).hexdigest()
+        assert got == RECIPE_APPLIED_MD5, f"应用产物 md5 漂移: {got}"
+    elif md5 == RECIPE_APPLIED_MD5:
+        # 已应用态（W5 窗 D16 应用后的靴路径 01 现役形）：sentinel + 编译门在下方直验
+        pass
+    else:
+        raise AssertionError(
+            f"recipe 基漂移: {md5}（既非呈裁基 {RECIPE_BASE_MD5}，"
+            f"也非已应用形 {RECIPE_APPLIED_MD5}）"
+        )
+
+    src = (target / "serving_chat.py").read_text(encoding="utf-8")
     for sentinel in (
         "# ---- t33-01a canonical: begin",
         "_t33_01a_validate_chat_request(request)",
