@@ -590,3 +590,176 @@ def test_patch_static_gate_checks():
         m._T33_01A_RF_REGEX_FLAG,
     ):
         assert key in region
+
+
+# ============================================================
+# F-recipe) W5 前置批（2026-10-24）：recipe 线重基呈裁件静态一致性
+# （t33-01a.overlay-serving-chat.recipe-rebase.patch；补丁基=serving_chat.py
+#  md5 3151a2ed…·recipe 线/r032c 容器保形/靴路径 01 现役形；呈裁未应用。
+#  现有 F 节断言为内容匹配不绑行号、对前基件仍绿——本节为 recipe 基变体，只增不减。）
+# ============================================================
+
+PATCH_PATH_RECIPE = os.path.join(
+    REPO, "tools", "patches", "t33-01a.overlay-serving-chat.recipe-rebase.patch"
+)
+RECIPE_BASE = (
+    "/home/liuxiaoya/migrate-assets/v4vl/sglang-overlay.o12c1-prod/serving_chat.py"
+)
+RECIPE_BASE_MD5 = "3151a2edf2c21e4d3492dff5bbc6ec10"
+# 基 3151a2ed + recipe 重基件应用后产物（W5 前置批构建器逐字节复算 pin）
+RECIPE_APPLIED_MD5 = "9b60a46312363add8c119a950ddc6c2c"
+
+
+def _patch_canonical_region_of(patch_path):
+    with open(patch_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+    collecting, out = False, []
+    for line in lines:
+        if line.startswith(("+++", "---")):
+            continue
+        if not line.startswith("+"):
+            continue
+        content = line[1:]
+        if CANONICAL_BEGIN in content:
+            collecting = True
+        if collecting:
+            out.append(content)
+        if collecting and CANONICAL_END in content:
+            collecting = False
+    assert out, "补丁必须内嵌 canonical sentinel 段"
+    return "".join(out).rstrip("\n")
+
+
+def _patch_hunks(patch_path):
+    """[(hunk 行序列，去前缀后原文)]，行首 ' ' '+' '-' 保留语义。"""
+    hunks, cur = [], None
+    with open(patch_path, "r", encoding="utf-8") as f:
+        for raw in f:
+            line = raw.rstrip("\n")
+            if line.startswith("@@"):
+                cur = []
+                hunks.append(cur)
+                continue
+            if cur is not None and not line.startswith(("--- ", "+++ ")):
+                cur.append(line)
+    return [h for h in hunks if h]
+
+
+@pytest.mark.skipif(not os.path.isfile(PATCH_PATH_RECIPE), reason="recipe 重基呈裁件未生成")
+def test_patch_canonical_identity_recipe():
+    """recipe 重基件内嵌 canonical 段与模块逐字一致（前基件同法；漂移即红）。"""
+    assert _patch_canonical_region_of(PATCH_PATH_RECIPE) == _module_canonical_region()
+
+
+@pytest.mark.skipif(not os.path.isfile(PATCH_PATH_RECIPE), reason="recipe 重基呈裁件未生成")
+def test_patch_static_gate_checks_recipe():
+    """recipe 重基件静态门控核验：单 overlay 文件 / 无 env / 三接线点门注释同现。"""
+    with open(PATCH_PATH_RECIPE, "r", encoding="utf-8") as f:
+        patch_text = f.read()
+    touched = {
+        line.split()[1][2:]
+        for line in patch_text.splitlines()
+        if line.startswith(("--- a/", "+++ b/"))
+    }
+    assert touched == {"deploy/overlay/o12c1-prod/serving_chat.py"}, touched
+    assert "deploy/env" not in patch_text
+
+    added_text = "\n".join(
+        ln[1:] for ln in patch_text.splitlines() if ln.startswith("+")
+    )
+
+    def wiring_comment_gate(call_snippet, flag):
+        idx = added_text.find(call_snippet)
+        assert idx != -1, f"补丁缺少接线点: {call_snippet}"
+        context_above = added_text[max(0, idx - 600) : idx]
+        assert flag in context_above, f"{call_snippet} 接线未带 {flag} 门注释"
+
+    wiring_comment_gate(
+        "messages = _t33_01a_apply_response_format(messages, request)",
+        m._T33_01A_RF_INJECT_FLAG,
+    )
+    wiring_comment_gate(
+        "\n                _t33_01a_apply_max_tokens(",
+        m._T33_01A_EFFORT_FLAG,
+    )
+    wiring_comment_gate(
+        "_t33_01a_error = _t33_01a_validate_chat_request(request)",
+        m._T33_01A_EFFORT_FLAG,
+    )
+
+
+@pytest.mark.skipif(not os.path.isfile(PATCH_PATH_RECIPE), reason="recipe 重基呈裁件未生成")
+def test_recipe_rebase_anchor_semantics():
+    """锚点语义保持（W4 报告 §六/K16 顺延注记的呈裁纪律）：
+    W3 注入=「encode 前」——recipe 基上位于 effort 提升块之后、encode_messages 之前
+    （前基件同律位=attach_task 之后、encode 之前）；W4 写回=「prompt_ids 终值后」
+    ——recipe 基上位于回退赋值之后（前基件同律位=单行赋值之后）。"""
+    hunks = _patch_hunks(PATCH_PATH_RECIPE)
+
+    def hunk_of(snippet):
+        hits = [h for h in hunks if any(ln[1:] == snippet for ln in h if ln[:1] == "+")]
+        assert len(hits) == 1, snippet
+        return hits[0]
+
+    w3 = hunk_of("                messages = _t33_01a_apply_response_format(messages, request)")
+    lines = [ln[1:] for ln in w3]
+    i_inject = lines.index("                messages = _t33_01a_apply_response_format(messages, request)")
+    assert any(
+        "dsv41_reasoning_effort = self._resolve_dsv41_reasoning_effort(" in ln
+        for ln in lines[:i_inject]
+    ), "W3 注入不在 effort 提升块后"
+    assert any(
+        "real_input, media = encoding_dsv41.encode_messages(" in ln
+        for ln in lines[i_inject:]
+    ), "W3 注入不在 encode_messages 前"
+
+    w4 = hunk_of("                _t33_01a_apply_max_tokens(")
+    lines4 = [ln[1:] for ln in w4]
+    i_apply = next(
+        i for i, ln in enumerate(lines4) if ln == "                _t33_01a_apply_max_tokens("
+    )
+    assert any(
+        ln == "                if prompt_ids is None:" for ln in lines4[:i_apply]
+    ), "W4 写回不在 recipe 回退赋值（prompt_ids 终值）后"
+
+
+@pytest.mark.skipif(not os.path.isfile(RECIPE_BASE), reason="recipe 基源不可读（migrate-assets）")
+def test_recipe_rebase_applies_clean_and_compiles(tmp_path):
+    """自建临时基底（3151a2ed 形，不入库）：干净应用 + 应用产物 md5 pin + py_compile。"""
+    import hashlib
+    import subprocess as sp
+
+    base_bytes = open(RECIPE_BASE, "rb").read()
+    md5 = hashlib.md5(base_bytes).hexdigest()
+    assert md5 == RECIPE_BASE_MD5, f"recipe 基漂移: {md5} != {RECIPE_BASE_MD5}"
+    target = tmp_path / "deploy" / "overlay" / "o12c1-prod"
+    target.mkdir(parents=True)
+    (target / "serving_chat.py").write_bytes(base_bytes)
+
+    dry = sp.run(
+        ["patch", "-p1", "--dry-run", "-i", PATCH_PATH_RECIPE],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert dry.returncode == 0, dry.stdout + dry.stderr
+    apply = sp.run(
+        ["patch", "-p1", "-i", PATCH_PATH_RECIPE],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert apply.returncode == 0, apply.stdout + apply.stderr
+
+    applied = (target / "serving_chat.py").read_bytes()
+    got = hashlib.md5(applied).hexdigest()
+    assert got == RECIPE_APPLIED_MD5, f"应用产物 md5 漂移: {got}"
+    src = applied.decode("utf-8")
+    for sentinel in (
+        "# ---- t33-01a canonical: begin",
+        "_t33_01a_validate_chat_request(request)",
+        "messages = _t33_01a_apply_response_format(messages, request)",
+        "_t33_01a_apply_max_tokens(",
+    ):
+        assert sentinel in src, sentinel
+    comp = sp.run(
+        [sys.executable, "-m", "py_compile", str(target / "serving_chat.py")],
+        capture_output=True, text=True,
+    )
+    assert comp.returncode == 0, comp.stdout + comp.stderr

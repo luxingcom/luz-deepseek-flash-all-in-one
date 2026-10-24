@@ -1879,8 +1879,8 @@ class Scheduler(
     def _init_sched_stats(self):
         """SCHED_STATS_V1 只读账本（env 默认关 → None，热路径单分支检查）。"""
         stats = SchedStatsV1(
-            gamma=int(
-                getattr(get_spec(), "speculative_num_draft_tokens", 0) or 0
+            gamma=max(
+                int(getattr(get_spec(), "speculative_num_draft_tokens", 0) or 0) - 1, 0
             ),
             sink=lambda line: logger.info("%s", line),
             get_running=lambda: len(self.running_batch.reqs),

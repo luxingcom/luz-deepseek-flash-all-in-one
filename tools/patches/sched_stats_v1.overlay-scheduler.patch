@@ -1,5 +1,8 @@
 # SCHED_STATS_V1 overlay-scheduler patch -- T33-03 Phase 1 (0.3.3, 2026-10-23)
-# 呈裁件（已应用+2026-10-24 Callable import 修复·W4 窗批）：主会话批准后从交付仓根目录 `git apply` / `patch -p1`。
+# 呈裁件（已应用+2026-10-24 Callable import 修复·W4 窗批；+2026-10-24 W5 前置批 gamma 语义修复）：主会话批准后从交付仓根目录 `git apply` / `patch -p1`。
+# gamma 语义（W4 报告 §八 第四态 D，W5 前置批已批修复）：引擎字段
+#   speculative_num_draft_tokens = verify 长度 = γ+1（DSPARK 实配 6 ⇒ γ=5），
+#   接线派生 γ = speculative_num_draft_tokens − 1（max 下限 0），不再把 verify 长度直标 gamma。
 # 目标: deploy/overlay/o12c1-prod/scheduler.py（现役未改；应用后需按 G-BL I.2#7 重锚 overlay backend md5）。
 # 回退: `git apply -R`；运行期回退=env 不设 SGLANG_SCHED_STATS（默认关）。
 # 类体与 tools/obs/sched_stats_v1.py 的 patch-canonical sentinel 段逐字一致
@@ -438,8 +441,8 @@
 +    def _init_sched_stats(self):
 +        """SCHED_STATS_V1 只读账本（env 默认关 → None，热路径单分支检查）。"""
 +        stats = SchedStatsV1(
-+            gamma=int(
-+                getattr(get_spec(), "speculative_num_draft_tokens", 0) or 0
++            gamma=max(
++                int(getattr(get_spec(), "speculative_num_draft_tokens", 0) or 0) - 1, 0
 +            ),
 +            sink=lambda line: logger.info("%s", line),
 +            get_running=lambda: len(self.running_batch.reqs),

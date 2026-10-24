@@ -7,13 +7,17 @@
   /tmp/w0venv/bin/python -m pytest -q tests/unit/test_sched_stats_v1.py -o cache_dir=/tmp/w0cache
 """
 
+import ast
 import importlib.util
 import json
+import logging
 import math
 import os
 import subprocess
 import sys
 import tempfile
+import textwrap
+from types import SimpleNamespace
 
 import pytest
 
@@ -464,3 +468,97 @@ def test_module_selfcheck_green():
     )
     assert r.returncode == 0, r.stdout + r.stderr
     assert r.stdout.strip().startswith("SELFCHK SCHED_STATS_V1 ok")
+
+
+# ── W5 前置批（2026-10-24）：γ = speculative_num_draft_tokens − 1 接线语义 ────
+# 法源：W4-WINDOW-REPORT-20261024.md §八 第四态 D（接线字段语义错位：引擎字段
+# speculative_num_draft_tokens = verify 长度 = γ+1，DSPARK 实配 6 ⇒ γ=5）。
+# 被测面：scheduler.py 部署件 _init_sched_stats 接线 × 补丁工件同段（双源一致）。
+def _wiring_src_from_scheduler():
+    src = open(OVERLAY_SCHED, encoding="utf-8").read()
+    lines = src.splitlines()
+    tree = ast.parse(src)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "_init_sched_stats":
+            return textwrap.dedent("\n".join(lines[node.lineno - 1 : node.end_lineno]))
+    raise AssertionError("_init_sched_stats 不在 scheduler.py")
+
+
+def _wiring_src_from_patch():
+    lines = open(PATCH_PATH, encoding="utf-8").read().splitlines()
+    plus = [ln[1:] for ln in lines if ln.startswith("+") and not ln.startswith("+++")]
+    text = "\n".join(plus)
+    start_marker = "    def _init_sched_stats(self):"
+    end_marker = "        return stats if stats.enabled else None"
+    start = text.index(start_marker)
+    end = text.index(end_marker) + len(end_marker)
+    return textwrap.dedent(text[start:end])
+
+
+def _gamma_expr(func_src):
+    tree = ast.parse(func_src)
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "SchedStatsV1"):
+            for kw in node.keywords:
+                if kw.arg == "gamma":
+                    return kw.value
+    raise AssertionError("SchedStatsV1(gamma=...) 接线缺失")
+
+
+def test_wiring_gamma_derivation_structure():
+    """AST 结构门：γ = max(int(getattr(get_spec(), "speculative_num_draft_tokens",
+    0) or 0) − 1, 0)——必须含 −1 派生与 0 下限（verify 长度不得直标 gamma）。"""
+    for src in (_wiring_src_from_scheduler(), _wiring_src_from_patch()):
+        g = _gamma_expr(src)
+        assert isinstance(g, ast.Call) and g.func.id == "max", ast.dump(g)
+        assert len(g.args) == 2 and g.args[1].value == 0, "缺 max(·, 0) 下限"
+        sub = g.args[0]
+        assert isinstance(sub, ast.BinOp) and isinstance(sub.op, ast.Sub)
+        assert sub.right.value == 1, "缺 − 1 派生"
+        assert "speculative_num_draft_tokens" in ast.dump(sub.left)
+
+
+@pytest.mark.parametrize(
+    "n,expected",
+    [
+        (6, 5),    # DSPARK 实配（γ=5 · verify=6）：修复后输出 gamma=5
+        (7, 6),    # 引擎缺省 γ=7（在役从未命中，防御面）
+        (5, 4), (2, 1),
+        (1, 0),
+        (0, 0),    # SPEC=0 臂：n−1 下限 0
+        (None, 0),  # 字段存在但 None：or 0 → 下限 0
+    ],
+)
+def test_wiring_gamma_n_minus_one_behavior(n, expected, monkeypatch):
+    """"γ=n−1" 用例（行为面）：真实接线函数 exec 求值，γ 必须 = n−1（下限 0）。
+    双源（scheduler 部署件 / 补丁工件）各自求值，部署=工件一致性同证。"""
+    monkeypatch.setenv(m.ENV_ENABLE, "1")
+    for src in (_wiring_src_from_scheduler(), _wiring_src_from_patch()):
+        ns = {
+            "SchedStatsV1": SchedStatsV1,
+            "get_spec": lambda: SimpleNamespace(speculative_num_draft_tokens=n),
+            "logger": logging.getLogger("test_sched_stats_wiring"),
+        }
+        exec(compile(src, "<sched-stats-wiring>", "exec"), ns)
+        stats = ns["_init_sched_stats"](SimpleNamespace())
+        assert stats is not None and stats.enabled is True
+        assert stats.gamma == expected, (n, expected, src)
+
+
+def test_wiring_gamma_missing_attr_defaults_zero(monkeypatch):
+    """引擎对象无该字段（getattr 缺省 0）→ γ=0（SPEC=0 形，不误报 γ=−1）。"""
+    monkeypatch.setenv(m.ENV_ENABLE, "1")
+    ns = {
+        "SchedStatsV1": SchedStatsV1,
+        "get_spec": lambda: SimpleNamespace(),
+        "logger": logging.getLogger("test_sched_stats_wiring"),
+    }
+    exec(compile(_wiring_src_from_scheduler(), "<w>", "exec"), ns)
+    assert ns["_init_sched_stats"](SimpleNamespace()).gamma == 0
+
+
+def test_wiring_scheduler_patch_text_identity():
+    """部署件 _init_sched_stats 与补丁工件同段逐字一致（工件=部署纪律）。"""
+    assert _wiring_src_from_scheduler() == _wiring_src_from_patch()
