@@ -439,6 +439,12 @@ def test_patch_class_identity():
 
 
 def test_patch_dryrun_applies_clean():
+    # 整合批 2026-10-24 起为「已应用态」不变量（原为呈裁态可应用性门）：
+    # ① 目标件 sentinel 在位；② 对已应用副本 dry-run 应检出 previously applied（拒绝重放）。
+    with open(OVERLAY_SCHED, encoding="utf-8") as f:
+        src = f.read()
+    assert "class SchedStatsV1" in src, "目标件 sentinel 缺失：补丁不在位"
+    assert "_init_sched_stats" in src, "目标件接线点缺失：补丁不在位"
     with tempfile.TemporaryDirectory() as td:
         rel = os.path.join("deploy", "overlay", "o12c1-prod")
         os.makedirs(os.path.join(td, rel))
@@ -448,7 +454,7 @@ def test_patch_dryrun_applies_clean():
             ["patch", "-p1", "--dry-run", "-i", PATCH_PATH],
             cwd=td, capture_output=True, text=True,
         )
-        assert r.returncode == 0, r.stdout + r.stderr
+        assert "previously applied" in (r.stdout + r.stderr), r.stdout + r.stderr
 
 
 def test_module_selfcheck_green():

@@ -1,5 +1,5 @@
 # SCHED_STATS_V1 overlay-scheduler patch -- T33-03 Phase 1 (0.3.3, 2026-10-23)
-# 呈裁件（未应用）：主会话批准后从交付仓根目录 `git apply` / `patch -p1`。
+# 呈裁件（已应用+2026-10-24 Callable import 修复·W4 窗批）：主会话批准后从交付仓根目录 `git apply` / `patch -p1`。
 # 目标: deploy/overlay/o12c1-prod/scheduler.py（现役未改；应用后需按 G-BL I.2#7 重锚 overlay backend md5）。
 # 回退: `git apply -R`；运行期回退=env 不设 SGLANG_SCHED_STATS（默认关）。
 # 类体与 tools/obs/sched_stats_v1.py 的 patch-canonical sentinel 段逐字一致
@@ -8,7 +8,6 @@
 # init_metrics_reporter+_init_sched_stats / _should_defer_prefill /
 # _record_step_counters（health、noncontig、range、accepted 尾钩）。
 --- a/deploy/overlay/o12c1-prod/scheduler.py	2026-10-23 23:09:22.007020212 +0000
-+++ b/deploy/overlay/o12c1-prod/scheduler.py	2026-10-23 23:09:22.007319982 +0000
 @@ -15,6 +15,7 @@
  
  import dataclasses
@@ -17,6 +16,15 @@
  import logging
  import math
  import os
+@@ -26,7 +27,7 @@
+ from contextlib import contextmanager, nullcontext
+ from functools import partial
+ from http import HTTPStatus
+-from typing import TYPE_CHECKING, Any, Deque, Dict, List, Optional, Set, Tuple, Union
++from typing import TYPE_CHECKING, Any, Callable, Deque, Dict, List, Optional, Set, Tuple, Union
+ 
+ from sglang.srt.runtime_context import (
+     SpawnRanks,
 @@ -461,6 +462,386 @@
  TEST_RETRACT_NO_PREFILL_BS = envs.SGLANG_TEST_RETRACT_NO_PREFILL_BS.get()
  
