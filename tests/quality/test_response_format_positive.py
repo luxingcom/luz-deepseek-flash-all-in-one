@@ -11,9 +11,10 @@
 #   A) encoder 层正例（encoding_dsv41 现有能力，pass）：message 级
 #      response_format 渲染进首条 system（response_format_template，
 #      encoding_dsv41.py:50,270-273），tools 段与 RF 段可并存。
-#   B) 接线层缺口（xfail 登记）：dsv41 服务路径未把 request.response_format
-#      喂给 encoder（EV-05-019）与协议无 regex 变体（EV-05-011/P6）——
-#      实现属 T33-01A（W5 条件件），0.3.3 不改产线。
+#   B) 接线层：dsv41 服务路径 response_format 接线（T33-01A 补丁
+#      t33-01a.overlay-serving-chat.patch 2026-10-24 应用后转正 pass，
+#      见 INTEGRATION-BATCH-20261024）与协议无 regex 变体（EV-05-011/P6，
+#      仍 xfail 登记——protocol.py 未触）。
 
 import json
 
@@ -130,7 +131,7 @@ def test_tools_and_response_format_coexist(encoding_dsv41):
 
 
 # ============================================================
-# B) 接线层缺口登记（xfail strict，实现归 T33-01A）
+# B) 接线层（RF 接线已转正；regex 协议缺口仍 xfail 登记）
 # ============================================================
 
 
@@ -145,21 +146,19 @@ def _dsv41_branch_source():
     return text[start:end if end != -1 else len(text)]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "接线缺口：dsv41 分支调用 encoding_dsv41.encode_messages 时不传"
-        " response_format（overlay serving_chat.py:1588-1604；EV-05-019；"
-        " renderer_handles_response_format 仅 kimi_k3 为 true，:1217），"
-        " 故 request 级 response_format 永远到不了 encoder 的注入模板。"
-        " schema 注入 + SGLANG_DSV41_RF_INJECT 开关属 T33-01A（W5 条件件）；"
-        " 开关未开时的负向护栏归 T33-10 G-RF，本文件不重复。"
-    ),
-)
+# 转正注记（2026-10-24，INTEGRATION-BATCH）：原 xfail(strict) reason=
+# 「接线缺口：dsv41 分支调用 encoding_dsv41.encode_messages 时不传
+#  response_format（EV-05-019）」——T33-01A 补丁应用后接线在位，XPASS 转红，
+# 按 T33-01C-REPORT §2.3 授权逐条转正；断言同步升级为实测新接线面
+# （接线调用 + 门控开关键同现于 dsv41 分支切片）。开关未开时的负向护栏
+# 仍归 T33-10 G-RF（test_no_go_render_contract.py），本文件不重复。
 def test_dsv41_serving_path_passes_response_format():
-    """正例（目标态）：dsv41 服务分支把 request.response_format 传入 encoder。"""
+    """正例（转正后）：dsv41 服务分支把 request.response_format 接入注入路径。"""
     branch = _dsv41_branch_source()
     assert "response_format" in branch
+    # 实测新接线面（W3）：RF 注入接线调用 + 门控开关键名在 dsv41 分支内
+    assert "messages = _t33_01a_apply_response_format(messages, request)" in branch
+    assert "SGLANG_DSV41_RF_INJECT" in branch
 
 
 @pytest.mark.xfail(
