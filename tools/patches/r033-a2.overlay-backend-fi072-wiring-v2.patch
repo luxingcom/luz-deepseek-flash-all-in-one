@@ -1,0 +1,258 @@
+# R033-A2 v2 FI-LAND 0.7.2 native writer/reader wiring patch -- A2 polish batch (D41+D46, 2026-10-25)
+# 呈裁件（未应用）：本补丁为 r033-a2.overlay-backend-fi072-wiring.patch（md5 a7bc65da…，呈裁未应用）的
+#   v2 打磨版，同基底下重制（base=deploy/reconstruct/0.3.2/overlay/deepseek_v4_backend.py
+#   md5 a1e7c3b5f769d89d824c2bc0c9145e0c；v1 补丁本体不动，v2 为独立呈裁件）。
+# 法源：
+#   DECISIONS-RESOLVED-20261024.md 第八批 D41（P1-② 热路径 import 上提+复用）与第十批 D46
+#   （read_face 拒收根因=pa 调用点 mid_out/mid_lse 显式传 None；SM120 sparse-MLA decode 硬性要求
+#   caller-supplied scratch——a2-live-v2.json 活体实录，错误信息 [64,32,16,512] bf16/[64,32,16] fp32
+#   仅 pbs64 用例实例，禁止硬编码）。
+#   CODE-QUALITY-REVIEW-20261025.md §⑤-3（D41 批准改法）：探针成功路径模块级绑定
+#   _FI072_PA/_FI072_WRITER；SM120_DECODE_MAX_TOKENS 上提模块级（与 stock 分支同源）；
+#   out/lse 缓冲不做复用（graph capture 地址稳定性风险 > µs 级收益）。
+#   内核语义源（flashinfer 0.7.2，logs/S-FIS0-STAGING-20261018/fi072-unpacked 只读解包）：
+#   scratch_heads = 8 if H==8 else ceil16(H)（attention_plan.h:98）；allocated split stride =
+#   chunk_capacity = ceil(topk/64)+ceil(extra_topk/64)，DeepSeek 族 tile=64
+#   （attention_resolve.cu:144-151；_api.py:1158-1170 _decode_dsv4_num_splits）；scratch 必须成对
+#   传递（attention_validation.h:175）；decode 形仅 num_tokens<=64（_policy.py:64-66），更大调用走
+#   prefill（忽略 scratch 元数据）；extra_fp4 无 dual cache 被解析器拒收（attention_resolve.cu:119）。
+# v2 相对 v1 的三点变化：
+#   ① D46——pa 调用点按内核语义从运行时量（q2 行/头数、indices 宽、head_dim_v）推导并供应
+#     mid_out/mid_lse（替换 v1 的 None/None）；scratch 按精确形状 pin 于 backend 实例复用
+#     （graph warmup 先于 capture，pin 式复用与 0.7.2 wrapper 自身制式一致）。
+#   ② D41——探针顺带模块级绑定 _FI072_PA/_FI072_WRITER（热路径零 import 机器）；
+#     SM120_DECODE_MAX_TOKENS 以别名 _SM120_DECODE_MAX_TOKENS 上提模块级（stock 分支函数内
+#     同名 import 使裸名成为整函数局部量，别名规避 use-before-bind）。
+#   ③ v1 潜伏缺陷修正（D46 衍生发现）——v1 无条件 extra_fp4=True，而 compress_ratio==0 层
+#     （无 extra cache）会被解析器以 "extra FP4 requires DSV41 dual cache" 拒收；v2 改为
+#     extra_fp4=extra_u8 is not None（有 dual 才 True；主格式仍由 kv_scale_format="ue8m0_g32"
+#     显式钉定，无 infer 路径）。
+# 回退：git apply -R（与 v1 同面；逆向应用逐字节回 a1e7c3b5 基底）。
+--- a/deploy/reconstruct/0.3.2/overlay/deepseek_v4_backend.py
++++ b/deploy/reconstruct/0.3.2/overlay/deepseek_v4_backend.py
+@@ -32,6 +32,64 @@
+ from sglang.kernels.ops.attention.dsv4.kv_layout import KVLayout
+ from sglang.kernels.ops.attention.dsv4.metadata_kernel import (
+     fill_all_compressed_indices,
++)
++
++# A2/D41 (FI-LAND 0.7.2 face; S-FIS0-RESULT-20261018 SS2-A2 + DECISIONS D41 /
++#   CODE-QUALITY-REVIEW-20261025 SS5-3): probe once, then bind the 0.7.2-only
++#   symbols to module globals so the store/read hot paths carry no per-step
++#   import machinery (~3-5 us/call eager face; graph replay unaffected).
++#   _FI072_PA/_FI072_WRITER stay None on any non-0.7.2 face (fail-closed);
++#   both wired sites gate on _dsv41_fi072_native_available() before use.
++_DSV41_FI072_NATIVE = None
++_FI072_PA = None
++_FI072_WRITER = None
++
++
++def _dsv41_fi072_native_available() -> bool:
++    global _DSV41_FI072_NATIVE, _FI072_PA, _FI072_WRITER
++    if _DSV41_FI072_NATIVE is None:
++        try:
++            from flashinfer.mla._sparse_mla_sm120 import (  # noqa: F401
++                _DECODE_DSV4_1_DISPATCH,
++                _sparse_mla_sm120_paged_attention,
++                dsv41_fp8_quantize_append_sparse_mla_cache,
++            )
++
++            _FI072_PA = _sparse_mla_sm120_paged_attention
++            _FI072_WRITER = dsv41_fp8_quantize_append_sparse_mla_cache
++            _DSV41_FI072_NATIVE = True
++        except Exception:
++            _DSV41_FI072_NATIVE = False
++    return _DSV41_FI072_NATIVE
++
++
++def _dsv41_fi072_decode_scratch_shapes(
++    num_tokens: int, num_heads: int, topk: int, extra_topk: int, d_v: int
++):
++    """D46: split-K decode scratch geometry derived from kernel semantics.
++
++    Sources (flashinfer 0.7.2, logs/S-FIS0-STAGING-20261018 fi072-unpacked):
++    scratch head capacity = 8 for num_heads == 8, else ceil16(num_heads)
++    (attention_plan.h:98 decode_scratch_heads); the allocated split stride is
++    chunk_capacity = ceil(topk / 64) + ceil(extra_topk / 64) with the
++    DeepSeek-family 64-candidate tile (attention_resolve.cu:144-151;
++    _api.py _decode_dsv4_num_splits; d_v per _expected_d_v). The pbs64 error
++    instance [64, 32, 16, 512] bf16 / [64, 32, 16] fp32 is one instantiation
++    of this rule, not a constant to hardcode. Returns (mid_out_shape,
++    mid_lse_shape) for caller-supplied scratch.
++    """
++    scratch_heads = 8 if num_heads == 8 else (num_heads + 15) // 16 * 16
++    num_splits = (topk + 63) // 64 + (extra_topk + 63) // 64
++    mid_out_shape = (num_tokens, scratch_heads, num_splits, d_v)
++    return mid_out_shape, mid_out_shape[:3]
++
++
++# D41 (SS5-3): decode token bound hoisted to module level (same source as the
++# stock SM120 branch's in-function import). Bound under an alias because that
++# stock import binds a same-name local for the whole _forward_attention
++# scope, which would shadow this global before it executes.
++from sglang.kernels.ops.attention.flash_mla_sm120 import (  # noqa: E402
++    SM120_DECODE_MAX_TOKENS as _SM120_DECODE_MAX_TOKENS,
+ )
+ from sglang.kernels.ops.attention.dsv4.metadata_kernel import (
+     init_compression_metadata as _init_compression_metadata_triton,
+@@ -3270,7 +3328,28 @@
+         self, layer_id: int, swa_k: torch.Tensor, forward_batch: ForwardBatch
+     ) -> None:
+         swa_loc = self.get_swa_out_cache_loc(forward_batch)
+-        self.token_to_kv_pool.set_swa_key_buffer_radix_fused(
++        pool = self.token_to_kv_pool
++        if pool.kv_layout is KVLayout.V41 and _dsv41_fi072_native_available():
++            # A2 (FI-LAND, S-FIS0-RESULT-20261018 SS2-A2): the main (SWA)
++            # 528B DSV4_1 cache is written through the 0.7.2 device writer
++            # (per-32 UE8M0 groups -- the quantizer family the G-k band was
++            # derived from), wired at the store-path position isomorphic to
++            # the existing set_extra_key_buffer_fused V41_FP4 branch
++            # (:3058-3073). The stock fused-store fallback below is kept for
++            # non-0.7.2 stacks (probe-gated; both faces write the same 528B
++            # DSV4_1 ABI). D41: the writer is the module-global binding made
++            # by the probe above -- no per-store import on this hot path.
++            raw = pool.get_swa_raw_buffer(layer_id)
++            assert raw.dim() == 2, (
++                "A2 writer wiring expects the 2D paged raw SWA buffer"
++            )
++            dest = (raw if raw.dtype == torch.uint8 else raw.view(torch.uint8))[
++                :,
++                : pool.swa_kv_pool.page_size * pool.get_swa_key_bytes_per_token(),
++            ]
++            _FI072_WRITER(swa_k, swa_loc, dest)
++            return
++        pool.set_swa_key_buffer_radix_fused(
+             layer_id=layer_id,
+             swa_loc=swa_loc,
+             cache_k=swa_k,
+@@ -3459,6 +3538,130 @@
+                 )
+ 
+             if get_platform().is_sm120:
++                if (
++                    token_to_kv_pool.kv_layout is KVLayout.V41
++                    and _dsv41_fi072_native_available()
++                ):
++                    # A2 (FI-LAND, S-FIS0-RESULT-20261018 SS2-A2 / INV-06
++                    # SS6.1 F3 row): the DSV4_1 formats are reachable only
++                    # explicitly -- 0.7.2 never infers ue8m0_g32 from widths
++                    # -- and the stock flash_mla_with_kvcache_sm120 drops
++                    # unknown kwargs (its pbs256->64 split constants are V4
++                    # geometry), so the V41 face calls the 0.7.2 entry
++                    # directly with the F1 leg-B-proven native dispatch form:
++                    # pbs256 528B FP8 main + pbs256 288B FP4 extra views
++                    # passed natively, kv_scale_format="ue8m0_g32" explicit
++                    # (no inference path). D41: the entry point and the decode
++                    # token bound are module-level bindings -- no per-step
++                    # import on this hot path.
++                    real_heads = layer.tp_q_head_num
++                    if q.shape[0] > _SM120_DECODE_MAX_TOKENS:
++                        # The 64-head pad only serves the decode kernel's h_q
++                        # specialization; the prefill kernel takes any h_q.
++                        if q.shape[-2] > real_heads:
++                            q = q[..., :real_heads, :].contiguous()
++                        if attn_sink is not None and attn_sink.shape[0] > real_heads:
++                            attn_sink = attn_sink[:real_heads]
++
++                    q2 = q.squeeze(1) if q.ndim == 4 else q
++                    swa_idx = (
++                        swa_page_indices.squeeze(1)
++                        if swa_page_indices.dim() == 3
++                        else swa_page_indices
++                    )
++                    extra_idx = (
++                        extra_indices.squeeze(1)
++                        if extra_indices is not None and extra_indices.dim() == 3
++                        else extra_indices
++                    )
++                    swa_u8 = (
++                        swa_k_cache
++                        if swa_k_cache.dtype == torch.uint8
++                        else swa_k_cache.view(torch.uint8)
++                    )
++                    extra_u8 = (
++                        extra_k_cache
++                        if extra_k_cache is None or extra_k_cache.dtype == torch.uint8
++                        else extra_k_cache.view(torch.uint8)
++                    )
++                    native_out = q2.new_empty(
++                        (q2.shape[0], q2.shape[1], self.head_dim_v),
++                        dtype=torch.bfloat16,
++                    )
++                    native_lse = torch.empty(
++                        (q2.shape[0], q2.shape[1]),
++                        dtype=torch.float32,
++                        device=q2.device,
++                    )
++                    # D46 (DECISIONS-RESOLVED-20261024 D46; a2-live-v2.json
++                    # read_face): SM120 sparse-MLA decode hard-requires
++                    # caller-supplied mid_out/mid_lse split-K scratch, and the
++                    # pair must be passed together or not at all
++                    # (attention_validation.h:175). Shapes derive from runtime
++                    # quantities per kernel semantics (helper above); nothing
++                    # is hardcoded from the error text's pbs64 instance.
++                    # extra_fp4 describes the extra cache: True exactly when
++                    # the dual (V41_FP4 288B) extra view is supplied; a
++                    # main-only layer (compress_ratio == 0) must pass False --
++                    # the resolver rejects extra_fp4 without a dual cache
++                    # (attention_resolve.cu:119) -- while kv_scale_format
++                    # still pins the main cache to DSV4_1 explicitly.
++                    # Split-K scratch is consumed within the call, so buffers
++                    # are pinned per exact shape and reused across steps and
++                    # layers (single-stream sequential decode; the 0.7.2
++                    # wrapper pins captured-shape scratch the same way, and
++                    # graph warmup precedes capture so capture reuses these
++                    # buffers). Bounded: decode form is only offered for
++                    # num_tokens <= 64 (_policy.py:64-66); larger calls take
++                    # prefill, which ignores scratch metadata (None pair).
++                    if q2.shape[0] <= _SM120_DECODE_MAX_TOKENS:
++                        mid_out_shape, mid_lse_shape = _dsv41_fi072_decode_scratch_shapes(
++                            q2.shape[0],
++                            q2.shape[1],
++                            swa_idx.shape[-1],
++                            0 if extra_idx is None else extra_idx.shape[-1],
++                            self.head_dim_v,
++                        )
++                        scratch_pool = getattr(
++                            self, "_dsv41_fi072_mid_scratch", None
++                        )
++                        if scratch_pool is None:
++                            scratch_pool = self._dsv41_fi072_mid_scratch = {}
++                        pinned = scratch_pool.get(mid_out_shape)
++                        if pinned is None:
++                            pinned = scratch_pool[mid_out_shape] = (
++                                torch.empty(
++                                    mid_out_shape,
++                                    dtype=torch.bfloat16,
++                                    device=q2.device,
++                                ),
++                                torch.empty(
++                                    mid_lse_shape,
++                                    dtype=torch.float32,
++                                    device=q2.device,
++                                ),
++                            )
++                        mid_out, mid_lse = pinned
++                    else:
++                        mid_out = mid_lse = None
++                    _FI072_PA(
++                        q2,
++                        swa_u8,
++                        swa_idx,
++                        native_out,
++                        native_lse,
++                        self.softmax_scale,
++                        topk_length=swa_topk_lengths,
++                        attn_sink=attn_sink,
++                        extra_kv_cache=extra_u8,
++                        extra_indices=extra_idx,
++                        extra_topk_length=extra_topk_lengths,
++                        kv_scale_format="ue8m0_g32",
++                        extra_fp4=extra_u8 is not None,
++                        mid_out=mid_out,
++                        mid_lse=mid_lse,
++                    )
++                    return native_out
+                 from sglang.kernels.ops.attention.flash_mla_sm120 import (
+                     SM120_DECODE_MAX_TOKENS,
+                     flash_mla_with_kvcache_sm120,
