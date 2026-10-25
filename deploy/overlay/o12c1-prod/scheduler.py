@@ -842,6 +842,151 @@ class SchedStatsV1:
         return ring[: n] if n <= len(ring) else ring[:]
 
 
+# I14-C (T33-08) -- 案 A 低频采样 + 案 B gauge 刷新（0 靴纯开发件 2026-10-24）。
+# 类体/工厂与 tools/obs/roce_i14c.py 逐字一致（单测强制同步）；默认关零开销；
+# env 键 DSV41_ROCE_SYNC_SAMPLE（案 A）/ DSV41_ROCE_METRICS（案 B）；R36-b 合并单臂。
+
+class RoceSyncSampler:
+    """I14-C 案 A 低频采样核心（每 N 个结果一次；query() 门控；异常吞掉计数）。
+
+    热路径（observe 非采样迭代）= 一次自增 + 一次取模比较，零 IO 零时钟。
+    采样迭代：先 `copy_done.query()`，未完成即跳过（skipped_busy），绝不
+    synchronize 阻塞（INV-07 N3 反例）；完成才调 check_fn（其内部
+    synchronize 在事件已完成时立即返回）与 refresh_fn（案 B gauge set()），
+    并产一行 `ROCE_I14C_SAMPLE {json}` 低频日志（周期 stats 口径）。
+    """
+
+    LOG_PREFIX = "ROCE_I14C_SAMPLE"
+
+    def __init__(
+        self,
+        every: int,
+        check_fn: Optional[Callable[[Any], None]] = None,
+        refresh_fn: Optional[Callable[[], None]] = None,
+        log_fn: Optional[Callable[..., None]] = None,
+        stats_fn: Optional[Callable[[], Dict[str, Any]]] = None,
+    ) -> None:
+        self.every = int(every)
+        if self.every <= 0:
+            raise ValueError("RoceSyncSampler: every must be >= 1")
+        self.check_fn = check_fn
+        self.refresh_fn = refresh_fn
+        self.log_fn = log_fn
+        self.stats_fn = stats_fn
+        self.observations = 0
+        self.checked = 0
+        self.skipped_busy = 0
+        self.no_copy_done = 0
+        self.errors = 0
+        self.last_payload: Optional[Dict[str, Any]] = None
+
+    def observe(self, result: Any) -> Optional[Dict[str, Any]]:
+        """对每个 batch result 调用；每 every 个做一次 query() 门控健康检查。"""
+        self.observations += 1
+        if self.observations % self.every != 0:
+            return None
+        copy_done = getattr(result, "copy_done", None)
+        if copy_done is None:
+            self.no_copy_done += 1
+            return None
+        try:
+            done = bool(copy_done.query())
+        except Exception:
+            self.errors += 1
+            return None
+        if not done:
+            # 未完成即跳过：绝不等待（逐 batch synchronize = INV-07 N3 反例）。
+            self.skipped_busy += 1
+            return None
+        self.checked += 1
+        if self.check_fn is not None:
+            try:
+                self.check_fn(copy_done)
+            except Exception:
+                self.errors += 1
+        if self.refresh_fn is not None:
+            try:
+                self.refresh_fn()
+            except Exception:
+                self.errors += 1
+        payload: Dict[str, Any] = {
+            "observations": self.observations,
+            "checked": self.checked,
+            "skipped_busy": self.skipped_busy,
+            "no_copy_done": self.no_copy_done,
+            "errors": self.errors,
+        }
+        if self.stats_fn is not None:
+            try:
+                payload["roce_ar"] = self.stats_fn()
+            except Exception:
+                pass
+        self.last_payload = payload
+        if self.log_fn is not None:
+            try:
+                self.log_fn(
+                    "%s %s",
+                    self.LOG_PREFIX,
+                    json.dumps(payload, separators=(",", ":"), sort_keys=True),
+                )
+            except Exception:
+                self.errors += 1
+        return payload
+
+
+def _make_roce_i14c_sampler():
+    """I14-C 案 A 低频采样 + 案 B gauge 刷新（R36-b A+B 合并单臂；env 默认关 → None）。
+
+    法源: 任务书 §T33-08 目标 3；INV-07 §4.2/§4.3；W4 §5.6 阻清单。
+    DSV41_ROCE_SYNC_SAMPLE=N（N>=1 每 N 个 batch result 一次；0/未设=关）。
+    check_fn 取自 pynccl 面 synchronize_and_check_roce（NCCL 臂无该面 → REFUSED
+    返回 None）；query() 门控、未完成即跳过，绝不逐 batch synchronize。
+    案 B gauge 刷新（adapter roce_metrics_gauge.refresh_gauges，自带
+    DSV41_ROCE_METRICS 门控）随同点低频执行；缺面=静默降级（案 A 单独成立）。
+    """
+    try:
+        every = int(str(os.environ.get("DSV41_ROCE_SYNC_SAMPLE", "0")).strip() or "0")
+    except ValueError:
+        every = 0
+    if every <= 0:
+        return None
+    check_fn = None
+    try:
+        from sglang.srt.distributed.device_communicators import (
+            pynccl as _roce_i14c_pynccl,
+        )
+        check_fn = getattr(_roce_i14c_pynccl, "synchronize_and_check_roce", None)
+    except Exception:
+        check_fn = None
+    if check_fn is None:
+        logger.info(
+            "ROCE_I14C REFUSED pynccl face has no synchronize_and_check_roce"
+        )
+        return None
+    refresh_fn = None
+    try:
+        from roce_metrics_gauge import refresh_gauges as refresh_fn
+    except Exception:
+        refresh_fn = None
+    try:
+        from roce_ar import stats as _roce_ar_stats
+    except Exception:
+        _roce_ar_stats = None
+    sampler = RoceSyncSampler(
+        every=every,
+        check_fn=check_fn,
+        refresh_fn=refresh_fn,
+        log_fn=logger.info,
+        stats_fn=_roce_ar_stats,
+    )
+    logger.info(
+        "ROCE_I14C ARMED every=%d metrics_refresh=%s",
+        every,
+        "on" if refresh_fn is not None else "off",
+    )
+    return sampler.observe
+
+
 STEP_MAX_US = 2_000_000
 
 # Min wall-clock between load publishes on the stalled no-batch path, which
@@ -922,6 +1067,7 @@ class Scheduler(
         # Parse args
         self.server_args = server_args
         self._sched_stats = None  # SCHED_STATS_V1 (T33-03): 默认关
+        self._roce_i14c = None  # I14-C (T33-08): 案 A/B 默认关（None=零开销）
         self.nccl_port = port_args.nccl_port
         self.schedule_policy = get_schedule().schedule_policy
         self.enable_priority_scheduling = get_schedule().enable_priority_scheduling
@@ -1875,6 +2021,7 @@ class Scheduler(
             metrics_collector=self.metrics_collector,
         )
         self._sched_stats = self._init_sched_stats()
+        self._roce_i14c = _make_roce_i14c_sampler()
 
     def _init_sched_stats(self):
         """SCHED_STATS_V1 只读账本（env 默认关 → None，热路径单分支检查）。"""
@@ -5320,6 +5467,9 @@ class Scheduler(
         # Flush async trace ops here: in overlap mode this CPU work runs while
         # the next batch's GPU forward is in flight, giving free overlap.
         flush_trace_batch(batch.reqs)
+        # I14-C 案 A 低频采样 + 案 B gauge 刷新（默认关：self._roce_i14c=None）。
+        if self._roce_i14c is not None:
+            self._roce_i14c(result)
         snapshot = self.publish_load_snapshot(force=batch.forward_mode.is_extend())
         # Router-facing gauge on the dedicated PUB socket, reusing the
         # snapshot above rather than walking the queues again.

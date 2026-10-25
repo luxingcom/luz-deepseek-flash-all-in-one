@@ -82,6 +82,21 @@ def stats():
     return dict(STATS, runtimes=len(_roce_runtimes), version=ROCE_AR_VERSION)
 
 
+def gauges():
+    """I14-C 案 B four-gauge readout (INV-07 §4.2 suggested names; readonly).
+
+    Frozen caliber: names roce_ar_communicators / roce_ar_roce_made /
+    roce_ar_roce_routed / roce_ar_nccl_kept (P0 freeze, 2026-10-24). Values are
+    monotonic counters over the process lifetime; missing key -> 0 is NOT
+    coerced (the dict carries exactly the four STATS keys)."""
+    return {
+        "roce_ar_communicators": int(STATS["communicators"]),
+        "roce_ar_roce_made": int(STATS["roce_made"]),
+        "roce_ar_roce_routed": int(STATS["roce_routed"]),
+        "roce_ar_nccl_kept": int(STATS["nccl_kept"]),
+    }
+
+
 def synchronize_and_check_roce(copy_done):
     """Finish this result before checking transport health or consuming output.
 
