@@ -13,6 +13,7 @@
 | 你要做什么 | 主读 | 配套 |
 |---|---|---|
 | 第一次接触本仓 | [GETTING-STARTED](docs/GETTING-STARTED.md) | [GLOSSARY-PUBLIC](docs/GLOSSARY-PUBLIC.md) |
+| **拿发布包**（0.3.4re 全套离线包：镜像 tar+仓快照+网关配方+网络层材料，约 14G） | 夸克网盘 `https://pan.quark.cn/s/95fcb0efd1c4`（提取码 `QkfP`） | 下载后先按包内 `CHECKSUMS.manifest` 逐件校验，再按包内 `README-DIST.md` 走（`docker load` 镜像→展开其余三件） |
 | **从零部署（0.3.4re 现役形）**：镜像 x6bake+61 键 env+v41 三联+BYPASS | [docs/runbook/runbook-034.md](docs/runbook/runbook-034.md)（三命令快速上手） | [UPGRADE-0.3.4](UPGRADE-0.3.4.md)（目标形态速查表）+ `tools/` 工具六件套 |
 | 从零部署（**0.3.2 交换机 flat 形**=历史定版形） | [DEPLOY-STEP-BY-STEP](docs/DEPLOY-STEP-BY-STEP.md)（主路径） | [RUNTIME-PARAMETERS](docs/RUNTIME-PARAMETERS.md)（逐键词典） |
 | 从零部署（**0.3.1 环网 hairpin 形**=最早期历史形/对照面） | [RING-DEPLOY](docs/RING-DEPLOY.md) | [RING-0.3.2-COMPAT](docs/RING-0.3.2-COMPAT.md)（两形边界） |
@@ -23,7 +24,7 @@
 | 查某个 env 键 / serve 参数 | [RUNTIME-PARAMETERS](docs/RUNTIME-PARAMETERS.md)（0.3.4 面 61 键+serve 八参全解；0.3.2 56 键为代际底稿） | [deploy/env/](deploy/env/) |
 | 0.3.4 部署/验收/自诊断 | [docs/runbook/runbook-034.md](docs/runbook/runbook-034.md)（三命令快速上手） | [tools/](tools/) 工具六件套 |
 
-> **当前断点声明（0.3.4re 面从零部署链，如实）**：runbook-034 面向**内部已固化集群**的运维/恢复手册——其 §六「env/tp4/guards/profile 四面零动作」只对内部已固化存储态成立，其 boot 翻 `:12` 后 md5=`d41323dd` 锚也只对内部基底（`20f22bc6`）成立；公开件基底（`9ac6e113`）翻 `:12` 后 md5 **必不等于**该锚，属预期，**勿据此误判自己改错**。[UPGRADE-0.3.4](UPGRADE-0.3.4.md) 与 [0.3.4-RELEASE-NOTE](docs/release/0.3.4-RELEASE-NOTE.md) 两件为移植**骨架**（各节 `TODO(写手)` 待后续窗充实，但其 §0「目标形态速查表」现即可用）。**当前已可用的 0.3.4re 增量=三处**：[DEPLOY-STEP-BY-STEP](docs/DEPLOY-STEP-BY-STEP.md) §5（61 键 env 落位与自检）、§6.6（deploy/verify/doctor/selftest 工具四件套）、§4.5（网关部署在管理机）；v41 三联的 tp4/guards 落位、prod-profile 钉面与镜像替换的逐步操作待 UPGRADE-0.3.4 充实。**overlay 29 件本体尚未入公开树**（锚件 map+md5 清单已入）：按新清单 `md5sum -c` 必红属已知缺口而非数据漂移；本体落地前**禁止**拿 0.3.2 overlay 增量件（`deploy/reconstruct/0.3.2/overlay/`）拼装 0.3.4 形栈（绑定律/混形禁忌），请等待整面同步窗。0.3.4re 形镜像取处=网盘包 `images/`（见包内 README-DIST）。
+> **当前断点声明（0.3.4re 面从零部署链，如实）**：runbook-034 面向**内部已固化集群**的运维/恢复手册——其 §六「env/tp4/guards/profile 四面零动作」只对内部已固化存储态成立，其 boot 翻 `:12` 后 md5=`d41323dd` 锚也只对内部基底（`20f22bc6`）成立；公开件基底（`9ac6e113`）翻 `:12` 后 md5 **必不等于**该锚，属预期，**勿据此误判自己改错**。[UPGRADE-0.3.4](UPGRADE-0.3.4.md) 与 [0.3.4-RELEASE-NOTE](docs/release/0.3.4-RELEASE-NOTE.md) 两件为移植**骨架**（各节 `TODO(写手)` 待后续窗充实，但其 §0「目标形态速查表」现即可用）。**当前已可用的 0.3.4re 增量=三处**：[DEPLOY-STEP-BY-STEP](docs/DEPLOY-STEP-BY-STEP.md) §5（61 键 env 落位与自检）、§6.6（deploy/verify/doctor/selftest 工具四件套）、§4.5（网关部署在管理机）；v41 三联的 tp4/guards 落位、prod-profile 钉面与镜像替换的逐步操作待 UPGRADE-0.3.4 充实。**overlay 29 件本体尚未入公开树**（锚件 map+md5 清单已入）：按新清单 `md5sum -c` 必红属已知缺口而非数据漂移；本体落地前**禁止**拿 0.3.2 overlay 增量件（`deploy/reconstruct/0.3.2/overlay/`）拼装 0.3.4 形栈（绑定律/混形禁忌），请等待整面同步窗。0.3.4re 形镜像取处=网盘发布包 `images/`（夸克网盘 `https://pan.quark.cn/s/95fcb0efd1c4`，提取码 `QkfP`；包=`images/`+`repo/`+`gateway-recipe/`+`net-infra/` 四件套+`CHECKSUMS.manifest` 逐件校验清单，接收步骤见包内 README-DIST）。
 
 ## 先认代际，再抄配置（部署三代声明）
 
