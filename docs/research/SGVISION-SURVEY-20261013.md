@@ -2,7 +2,7 @@
 
 > **性质**：案头调查代理件（零 boot/零集群/零流量/零 docker；三源全部只读）。唯一写动作=本件+commit。
 > 战役仓=/home/liux***ya/luz030-opt-campaign。三源：A=~/knapcio-v41-audit-20260925/（只读）、
-> B=我方 0.2.8/0.3.x 归档区（~/v40exp-branch-20260928/、~/dsv41-flash-dgxsparks git、
+> B=我方 0.2.8/0.3.x 归档区（~/v40exp-branch-20260928/、~/<source-repo> git、
 > ~/LuZ-0.3.0-ARCHIVE-20260930/、~/archive-20261001/、~/archive-20261012/、战役仓 git 史与
 > logs/）、C=~/sglang-main-src/（main-79cafec0，git 单提交浅克隆、status 干净=纯上游树）。
 > 标注律：【实测】=本会话直接读到（文件:行 / git 对象）；【转录】=权威档原文引用；〔推演〕=推导。
@@ -22,7 +22,7 @@
    DeepseekV41ImageProcessor（processor-file-free、按类注册到 DeepseekV4ForCausalLM）、
    配置侧 auto-detect（model_config.py:657-669）、启动侧零旗——与 knapcio 同构。
    FL6-PROMO 生产 boot 日志直证 mm 机制在役（logs/FL6-PROMO-20261013/teardown/pre-stop/
-   r3prod-worker-dgxspark02.docker.log:236-237/:277）。**在役 V4.1-Flash 检查点本体携带
+   <prod-log>:236-237/:277）。**在役 V4.1-Flash 检查点本体携带
    266 个视觉权重键**（/data/models/DeepSeek-V4.1-Flash 权重索引实测）。「主线无视觉」=
    使用面事实（无图像请求/未认证），非代码面事实。
 3. **我方 0.2.8 的 V4.0exp graft 没有死在技术上，死在谱系更替上**：0928 graft 全绿（静态
@@ -35,7 +35,7 @@
 
 > ⚠ **对任务书的两处如实勘正**（证据在 §B.2-§B.3/§C.1-§C.2）：①现役 VL 定板形 STDVL-K6CG-R1 的
 > 126%/125% 读数产自 **SGLang 栈**（main-79cafec0+v4vl overlay 28 件影子挂载，
-> logs/RATIFY-CG-20260909/desk/boot_mvl_uv.sh:48 实锚 IMAGE=192.168.5.187:5000/lmsysorg/
+> logs/RATIFY-CG-20260909/desk/boot_mvl_uv.sh:48 实锚 IMAGE=<registry-host>:5000/lmsysorg/
 > sglang:main-79cafec0），并非 vLLM 镜像读数；②vllm-openai:LuZ0.4.5-…-VL-S1-20260910b
 > =vLLM VL 十三轮世系（09-10 建），09-11 晚切 dsv41 后停备回退（VLLM045-ARCHAEOLOGY
 > §A.1 资产⑤转录），现为历史/备份栈。用户「通过加入一个 vllm 模型来实现视觉」的表述与
@@ -95,7 +95,7 @@ sglang-kernel 0.4.7 同源），且我方基座的 VL 全链已直接在树验�
 - 权威工作区 `~/v40exp-branch-20260928/`：`pr37253.diff`（36 文件）、`pr-hunks/`、`graft/`、
   `graft-report.txt`（24 共享文件 hunk 计数）、`pr-branch/`（yhyang201/sglang @d5a3b77 sparse
   克隆，git log tip=`d5a3b77 Clean up DeepSeek V4 vision metadata`）、`worktree/`。
-- fork 仓 `~/dsv41-flash-dgxsparks` 分支 `v40exp-20260928`：
+- fork 仓 `~/<source-repo>` 分支 `v40exp-20260928`：
   - `ab669c1 feat(v40exp): V4.0exp(Vision-Exp) 文本骨干分支——计算路径调查+静态验证+首启保守臂`；
   - `36ae8da feat(v40exp): PR #37253 视觉件 hunk-graft 到 ep1u——V4.0exp Vision 臂就绪（待测试窗）`，
     含 **`sglang-overlay.v40exp-vision/`（28 平铺文件，97,277 行插入）** + 移植方案
@@ -188,7 +188,7 @@ sglang-kernel 0.4.7 同源），且我方基座的 VL 全链已直接在树验�
 
 ### C.2 在役生产 51 键形（0731 线 FL6-PROMO，2026-10-13 13:25 boot）mm 活性直证【实测日志】
 
-logs/FL6-PROMO-20261013/teardown/pre-stop/r3prod-worker-dgxspark02.docker.log：
+logs/FL6-PROMO-20261013/teardown/pre-stop/<prod-log>：
 - :94 server_args 全量：`model_path=/models/DeepSeek-V4.1-Flash`、`enable_multimodal: None`
   （=缺省 True 路径）、DSPARK k=6（speculative_num_draft_tokens=6）、decode CG full bs16、
   chunked_prefill 4096、池 9,600,000；
@@ -318,9 +318,9 @@ V4VL-COMPAT-SURVEY §3.2 的「生产应已 is_multimodal=True 起服」推演 h
 ## §F 引用清单（本件全部一手锚）
 
 - 源A：~/knapcio-v41-audit-20260925/{Dockerfile:1-8, README.md:12/:15/:61, boot.py:99/:159-178/:288-307/:342-344, start.sh:26/:99/:102, adapter/tp3_pad.py:81-90, adapter/prefill_sp.py:494/:732-743/:986-991, runtime/b12x_next/b12x_next/norm/{vision.py:1-5,_vision_preparation.py:1-4}, preparation/catalog.py:71, tests/test_prefill_sp_moe8_gpu.py:24-27, git:0102f5c(2026-09-24)}
-- 源B：~/dsv41-flash-dgxsparks git:{ab669c1,36ae8da+stat,docs/V40EXP-VISION-PORT-PLAN-20260928.md §0/§3.1/§4/§5}；~/v40exp-branch-20260928/{pr37253.diff,graft-report.txt,pr-branch@d5a3b77}；~/LuZ-0.3.0-ARCHIVE-20260930/{92-…:8/:45,74C-…:22}；~/archive-20261012/{INDEX.md,MANIFEST.csv:5-6}；~/archive-20261012/overlay-superseded/sglang-overlay.v4vl-79cafec0/（34 件实列）；战役仓 git:{6e38414,fa36a61,94fc6b8,9840460}；opt1-dev/model_compat_20261004/{V4VL-COMPAT-SURVEY-20261004.md §1.3/:1.4/§3.1-3.4/§4,v4vl_regraft/REGRAFT-REPORT-20261005.md §0-§2}；docs/{taskcards/MODEL-COMPAT-TASKBOOK-20261005.md,taskcards/O13B-VL-PORT-CARD-20261006.md,research/VL-PERFOPT-CARRYOVER-20261008.md §A,research/VLLM045-ARCHAEOLOGY-20261008.md:26/:38/:49,research/031-FINAL-PERF-REPORT-20261009.md:69-70/:196,TOOL-ANCHORS.md:43-44,inventories/FORM-REGISTRY-031.md}；logs/RATIFY-CG-20261009/desk/boot_mvl_uv.sh:48/:102-143
+- 源B：~/<source-repo> git:{ab669c1,36ae8da+stat,docs/V40EXP-VISION-PORT-PLAN-20260928.md §0/§3.1/§4/§5}；~/v40exp-branch-20260928/{pr37253.diff,graft-report.txt,pr-branch@d5a3b77}；~/LuZ-0.3.0-ARCHIVE-20260930/{92-…:8/:45,74C-…:22}；~/archive-20261012/{INDEX.md,MANIFEST.csv:5-6}；~/archive-20261012/overlay-superseded/sglang-overlay.v4vl-79cafec0/（34 件实列）；战役仓 git:{6e38414,fa36a61,94fc6b8,9840460}；opt1-dev/model_compat_20261004/{V4VL-COMPAT-SURVEY-20261004.md §1.3/:1.4/§3.1-3.4/§4,v4vl_regraft/REGRAFT-REPORT-20261005.md §0-§2}；docs/{taskcards/MODEL-COMPAT-TASKBOOK-20261005.md,taskcards/O13B-VL-PORT-CARD-20261006.md,research/VL-PERFOPT-CARRYOVER-20261008.md §A,research/VLLM045-ARCHAEOLOGY-20261008.md:26/:38/:49,research/031-FINAL-PERF-REPORT-20261009.md:69-70/:196,TOOL-ANCHORS.md:43-44,inventories/FORM-REGISTRY-031.md}；logs/RATIFY-CG-20261009/desk/boot_mvl_uv.sh:48/:102-143
 - 源C：~/sglang-main-src/python/sglang/srt/{models/deepseek_v41_vit.py:1-2/:60-72, models/deepseek_v4.py:178/:2653-2654/:4290-4293/:4458-4466/:4860-4874/:4990-5008/:5082-5102/:5455-5464/:5773, models/deepseek_v2.py:191/:502-507/:1028-1029/:1280-1281, configs/deepseek_v41.py:5-58, configs/model_config.py:531-552/:657-708, multimodal/processors/deepseek_v41.py:15-66, multimodal/deepseek_v41_image_processing.py, multimodal/dsv41/vl_routing.py, managers/tokenizer_manager.py:562-572, managers/multimodal_processor.py:17-74, models/registry.py:22-26}
-- 生产直证：logs/FL6-PROMO-20261013/teardown/pre-stop/r3prod-worker-dgxspark02.docker.log:94/:230/:236-237/:277；/data/models/DeepSeek-V4.1-Flash/{config.json,权重索引 266 视觉键+bias_vl,tokenizer.json added_tokens 129264}；~/models/{deepseek-v4-flash-0731,DeepSeek-V4-Flash-Vision-Exp}/config.json；~/migrate-assets/v4vl/sglang-overlay.o12c1-prod/{overlay-map.tsv 29 行,4 空占位,model_config.py md5=上游同}
+- 生产直证：logs/FL6-PROMO-20261013/teardown/pre-stop/<prod-log>:94/:230/:236-237/:277；/data/models/DeepSeek-V4.1-Flash/{config.json,权重索引 266 视觉键+bias_vl,tokenizer.json added_tokens 129264}；~/models/{deepseek-v4-flash-0731,DeepSeek-V4-Flash-Vision-Exp}/config.json；~/migrate-assets/v4vl/sglang-overlay.o12c1-prod/{overlay-map.tsv 29 行,4 空占位,model_config.py md5=上游同}
 - 待核清单：「SGLang 视觉死路」判定逐字原文未定位（B.1）；dev-dsv41 与 79cafec0 的 revision 异同（零 docker 纪律）；encoding_dsv41 图像分支行为（首冒烟验）；V4.1 线 mm×k6×CG 三共面（专窗）。
 
 ——SGVISION 调查代理 / 2026-10-13

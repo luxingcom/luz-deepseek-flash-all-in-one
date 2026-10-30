@@ -21,7 +21,7 @@
    `models=[DeepseekV4ForCausalLM]`，tokenizer_manager.py:562-572 pkgutil 扫描）；**chat 编码
    图像分支静态在树闭环**（SURVEY 待核①案头闭合，见 §1.2）——与 knapcio 零旗生产实证同构。
 2. **生产 51 键文本靴此刻就是 mm 活体**：FL6-PROMO 生产靴（r3prod/8899/SPEC6）日志三直证
-   （mm 后端 triton_attn 两行+mm KV 0.10G 预留，r3prod-worker-dgxspark02.docker.log:236-237/:277）
+   （mm 后端 triton_attn 两行+mm KV 0.10G 预留，<prod-log>:236-237/:277）
    =视觉塔权重已装载（266 视觉键，模型侧 vision=None 才 skip，deepseek_v4.py:5455-5464——
    生产 vision≠None）。⇒「文本靴 vs VL 靴」在 V4.1 线**不是两种代码形态，只是流量形态之差**；
    认证期独立 VL 靴的必要性=隔离 mm×k6×CG 无先例面与 mm 足迹前科（§3.1），非启用需要。
@@ -364,7 +364,7 @@ f26c4888；CG-β 回滚坐标 backend 4d7c6d2c=认证态在此谱系内）。
   :5455-5464
 - 生产/boot/臂：~/migrate-assets/bin/r3-boot-arm.sh:12/:38-45/:103-115/:356-433；logs/
   FL6-PROMO-20261013/{desk/lib.sh:15-25/:233-242, desk/s3_boot.sh, teardown/pre-stop/
-  r3prod-worker-dgxspark02.docker.log:230-237/:277-279}；dev/c24-compat48m/
+  <prod-log>:230-237/:277-279}；dev/c24-compat48m/
   boot_mvl_600k_48m.sh（全文）；logs/RATIFY-CG-20260909/{desk/boot_mvl_uv.sh:48-118,
   READINGS.md:85-135, bench/STDVL-K6CG-R1/de_prose_c1.json}；arms/STDVL-K6CG-R2-C24T.env；
   tools/packages/cfgmgmt/payload/env/PROD-R51W5-spec1.env（50 键面）；models.d/{v41-prod.md,

@@ -14,7 +14,8 @@ set -euo pipefail
 
 KIT="$(cd "$(dirname "$0")" && pwd)"
 REPLAY_TREE="dab49d96d33839480e30a1d24ac9e6cdb0a9c29d"
-BASE="${BASE:-192.168.0.202:5000/lmsysorg/sglang:main-79cafec0}"
+# 20261030 脱敏：registry 主机改经环境变量注入，缺参拒跑。
+BASE="${BASE:?缺环境变量 BASE（<registry-host>:5000/lmsysorg/sglang:main-79cafec0），拒跑}"
 TAG="${TAG:-dsv41-sglang-optimized:0.3.2-r032c}"
 NOCACHE="${NOCACHE:-0}"
 SKIP_BASE_ID="${SKIP_BASE_ID:-0}"

@@ -26,6 +26,14 @@ T33-03 Phase 0 双口径（033 任务书 v2.1 §T33-03；附录 D）：
     （钉 thinking；缺 sglext 必红不静默）；默认关 ⇒ 请求体逐字节不变（selfcheck 断言）。
   --legacy-csv：输出裁回旧 schema 键序（回退面；INV-02 §6.9 旧管道兼容）。
   --replay：离线回放既有 JSON（旧/新 schema）验闭合，零请求零产线触。
+  --runs×PR（DF-04 修复，升级篇-20）：PR 模式不再静默吞参——缺省 1=旧单发行
+    schema 逐字节不变（旧锚/旧管道可比）；显式 N>1=每档 N 次独立调用（每发独立
+    fresh salt 防跨发前缀缓存），行含 shots 逐发记录 + tok_s/ttft_s 的
+    median/min/max/range（极差）；--legacy-csv 下 shots 逐发展开为旧键行。
+  EQ-11 参数面统一（0.3.4re，2026-10-30）：--base-url 三形通吃归一到 v1 基
+    （origin/v1基/全路径 → …/v1；bench_url 唯一构造处；旧正确形请求 URL 逐字节
+    不变）；--targets 是 --sizes 的等价别名；URL 错形与 argparse 拒起一律
+    首行 `ERROR[sd_bench.py]: …` 到 stderr + exit 2（管道 `2>&1|grep ERROR` 必命中）。
 """
 import argparse
 import json
@@ -35,6 +43,17 @@ import time
 import uuid
 
 import requests
+
+# ── EQ-11 共享构造处（bench_url）：URL 三形归一 + argparse 拒起首行 ERROR 摘要 ──
+try:
+    import bench_url  # 直跑（python3 tools/bench/sd_bench.py）时 sys.path[0] 即本目录
+except ImportError:  # importlib 直载（de_c48_bench spec_from_file_location）时本目录不在 sys.path
+    import importlib.util as _ilu
+    import os as _os
+    _spec = _ilu.spec_from_file_location(
+        "bench_url", _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "bench_url.py"))
+    bench_url = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(bench_url)
 
 # ── sparkDash src/shared/llmPrompts.js（逐字节，勿改一字） ──────────────────
 DE_STRUCTURED_PROMPT = "Count from 1 to 200. Output only the numbers, separated by spaces. No other text."
@@ -78,6 +97,10 @@ NEXTN_DEFAULT = 5  # 投机 γ（DSPARK 静态 nextn=5，INV-02 §6.3）；SPEC=
 DE_ROW_LEGACY_KEYS = ("type", "conc", "per", "per_all", "agg", "completion")  # --legacy-csv 键序
 PR_ROW_LEGACY_KEYS = ("target", "prompt_tokens", "ttft_s", "tok_s",
                       "prompt_chars", "chars_per_token", "filler")
+# DF-04：PR 单发（runs=1）行的完整键序=旧版行构造序（runs=1 输出须与旧版逐字节可比）
+PR_FLAT_ROW_KEYS = ("target", "prompt_tokens", "ttft_s", "tok_s",
+                    "prompt_chars", "chars_per_token", "filler", "cached_tokens",
+                    "uncached_tokens", "uncached_tok_s", "reasoning_tokens")
 
 
 def de_prompt(type_: str, n: int):
@@ -210,7 +233,11 @@ def _real_filler(salt: str, units: int) -> str:
 
 class Client:
     def __init__(self, base_url, key, timeout_s):
-        self.base = base_url.rstrip("/")
+        # EQ-11：--base-url 三形通吃归一到 v1 基（bench_url 唯一构造处）。旧正确形
+        # （带 /v1）归一后逐字节不变；origin 形（旧版会拼成 …/chat/completions 404）
+        # 与全路径形（旧版 /chat/completions/chat/completions 404）现均成形；错形
+        # （非 http(s)/无 host）构造时即首行 ERROR 摘要 + exit 2（不再等到请求才 404）。
+        self.base = bench_url.v1_base(base_url, flag="--base-url", prog="sd_bench.py")
         self.h = {"Authorization": f"Bearer {key}"} if key else {}
         self.timeout = timeout_s
 
@@ -401,41 +428,87 @@ def dual_caliber_block(out, reqs, agg, nextn):
     return base
 
 
-def run_pr(c: Client, sizes, warm_tokens=512, gen_tokens=8, filler="repeated",
+def run_pr(c: Client, sizes, runs=1, warm_tokens=512, gen_tokens=8, filler="repeated",
            capture_spec=False):
+    """PR 基准（PrefillBench 口径：串行、fresh salt、GEN 8、tok_s=prompt/TTFT）。
+    DF-04（升级篇-20）：runs 不再被静默吞掉——
+      runs=1（缺省）＝旧单发口径，行 schema 与旧版逐字节相同（旧锚/旧管道可比）；
+      runs=N>1＝每档 N 次**独立调用**，每发独立 fresh salt（防跨发前缀缓存），
+        行含 shots 逐发记录 + tok_s/ttft_s 的 median/min/max/range（极差），
+        median=sorted(发)[N//2]（与 run_de per 同族取法；3 发时=statistics.median）。"""
+    if runs < 1:
+        raise ValueError(f"runs 必须 ≥1（got {runs}；DF-04：禁止静默空转/吞参）")
     c.stream(build_pr_prompt(warm_tokens, uuid.uuid4().hex[:8], filler), gen_tokens,
              capture_spec=capture_spec)  # warmup
     rows = []
     for n in sizes:
-        salt = uuid.uuid4().hex[:8]
-        prompt = build_pr_prompt(n, salt, filler)
-        o = c.stream(prompt, gen_tokens, capture_spec=capture_spec)
-        ttft = o["t_first"] - o["t_req"]
-        pt = o["prompt_tokens"] or n
-        # T33-03：PR 双口径=total（tok_s 原式不变）+ cached/uncached 拆分（cached_tokens
-        # 是 KV 前缀缓存【A9 --enable-cache-report】，不是 Engram 行缓存；缺=None 不造 0）
-        ct = o.get("cached_tokens")
-        rows.append({"target": n, "prompt_tokens": pt, "ttft_s": round(ttft, 3),
-                     "tok_s": round(pt / ttft, 1) if ttft > 0 else None,
-                     # 行级 cpt 记录位（PR-ANCHOR-AUDIT §四.2-4 三要素；探针侧只读不猜）
-                     "prompt_chars": len(prompt),
-                     "chars_per_token": round(len(prompt) / pt, 3) if pt else None,
-                     "filler": filler,
-                     "cached_tokens": ct,
-                     "uncached_tokens": (pt - ct) if ct is not None else None,
-                     "uncached_tok_s": round((pt - ct) / ttft, 1)
-                     if (ct is not None and ttft > 0) else None,
-                     "reasoning_tokens": o.get("reasoning_tokens")})
+        if runs <= 1:  # 旧路径：单发扁平行（键序=PR_FLAT_ROW_KEYS，逐字节旧 schema）
+            salt = uuid.uuid4().hex[:8]
+            prompt = build_pr_prompt(n, salt, filler)
+            o = c.stream(prompt, gen_tokens, capture_spec=capture_spec)
+            ttft = o["t_first"] - o["t_req"]
+            pt = o["prompt_tokens"] or n
+            # T33-03：PR 双口径=total（tok_s 原式不变）+ cached/uncached 拆分（cached_tokens
+            # 是 KV 前缀缓存【A9 --enable-cache-report】，不是 Engram 行缓存；缺=None 不造 0）
+            ct = o.get("cached_tokens")
+            rows.append({"target": n, "prompt_tokens": pt, "ttft_s": round(ttft, 3),
+                         "tok_s": round(pt / ttft, 1) if ttft > 0 else None,
+                         # 行级 cpt 记录位（PR-ANCHOR-AUDIT §四.2-4 三要素；探针侧只读不猜）
+                         "prompt_chars": len(prompt),
+                         "chars_per_token": round(len(prompt) / pt, 3) if pt else None,
+                         "filler": filler,
+                         "cached_tokens": ct,
+                         "uncached_tokens": (pt - ct) if ct is not None else None,
+                         "uncached_tok_s": round((pt - ct) / ttft, 1)
+                         if (ct is not None and ttft > 0) else None,
+                         "reasoning_tokens": o.get("reasoning_tokens")})
+            continue
+        # DF-04 新路径：每档 N 次独立调用（每发独立 uuid salt ⇒ 跨发前缀缓存不可命中）
+        shots = []
+        for i in range(runs):
+            salt = uuid.uuid4().hex[:8]
+            prompt = build_pr_prompt(n, salt, filler)
+            o = c.stream(prompt, gen_tokens, capture_spec=capture_spec)
+            ttft = o["t_first"] - o["t_req"]
+            pt = o["prompt_tokens"] or n
+            ct = o.get("cached_tokens")
+            shots.append({"shot": i + 1, "salt": salt, "target": n,
+                          "prompt_tokens": pt, "ttft_s": round(ttft, 3),
+                          "tok_s": round(pt / ttft, 1) if ttft > 0 else None,
+                          "prompt_chars": len(prompt),
+                          "chars_per_token": round(len(prompt) / pt, 3) if pt else None,
+                          "filler": filler,
+                          "cached_tokens": ct,
+                          "uncached_tokens": (pt - ct) if ct is not None else None,
+                          "uncached_tok_s": round((pt - ct) / ttft, 1)
+                          if (ct is not None and ttft > 0) else None,
+                          "reasoning_tokens": o.get("reasoning_tokens")})
+        row = {"target": n, "runs": runs, "filler": filler, "shots": shots}
+        for name, rnd in (("tok_s", 1), ("ttft_s", 3)):  # 逐发记录+中位数+极差
+            vals = [s[name] for s in shots if s[name] is not None]
+            row[f"{name}_median"] = round(sorted(vals)[len(vals) // 2], rnd) if vals else None
+            row[f"{name}_min"] = round(min(vals), rnd) if vals else None
+            row[f"{name}_max"] = round(max(vals), rnd) if vals else None
+            row[f"{name}_range"] = round(max(vals) - min(vals), rnd) if vals else None
+        rows.append(row)
     return rows
 
 
 def strip_legacy_rows(data):
-    """--legacy-csv：输出裁回旧 schema 键序（回退面；INV-02 §6.9 旧管道/旧锚可比性）。"""
+    """--legacy-csv：输出裁回旧 schema 键序（回退面；INV-02 §6.9 旧管道/旧锚可比性）。
+    DF-04：PR runs>1 的 shots 行按发展开为 N 条旧键行（=旧管道「N 次独立调用各自
+    成行」的同形态；shot 行自含 target 等全部旧键）。"""
     out = {"label": data.get("label")}
     if "de" in data:
         out["de"] = [{k: r[k] for k in DE_ROW_LEGACY_KEYS} for r in data["de"]]
     if "pr" in data:
-        out["pr"] = [{k: r[k] for k in PR_ROW_LEGACY_KEYS} for r in data["pr"]]
+        pr = []
+        for r in data["pr"]:
+            if r.get("shots"):  # DF-04：runs>1 档行 → 逐发展开
+                pr.extend({k: s[k] for k in PR_ROW_LEGACY_KEYS} for s in r["shots"])
+            else:
+                pr.append({k: r[k] for k in PR_ROW_LEGACY_KEYS})
+        out["pr"] = pr
     return out
 
 
@@ -494,12 +567,39 @@ def check_de_row(row, nextn=NEXTN_DEFAULT):
 
 def check_pr_row(row):
     """PR 行闭合：tok_s=prompt_tokens/TTFT（total 口径）、chars_per_token=chars/tokens；
-    cached 在场时 uncached=prompt−cached、uncached_tok_s=uncached/TTFT。"""
+    cached 在场时 uncached=prompt−cached、uncached_tok_s=uncached/TTFT。
+    DF-04 shots 行（--runs N>1 档行）：runs=shots 数、salt 唯一（fresh salt 口径）、
+    逐发闭合、median/min/max/range（极差）与逐发自洽。"""
     notes = []
 
     def bad(m):
         notes.append(m)
 
+    if row.get("shots") is not None:  # DF-04：--runs N>1 的档行
+        shots = row["shots"]
+        if not shots or row.get("runs") != len(shots):
+            return False, [f"shots 数 {len(shots)} ≠ runs {row.get('runs')}"]
+        salts = [s.get("salt") for s in shots]
+        if len(set(salts)) != len(salts):
+            bad("shots salt 非唯一（fresh salt 独立调用口径破坏）")
+        for s in shots:
+            ok_one, ns = check_pr_row(s)
+            notes.extend(ns)
+        for name, rnd in (("tok_s", 1), ("ttft_s", 3)):
+            vals = [s.get(name) for s in shots]
+            if any(v is None for v in vals):
+                bad(f"{name} 存 None 发（ttft≤0？）——median/极差不判")
+                continue
+            med = round(sorted(vals)[len(vals) // 2], rnd)
+            if row.get(f"{name}_median") != med:
+                bad(f"{name}_median≠逐发中位（{row.get(f'{name}_median')} vs {med}）")
+            lo, hi = round(min(vals), rnd), round(max(vals), rnd)
+            if row.get(f"{name}_min") != lo or row.get(f"{name}_max") != hi:
+                bad(f"{name}_min/max≠逐发极值（{row.get(f'{name}_min')}/{row.get(f'{name}_max')}"
+                    f" vs {lo}/{hi}）")
+            if row.get(f"{name}_range") != round(hi - lo, rnd):
+                bad(f"{name}_range≠max−min（极差不闭合）")
+        return not notes, notes
     pt, ttft = row.get("prompt_tokens"), row.get("ttft_s")
     if not pt or not ttft:
         return False, ["缺 prompt_tokens/ttft_s"]
@@ -704,25 +804,122 @@ def selfcheck():
          "reasoning_tokens": 0, "cached_tokens": 0, "gen_eq_accepted_plus_b": False}]}
     need(not check_de_row(bad_req_row)[0], "per_request 重复计数必红（回放面）")
 
+    # ── 10. DF-04：PR --runs 生效（每档 N 次独立调用 + 逐发记录 + 中位数 + 极差）──
+    flat = run_pr(_SpecClient(), [4096], runs=1)[0]
+    need(list(flat) == list(PR_FLAT_ROW_KEYS) and flat["target"] == 4096,
+         "DF-04 runs=1 行=旧扁平 schema 键序（旧锚/旧管道逐字节可比）")
+    need(check_pr_row(flat)[0], "DF-04 runs=1 行闭合（合成：tok_s=1280.0）")
+    r3 = run_pr(_SpecClient(), [4096], runs=3)[0]
+    need(r3["runs"] == 3 and len(r3["shots"]) == 3, "runs=3 ⇒ 每档 3 条独立记录")
+    need(len(set(s["salt"] for s in r3["shots"])) == 3, "每发独立 fresh salt（防跨发前缀缓存）")
+    need(all(s["tok_s"] == 1280.0 and s["ttft_s"] == 0.05 for s in r3["shots"]),
+         "逐发记录含 tok_s/ttft_s（合成固定 1280.0/0.05）")
+    need(r3["tok_s_median"] == 1280.0 and r3["tok_s_range"] == 0.0
+         and r3["ttft_s_median"] == 0.05 and r3["ttft_s_range"] == 0.0,
+         "同值三发：median=1280.0 / 极差=0（合成对表）")
+    need(check_pr_row(r3)[0], "runs=3 行闭合（median/min/max/极差与逐发自洽）")
+
+    class _PrVarClient(_SpecClient):
+        """逐发递增 TTFT 的合成客户端（DF-04 变异对表：第 k 次调用 ttft=0.05+0.01k）。"""
+
+        def __init__(self):
+            super().__init__()
+            self.k = 0
+
+        def stream(self, prompt, max_tokens, temperature=0.0, top_p=1.0,
+                   extra_body=None, capture_spec=False):
+            self.k += 1
+            o = super().stream(prompt, max_tokens, temperature, top_p, extra_body,
+                               capture_spec)
+            o["t_req"] = o["t_first"] - (0.05 + 0.01 * self.k)
+            return o
+
+    rv = run_pr(_PrVarClient(), [4096], runs=3)[0]
+    # warmup 消耗 k=1；档内三发 k=2,3,4 ⇒ ttft=0.07/0.08/0.09 ⇒ tok_s=914.3/800.0/711.1
+    need([s["tok_s"] for s in rv["shots"]] == [914.3, 800.0, 711.1],
+         "逐发记录保序（合成递增 ttft ⇒ tok_s 914.3/800.0/711.1）")
+    need(rv["tok_s_median"] == 800.0 and rv["tok_s_min"] == 711.1
+         and rv["tok_s_max"] == 914.3 and rv["tok_s_range"] == 203.2,
+         "median/min/max/极差 对表（800.0 / 711.1 / 914.3 / 203.2）")
+    need(rv["ttft_s_median"] == 0.08 and rv["ttft_s_range"] == 0.02,
+         "ttft 中位/极差 对表（0.08 / 0.02）")
+    need(check_pr_row(rv)[0], "变异行闭合（回放面自洽）")
+    need(not check_pr_row({**rv, "tok_s_median": 999.0})[0], "median 虚假必红")
+    dup = {**rv, "shots": [dict(rv["shots"][i], salt="deadbeef") for i in range(3)]}
+    need(not check_pr_row(dup)[0], "shots salt 重复必红（fresh salt 口径）")
+    try:
+        run_pr(_SpecClient(), [8], runs=0)
+        need(False, "runs=0 必须红")
+    except ValueError as e:
+        need("runs" in str(e), f"runs<1 红不静默（{str(e)[:40]}…）")
+    leg3 = strip_legacy_rows({"label": "sd", "pr": [r3]})
+    need(len(leg3["pr"]) == 3
+         and all(list(x) == list(PR_ROW_LEGACY_KEYS) for x in leg3["pr"]),
+         "--legacy-csv：shots 行逐发展开 3 条旧键行（旧管道兼容）")
+
     try:  # 坏端点必须因正确理由红
         Client("http://127.0.0.1:1/v1", "k", 2).stream(DE_PROSE_PROMPT, 32)
         need(False, "坏端点必须红")
     except Exception as e:
         need("Connection" in type(e).__name__ or "connection" in str(e).lower(), f"坏端点红（{type(e).__name__}）")
+
+    # ── 11. EQ-11 参数面统一：URL 三形归一 + 拒起首行 ERROR 摘要（零请求离线）──
+    import contextlib as _ctx
+    import io as _io
+    b = bench_url.v1_base
+    need(b("http://127.0.0.1:8899", flag="--base-url", prog="sd_bench.py")
+         == "http://127.0.0.1:8899/v1", "EQ-11 origin 形归一补 /v1")
+    need(b("http://127.0.0.1:8899/v1", flag="--base-url", prog="sd_bench.py")
+         == "http://127.0.0.1:8899/v1", "EQ-11 v1 基形原样（旧正确形逐字节不变）")
+    need(b("http://127.0.0.1:8899/v1/", flag="--base-url", prog="sd_bench.py")
+         == "http://127.0.0.1:8899/v1", "EQ-11 尾斜坡形归一")
+    need(b("http://127.0.0.1:8899/v1/chat/completions", flag="--base-url", prog="sd_bench.py")
+         == "http://127.0.0.1:8899/v1", "EQ-11 全路径形剥 /chat/completions（旧 404 形修复）")
+    need(b("https://h.example/api", flag="--base-url", prog="sd_bench.py")
+         == "https://h.example/api", "EQ-11 自定义挂载路径原样保留自担")
+    need(bench_url.chat_completions("http://127.0.0.1:8899/v1", flag="--base-url", prog="sd_bench.py")
+         == "http://127.0.0.1:8899/v1/chat/completions",
+         "EQ-11 请求 URL=旧正确形逐字节同（Client.stream 拼接不变量）")
+    need(Client("http://127.0.0.1:1", "k", 2).base == "http://127.0.0.1:1/v1",
+         "EQ-11 Client 构造即归一（origin 形不再等到请求才 404）")
+    for bad in ("foo", "://x", "http://", "127.0.0.1:8899"):  # 错 URL 形必红：首行 ERROR 摘要 + exit 2
+        buf = _io.StringIO()
+        try:
+            with _ctx.redirect_stderr(buf):
+                Client(bad, "k", 2)
+            need(False, f"错 URL 形 {bad!r} 必须拒起")
+        except SystemExit as e:
+            first = buf.getvalue().splitlines()[0] if buf.getvalue() else ""
+            need(e.code == 2 and first.startswith("ERROR[sd_bench.py]:"),
+                 f"错 URL 形 {bad!r} 首行 ERROR 摘要+exit 2（{first[:44]}…）")
+    p = bench_url.BenchArgumentParser(prog="sd_bench.py")
+    buf = _io.StringIO()
+    try:
+        with _ctx.redirect_stderr(buf):
+            p.error("argument --type: invalid choice: 'prose2'")
+        need(False, "拒起必须 exit")
+    except SystemExit as e:
+        first = buf.getvalue().splitlines()[0] if buf.getvalue() else ""
+        need(e.code == 2 and first.startswith("ERROR[sd_bench.py]:"),
+             f"argparse 拒起首行 ERROR 摘要+exit 2（{first[:44]}…）")
     print("SELFCHECK", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
 
 def main():
-    ap = argparse.ArgumentParser()
+    ap = bench_url.BenchArgumentParser(prog="sd_bench.py")  # EQ-11：拒起首行 ERROR 摘要 + exit 2
     ap.add_argument("--mode", choices=("de", "pr"), required=False,
                     help="de/pr；--selfcheck 时可不填")
     ap.add_argument("--type", choices=DE_TYPES, default="prose")
     ap.add_argument("--concurrency", type=int, default=1)
     ap.add_argument("--max-tokens", type=int, default=400)
-    ap.add_argument("--runs", type=int, default=5)
+    ap.add_argument("--runs", type=int, default=None,
+                    help="重复次数。DE 缺省 5；PR 缺省 1（旧单发口径，旧锚/旧管道可比）。"
+                         "PR 下显式 N>1=每档 N 次独立调用（每发 fresh salt），行含 shots"
+                         " 逐发记录+median/极差（DF-04：PR 不再静默吞参）")
     ap.add_argument("--warmups", type=int, default=2)  # knapcio 口径：first run after two warm-ups
-    ap.add_argument("--sizes", type=int, nargs="+", default=[4096, 8192, 16384, 32768])
+    ap.add_argument("--sizes", "--targets", type=int, nargs="+", default=[4096, 8192, 16384, 32768],
+                    help="PR 档位（token 数）。--targets 是 --sizes 的等价别名（EQ-11 参数面统一）")
     ap.add_argument("--pr-filler", choices=("repeated", "random", "real"), default="repeated",
                     help="PR 填充口径：repeated=sparkDash 原样（行缓存膨胀）；random=均匀词汤（P5）；"
                          "real=真实文本分布（ds_gate 语料生成器，MiaAI-Lab#21 口径）")
@@ -749,8 +946,16 @@ def main():
         return replay(a.replay, nextn=a.nextn)
     if not a.mode:
         ap.error("--mode 必填（仅 --selfcheck/--replay 时可省）")
+    # DF-04：--runs 缺省分模式——DE=5（旧默认）；PR=1（旧实际行为，pr_ladder6.sh 等
+    # 在役链按「每次调用=单发读数」解析产物，缺省变更即断链）；显式传值两模式均真生效。
+    runs = a.runs if a.runs is not None else (5 if a.mode == "de" else 1)
+    if runs < 1:
+        bench_url.fail("sd_bench.py", f"--runs 必须 ≥1（got {runs}）")  # EQ-11：首行 ERROR 摘要 + exit 2
+    if a.mode == "pr" and runs > 1:
+        print(f"[sd_bench] DF-04：pr 模式 --runs {runs} 生效——每档 {runs} 发独立调用"
+              f"（每发 fresh salt），产物含 shots 逐发记录+median/极差", file=sys.stderr)
     if a.concurrency not in ALLOWED_CONC:
-        return print(f"concurrency 必须是 {ALLOWED_CONC}", file=sys.stderr) or 2
+        bench_url.fail("sd_bench.py", f"--concurrency 必须是 {ALLOWED_CONC}（got {a.concurrency}）")
     key = ""
     try:
         key = open(a.key_file).read().strip()
@@ -758,9 +963,9 @@ def main():
         pass
     c = Client(a.base_url, key, timeout_s=max(120, a.max_tokens * 8))
     data = {"label": a.label,
-            "de": run_de(c, a.type, a.concurrency, a.max_tokens, a.warmups, a.runs,
+            "de": run_de(c, a.type, a.concurrency, a.max_tokens, a.warmups, runs,
                          capture_spec=a.capture_spec, nextn=a.nextn)} if a.mode == "de" \
-        else {"label": a.label, "pr": run_pr(c, a.sizes, filler=a.pr_filler,
+        else {"label": a.label, "pr": run_pr(c, a.sizes, runs=runs, filler=a.pr_filler,
                                              capture_spec=a.capture_spec)}
     if a.legacy_csv:
         data = strip_legacy_rows(data)

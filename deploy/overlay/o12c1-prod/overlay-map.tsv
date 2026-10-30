@@ -26,3 +26,4 @@ deepseek_v4_vit.py	srt/models/deepseek_v4_vit.py
 deepseek_v4_vl.py	srt/models/deepseek_v4_vl.py
 mm_processor_deepseek_v4_vl.py	srt/multimodal/processors/deepseek_v4_vl.py
 hf_processor.py	srt/utils/hf_transformers/processor.py
+page_map_export.py	srt/mem_cache/page_map_export.py

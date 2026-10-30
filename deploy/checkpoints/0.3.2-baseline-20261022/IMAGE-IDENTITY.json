@@ -1,9 +1,9 @@
 {
   "baseline": "0.3.2-baseline-20261022",
   "decision_date": "2026-10-22",
-  "source_tag": "192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c",
-  "baseline_tag": "192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-baseline-20261022",
-  "registry": "192.168.0.202:5000",
+  "source_tag": "<registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c",
+  "baseline_tag": "<registry-host>:5000/dsv41-sglang-optimized:0.3.2-baseline-20261022",
+  "registry": "<registry-host>:5000",
   "repository": "dsv41-sglang-optimized",
   "created": "2026-10-18T05:15:37.406789635Z",
   "platform": {
@@ -36,7 +36,7 @@
     "org.opencontainers.image.version": "lmsysorg/sglang:nightly-dev-20260929-79cafec0"
   },
   "hosts": {
-    "dgxspark01": {
+    "<node01>": {
       "role": "head",
       "container": "r3prod-head",
       "local_image_id": "sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4",
@@ -45,7 +45,7 @@
       "api_port": 8899,
       "health": "200"
     },
-    "dgxspark02": {
+    "<node02>": {
       "role": "worker+registry",
       "container": "r3prod-worker",
       "local_image_id": "sha256:ef64dec3d74b577bfcc8f54cc940b87d92701a9d9c3bb3c6c1214133c5e605b2",
@@ -54,7 +54,7 @@
       "api_port": 30000,
       "health": "200"
     },
-    "dgxspark03": {
+    "<node03>": {
       "role": "worker",
       "container": "r3prod-worker",
       "local_image_id": "sha256:ef64dec3d74b577bfcc8f54cc940b87d92701a9d9c3bb3c6c1214133c5e605b2",
@@ -63,7 +63,7 @@
       "api_port": 30000,
       "health": "200"
     },
-    "dgxspark04": {
+    "<node04>": {
       "role": "worker",
       "container": "r3prod-worker",
       "local_image_id": "sha256:ef64dec3d74b577bfcc8f54cc940b87d92701a9d9c3bb3c6c1214133c5e605b2",
@@ -74,11 +74,11 @@
     }
   },
   "supersedes": [
-    "192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032",
-    "192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032b",
-    "192.168.5.187:5000/dsv41-sglang-optimized:0.3.1",
-    "192.168.5.187:5000/dsv41-sglang-optimized:0.3.1-r2",
-    "192.168.5.187:5000/dsv41-sglang-optimized:0.3.1-r3"
+    "<registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032",
+    "<registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032b",
+    "<registry-host>:5000/dsv41-sglang-optimized:0.3.1",
+    "<registry-host>:5000/dsv41-sglang-optimized:0.3.1-r2",
+    "<registry-host>:5000/dsv41-sglang-optimized:0.3.1-r3"
   ],
   "checks": {
     "registry_manifest_put": "HTTP 201 Created, Docker-Content-Digest sha256:47f6d91ada…",

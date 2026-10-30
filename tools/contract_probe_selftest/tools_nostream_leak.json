@@ -1,0 +1,17 @@
+{
+  "id": "chatcmpl-fixture-tools-nostream-leak",
+  "object": "chat.completion",
+  "created": 1760000001,
+  "model": "deepseek-v4.1-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function<｜tool▁sep｜>get_server_time\n```json\n{\"tz\": \"Asia/Shanghai\"}\n```<｜tool▁call▁end｜><｜tool▁calls▁end｜>"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {"prompt_tokens": 42, "completion_tokens": 29, "total_tokens": 71}
+}

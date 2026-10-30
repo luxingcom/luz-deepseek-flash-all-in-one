@@ -8,8 +8,7 @@ scoring.py:210-225 的 score_tiles 调用期读模块全局——单点覆盖 de
 
 == 与在役 sparse_wire 的关系（2026-10-05 实测定谳，如实登记）==================
 M0731W2 靴日志直证：0731 线 adapter 挂载（PYTHONPATH=/opt/dsv41/adapter）下
-sparse_wire.install_scoring **常开生效**（seg4-teardown-logs/r3boot-m0731-worker-
-dgxspark04.docker.log：「sparse_wire: scoring row-chunk budgets <- ..(deep_gemm
+sparse_wire.install_scoring **常开生效**（seg4-teardown-logs/<prod-log>：「sparse_wire: scoring row-chunk budgets <- ..(deep_gemm
 2,147,483,648->134217728..)」）——TLSEGMENT-CARD §1.1「0731 现形=stock 2GiB」
 的预算面前提**已被实测推翻**：A4 黑名单剥的是 env 键（arm env 不得设
 DSV41_DENSE_INDEXER_LOGITS_BUDGET_BYTES），不是 install 本体。因此本件 ①预算

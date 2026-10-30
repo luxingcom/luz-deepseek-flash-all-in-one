@@ -8,6 +8,15 @@
 > 与 [deploy/reconstruct/0.3.2/README.md](../deploy/reconstruct/0.3.2/README.md)
 > （逐字节重建包，落位面真相源）为法源。
 >
+> **0.3.4re 增量并入（2026-10-30）**：本篇主体仍按 0.3.2 交换机基线写（§2 镜像
+> r032c、§4.2 adapter 87 件、§4.3 overlay 29 件各节不动）；0.3.4 面的部署增量已
+> 并入三处——**§4.5 网关部署在管理机**（Mac 独立宿主 · OrbStack 承载）、**§5 env
+> 落位**（0.3.4 调优终态 61 键形）、**§6.6 工具族**（deploy/verify/doctor/selftest
+> 四件套用法位）。镜像面 0.3.2→0.3.4 差异（`0.3.4-x6bake` 74 层/v41 三联/61 键
+> env 全貌）以 [UPGRADE-0.3.4.md](../UPGRADE-0.3.4.md) 与
+> [release/0.3.4-RELEASE-NOTE.md](release/0.3.4-RELEASE-NOTE.md) 为正典；键值逐键
+> 语义见 [RUNTIME-PARAMETERS.md](RUNTIME-PARAMETERS.md) §1。
+>
 > 读者：拿到 4×DGX Spark（交换机以太网形态）+ 本仓、要从零部署到引擎在役的工程师。
 > 读法：按节号顺序执行，**不要跳节**；每步红掉时先看该步末尾的"失败先查"。
 
@@ -33,12 +42,15 @@
 | `<TEST_PORT>` | 引擎测试口（量具/验收专用，避开网关转发） | 8898 |
 | `<GW_PORT>` | 网关对外车道口 | 8001 |
 | `<PREFIX>` | 容器名前缀（拼 `-head`/`-worker`） | r3prod |
+| `<mac-admin-host>` | 网关宿主=Mac 独立管理机（OrbStack 承载，§4.5） | Mac mini M6 |
+| `<mac-if-ip>` / `<mac-gw-ip>` | 管理机的管理段地址 / 专线地址 | — |
+| `<tunnel-port>` | head→网关反向隧道监听口（§4.5） | 24001 |
 | `<repo>` | 本仓 checkout 根目录 | — |
 
 三条纪律先立好，违反任何一条，后面所有读数作废：
 
 1. **一个判读窗内 env/serve/adapter 三元组不许中途切换**；改 env 后必须复靴，热改无效。
-2. **拆靴→点火之间沉降 ≥600s**（§7 第五步）；快速重启=首请求 940 级慢窗。
+2. **拆靴→点火之间沉降 ≥600s**（§7 第五步）；快速重启=首请求 940 级慢窗。**沉降时长三口径**：手工序（本文 §7）沿用 **≥600s**；工具序（`deploy-034.sh` S5，§6.6）按 D113-① 新制为 **300s**；更旧的 1800s 制已废（D 系号=内部决策台账编号，未入公开树，语义随文给出）。
 3. **四机必须同批落同一棵树**：adapter/overlay/env 任一面只换 head=混形栈。
 
 外部三项不入 Git、需自备：基座镜像（48.6GB/70 层）、V4.1-Flash-1017 权重（476G）、
@@ -128,6 +140,8 @@ for h in <H2> <H3> <H4>; do ssh -o BatchMode=yes "$h" true && echo "$h ok"; done
 ## 2. 拉镜像
 
 ### 2.1 通道与命令（二选一）
+
+> **先分流（部署哪一形，别拉错镜像）**：要部署**现役 0.3.4re 形**，镜像=`dsv41-sglang-optimized:0.3.4-x6bake-20261026`（RepoDigest `sha256:80e4c957…8f7d0`，74 层；取处=网盘发布包 `images/` 内的 image-id 导出 tar，`docker load` 后自打 tag，见包内 README-DIST）——本章 §2 的拉取与核验命令面向 **0.3.2 历史定版形**（r032c/digest `47f6d91a…`/71 层），勿混用。0.3.4 形与 0.3.2 形的 env/adapter/overlay 面互斥（§0 纪律 3 混形禁忌）；0.3.4 形的 env 落位见 §5，逐步升级面见 [UPGRADE-0.3.4.md](../UPGRADE-0.3.4.md)。
 
 **A. 直接拉现役镜像（推荐，身份完全一致）**——四机逐台：
 
@@ -257,8 +271,11 @@ bash <repo>/deploy/reconstruct/0.3.2/weights/engram-tools/build_and_distribute.s
 | `deploy/overlay/o12c1-prod/` + `deploy/reconstruct/0.3.2/overlay/` | `$HOME/migrate-assets/v4vl/sglang-overlay.o12c1-prod/`（=容器内 `SGLANG_OVERLAY_DIR`） | 29 件=28 活件影子挂载+1 映射表（§4.3） |
 | `deploy/reconstruct/0.3.2/b12x/` 三件 | `$HOME/migrate-assets/b12x/b12x/comm/roce/` | flat/交换机运行时（§4.4） |
 | `deploy/kit/` | `$HOME/w6-kit/`（或烘入镜像 `/opt/dsv41/kit/`） | guard 守卫族+量具 |
-| `tools/packages/` 五包 | 各包 README 的部署位（如网关→`/opt/aicad-prod/`） | fabric-net/selfdiag/selfheal/gateway/cfgmgmt（含 systemd 单元面） |
+| `tools/packages/` 五包 | 各包 README 的部署位（如网关→`/opt/aicad-prod/`） | fabric-net/selfdiag/selfheal/gateway/cfgmgmt（含 systemd 单元面）；**网关现役=管理机容器形，见 §4.5**（01 systemd 形已 RETIRED 留回退线） |
 | `deploy/nccl/nccl-ringonly/`+`ncclpin.so` | （0.3.2 交换机形**不需要**） | 环网形遗留件已全链退役封存；仅做环网回退时按 [RING-DEPLOY.md](RING-DEPLOY.md) 落位 |
+| `deploy/env/.env.tp4` | head 机 boot 链读取位（TP4 面环境文件，四机一致） | 0.3.4 面第 2 面：`:87` 钉 `SGLANG_DSV4_KV_LAYOUT=v41`+prefill TP-split 保全；boot 前置消费，**部署 0.3.4re 形必须落位并核 `:87`**（缺=v41 三联缺一面，退化面风险） |
+| `deploy/kit/guard/guards.conf` | 守卫族配置位（在役位=guard kit 目录，kit/deploy 下同名件为副本） | 0.3.4 面第 3 面：`:161` envpin 钉 v41；守卫（guard watch）消费，部署 0.3.4re 形时随 kit 落位并核 envpin 行 |
+| `deploy/prod/prod-profile.env` | head 机专属钉面（boot-prod/prod-selfcheck 消费） | 0.3.4 面第 4 面：`:8` env md5 锚/`:9` 键数/`:12` overlay 计数/`:20-21` 镜像 digest 钉行；boot-prod env 校验门比对此件，**改 env/镜像/overlay 面后须同步重钉**（值口径见 [UPGRADE-0.3.4.md](../UPGRADE-0.3.4.md) §0 表） |
 
 VL 双臂 overlay 树、网关 VL 车道等非默认在役面见 [DEPLOY-GUIDE.md](DEPLOY-GUIDE.md) §9。
 
@@ -305,7 +322,7 @@ md5sum $HOME/migrate-assets/v4vl/sglang-overlay.o12c1-prod/deepseek_v4_backend.p
 ls $HOME/migrate-assets/v4vl/sglang-overlay.o12c1-prod/ | wc -l   # 期望：29（28 活件+overlay-map.tsv）
 ```
 
-boot 链对 overlay 有挂载计数断言（`ov_n` 门==28，fail-closed）。注意 overlay 是**运行期
+boot 链对 overlay 有挂载计数断言（`ov_n` 门==28，fail-closed）。**「28/29/29」三个数别混**：目录共 **29 项**=28 个活件+1 个 `overlay-map.tsv`（上式 `ls|wc -l` 期望 29）；boot 的活件挂载门 `ov_n`==**28**（map 不计）；runbook-034 §三-2 的 die 文案「挂载计数≠29」与 boot `:465` 门按 **map 行数=29** 断言（BL15 行数锚）。§8.1 横幅 `banner complete: 29 gates` 里的 29 是**守卫门总数**，与 overlay 计数无关（数值相同纯属巧合）。注意 overlay 是**运行期
 盖在镜像内引擎路径之上**的影子面：镜像里换对了，overlay 里的同名旧件照样盖回去——
 这是 ImportError 的第三来源（§9）。
 
@@ -329,33 +346,128 @@ NCCL 面：0.3.2 交换机形用**镜像内 stock pip NCCL 2.30.7** 接管，boo
 `ncclpin.so` 注入链已退役（件原位封存、不再是 boot 前置）。从零部署交换机形
 **不需要**落 NCCL 补丁件。
 
-## 5. env 落位与自检三件
+### 4.5 网关部署在管理机（Mac 独立宿主 · OrbStack 承载 · 0.3.4re 增）
+
+> 法源：[`tools/packages/gateway/README.md`](../tools/packages/gateway/README.md)
+> Mac M6 部署节（部署形态/升级序/键面表）+ 0.3.4 版本锁档 §五（网关 rc3.8.7 采样
+> 基线锚）。主机名与地址一律占位符，替换为本站实测值后再执行。
+
+**形态总述**：0.3.4 现役网关**不在四机集群内、也不在 head 机 systemd 上**，而是
+独立管理机上的 OrbStack 容器——**源码正本在服务器（本仓+服务器 /opt 副本），
+下发到管理机以容器形运行**：
+
+| 件 | 落位 / 身份 |
+|---|---|
+| 宿主 | `<mac-admin-host>`（参考形 Mac mini M6；管理段 `<mac-if-ip>`、专线 `<mac-gw-ip>`） |
+| 承载 | OrbStack 容器，编排=管理机 `mac-stack/docker-compose.yml`（`restart: always`；脚本烧镜像，升级必 `compose build`） |
+| 容器一 | `concurrency-proxy`（内部键控车道 :8001，容器名 **`concurrency-proxy-v2-mac`**；**0.3.4re 批后现役版=rc3.8.8**，公开适配形 `concurrency_proxy_v2.py` md5 `4f12f2d3`——含 DF-05 `INJECT_CONSERVATIVE_SAMPLING` 保守采样开关（**默认 0=关**，见 KNOWN-ISSUES §1）；**rc3.8.7**（内部正典 md5 `be9b0aba…`）为 0.3.4 调优终态时点值（版本锁档 §五锚），两者行为在开关关闭时零差异——`GW_SAMPLING_POLICY=1` sampling-on=0.3.4 判读基线） |
+| 容器二 | `responses-gateway`（:8003 鉴权公共入口，容器名 `responses-gateway-mac`；`python:3.12-slim`+固化 requirements） |
+| 已撤除 | `concurrency-proxy-vl`（:8002，零消费者实证撤除；compose `.bak` 留服务定义=回退线） |
+| 源码正本 | 服务器侧：本仓 `tools/packages/gateway/`（载荷+桌面测试台+units/env 模板；在役对表=selfcheck/sources.tsv）；head 机 `/opt` 副本=对表基准 |
+
+**下发/升级序**（源在服务器、跑在管理机）：
+
+```bash
+# ① 服务器侧桌面测试台全绿后才准下发（零流量自跑）：
+python3 <repo>/tools/packages/gateway/payload/tests/test_rc385.py   # 期望：13/13
+python3 <repo>/tools/packages/gateway/payload/tests/test_rc386.py   # 期望：14/14
+# ② scp 新载荷到管理机，md5 对锚（现役 rc3.8.8=4f12f2d3，公开适配形；升级前 .bak 备份载荷+env）：
+scp <repo>/tools/packages/gateway/concurrency_proxy_v2.py \
+    <USER>@<mac-admin-host>:mac-stack/
+ssh <USER>@<mac-admin-host> 'md5 -q mac-stack/concurrency_proxy_v2.py'
+# ③ （如需）改 proxy.env —— ④ 重建并强制重建容器：
+ssh <USER>@<mac-admin-host> 'cd mac-stack && docker compose build concurrency-proxy \
+  && docker compose up -d --force-recreate concurrency-proxy'
+# ⑤ 探针族验收（rc3.8.6 起 P1b/P6/P7 可用）；回退=cp 回 .bak + force-recreate
+```
+
+**上游隧道形**：proxy.env 的 `UPSTREAM=http://<mac-gw-ip>:<tunnel-port>`＝head 侧
+反向隧道（`mac-forwarders.service`=systemd 托管，`Restart=always`；
+`ssh -N -R <mac-gw-ip>:<tunnel-port>:127.0.0.1:<PORT>`）。**隧道断=网关 502**
+（ServerAlive 20s×3 自愈）。**引擎绑定两形态（先认你的形再排「上游不通」）**：本仓公开
+boot 件缺省 `--host 0.0.0.0`（引擎口四机管理段可达，网关可直接指
+`http://<H1>:<PORT>`，隧道非必需）；**参考产线形由站点把引擎口收敛为只绑 head 机
+127.0.0.1（回环）**——此时链路必经上述反向隧道（隧道终点=head 机回环口），网关侧一切
+「上游不通」先查隧道再查引擎。参考读数（§4.5 全部锚值）按回环+隧道形记录；判读口径
+与参考对齐时建议照 §4.5 隧道形部署。
+
+**键面与密钥**：proxy.env 十八键=rc3.8.5 十六键（含
+`GW_REQUIRE_AUTH=1`+`GW_ALLOWED_MODELS=deepseek-v4.1-flash`）+容量广播两键
+（`ADVERTISE_MODEL_CAPACITY=1`+`MODELS_CONTEXT_LEN=0`）。**鉴权键值
+（GW_API_KEY 等）一律宿主 0600 落位，绝不入包/入 unit/入镜像/入日志**。
+
+**验收（第五查，EQ-09；引擎 health 全绿≠主链健康——网关不在点火脚本/槽锁/启动链）**：
+
+1. 网关 `/health`=200（引擎探活透传面：引擎挂→502、代理挂→000——先 curl 网关口
+   health 再打主链入口）；
+2. 代理上游（`UPSTREAM`）指向 `http://<mac-gw-ip>:<tunnel-port>`（反向隧道终点=head 机
+   `127.0.0.1:<PORT>` 引擎生产口。注意网关跑在管理机容器内，**它的 127.0.0.1=Mac 自身**，
+   把 UPSTREAM 直写 `127.0.0.1:<PORT>` 会断链；`<TEST_PORT>` 8898=**引擎测试口（量具专用）**，
+   网关上游不得指向它）；
+3. 网关 `/v1/models` 与引擎直连清单**逐 id 一致**（静态别名表会列已下线旧名，判
+   在役模型以引擎/网关侧真实清单为准）。
+
+以上三断言已内建于 `tools/deploy-034.sh` S8 与 `tools/verify-034.sh` B0（§6.6），
+手工部署完可用任一件复核。
+
+**判读窗禁切律**：任何性能/质量判读窗内**禁切 `GW_SAMPLING_POLICY` 与 K16 两键**
+（env `:60-61`）；sampling-on 基线的切换走专门窗（先读网关侧策略报告再动），
+不现场切。
+
+## 5. env 落位与自检（0.3.4 面=61 键）
 
 ```bash
 cp <repo>/deploy/env/CBX1A-CERTM-spec1.env $HOME/migrate-assets/dsv41/env/
-# 自检三件：
+# 自检五件（0.3.4 调优终态=61 键）：
 grep -c '^[A-Z0-9_]*=' $HOME/migrate-assets/dsv41/env/CBX1A-CERTM-spec1.env
-# 期望：56（键数）
-md5sum $HOME/migrate-assets/dsv41/env/CBX1A-CERTM-spec1.env
-# 期望：0729e18d 开头（md5 锚）
+# 期望：61（键数；口径=gates-034 BL11 判据）
+grep -c '^SGLANG_DSV4_KV_LAYOUT=v41$' $HOME/migrate-assets/dsv41/env/CBX1A-CERTM-spec1.env
+# 期望：1（v41 尾行独立键；缺=fork-v4-fp4 退化面风险，慢带 −15~19%）
+grep -c '^DSV41_PREFILL_BYPASS=2048$' $HOME/migrate-assets/dsv41/env/CBX1A-CERTM-spec1.env
+# 期望：1（BYPASS 尾行独立键；缺=首键 TTFT 74s 慢带面）
+grep -c '^DSV41_ENGRAM_CACHE_GIB=2$' $HOME/migrate-assets/dsv41/env/CBX1A-CERTM-spec1.env
+# 期望：1（I8 采纳尾行独立键；缺=engram cache 回 1.0GiB 面）
 tail -c 1 $HOME/migrate-assets/dsv41/env/CBX1A-CERTM-spec1.env | xxd
 # 期望：00000000: 0a                                     （尾字节=换行）
+md5sum $HOME/migrate-assets/dsv41/env/CBX1A-CERTM-spec1.env
+# 未改值时期望：1dd2cd3e 开头（本仓脱敏拷贝现值——B12X_ROCE_HCA 为 <hca-names> 占位）
 ```
 
-三件缺一不可：
+五件判读：
 
-- **键数 56 / md5 `0729e18d`**：与 `deploy/reconstruct/0.3.2/env/` 同名件逐字节相同；
-  md5 偏离=文件被动过（哪怕只改注释），先找原因再继续。
+- **键数 61（0.3.4 调优终态正典口径）**：演进链=0.3.2 CBX1A 56 键 →〔0.3.3〕+K16
+  两键（`:60-61`）=58 →〔0.3.4 修复固化〕+`SGLANG_DSV4_KV_LAYOUT=v41` 尾行
+  （`:62`）=59 →〔D121〕+`DSV41_PREFILL_BYPASS=2048`（`:63`）=60 →〔W-f 调优
+  终态〕+`DSV41_ENGRAM_CACHE_GIB=2` 尾行（`:64`）=**61**。59/60/61 三级史档键数
+  在 gates-034 BL11 失败提示列有对表说明。
+- **三条尾行独立键检查**：v41/BYPASS/engram=2 三行各自独立成行才计（BL11 同判据）。
+  **同键双行 last-wins**：`DSV41_ENGRAM_CACHE_GIB` 在 `:8`=1.0 与 `:64`=2 双注入，
+  boot 注入序尾行最晚生效=**2**——删 `:64` 行≠回 0，而是回 `:8` 的 1.0（路 B
+  回置形就是利用这一点，见
+  [runbook/ROLLBACK-PATHS-034.md](runbook/ROLLBACK-PATHS-034.md)）。
+- **md5 判读（0.3.4 面是脱敏拷贝）**：内部四机在役件正典锚=`4370aab9`（0.3.4
+  版本锁档 §二）；本仓拷贝因 `B12X_ROCE_HCA=<hca-names>` 占位而为 `1dd2cd3e`。
+  **填入本站实测部署对后 md5 自然变化，属预期**——站点自检用内容判据（键数
+  61+三尾行+池组键），不要拿内部锚硬套自己的站点件；逐键语义与陷阱见
+  [RUNTIME-PARAMETERS.md](RUNTIME-PARAMETERS.md) §1/§1.12。
 - **尾字节 `0a` 检查**：boot 链自 2026-10-30 起已加尾行守护（旧版 `while read` 注入
-  会在文件末尾缺换行时**静默丢掉最后一行**，引擎回落源码缺省值、什么错都不报），但
-  仍建议每次落位后自检——旧版脚本或其他消费者可能仍丢末行。若补了尾换行：md5 会变，
-  锚表同步更新；补换行**不改运行中容器**，必须重靴才生效。
+  会在文件末尾缺换行时**静默丢掉最后一行**，引擎回落源码缺省值、什么错都不报），
+  0.3.4 面最后一行恰是 engram=2 尾行，丢行=I8 增益面静默失效——落位后必查。补
+  换行会改 md5（锚表同步）且**不改运行中容器**，必须重靴才生效。
+- **EQ-02 机器门**：boot 链（2026-10-30 起）对 RoCE 聚合双键
+  `SGLANG_ROCE_MAX_SIZE`/`DSV41_ROCE_GATHER` 条件式 fail-closed——env 声明两键时
+  任一回滚值（524288/262144 历史档位）即 die 拒起（§9 末行「越并越慢塌陷」的
+  机器门承载）；绿时横幅自报 `[EQ-02] ... PASS`。
 
 要点：boot 用 `ARM_ENV_FILE` 指向哪一个文件就是哪一形，改 env 后必须复靴；三个键
 （`DSV41_CERT_HEAD=1`、`DSV41_FP4KV_R1_INKERNEL=1`、`DSV41_FL6_RECALL_FIX=1`）在
-0.3.2 仍为 `1`，**不要按"转正=删键"误删**；不要为了改注释改文件。回退链为相邻级
-单文件整替：CBX1A(56)→E16B2(56)→E16B1(54)→FB54(54)→0.3.1 51 键，逐级键差见
-[`deploy/reconstruct/0.3.2/env/ENV-CHAIN.md`](../deploy/reconstruct/0.3.2/env/ENV-CHAIN.md)。
+0.3.4 仍为 `1`，**不要按"转正=删键"误删**；不要为了改注释改文件。回退两制：
+0.3.2 期 56 键面的相邻级单文件链（CBX1A(56)→E16B2(56)→E16B1(54)→FB54(54)→0.3.1
+51 键，逐级键差见
+[`deploy/reconstruct/0.3.2/env/ENV-CHAIN.md`](../deploy/reconstruct/0.3.2/env/ENV-CHAIN.md)）
+仍是 0.3.2 面正典；**0.3.4 面（61 键）回退不走该链**，走双路正典
+[runbook/ROLLBACK-PATHS-034.md](runbook/ROLLBACK-PATHS-034.md)（路 A=0.3.3 全回退
+七面联动 / 路 B=撤 I8 采纳恰 3 行差回置）。
 
 ## 6. 首次点火
 
@@ -393,9 +505,11 @@ SPEC_EXTRA_ARGS="--prefill-decode-interval 16 --max-queued-requests 32 --min-fre
 SPEC 六参：`--prefill-decode-interval 16`、`--max-queued-requests 32`、
 `--min-free-slots-delay 1`、`--enable-decoder-swa-bounded-replay`（flag）、
 `--reasoning-parser deepseek-v41`（**连字符**）、`--swa-prefix-tails 256`。
-boot 件的 `SERVER_ARGS` 固定面另含第九参族的另外三参：
+boot 件的 `SERVER_ARGS` 固定面另含第八/九行的两参：
 `--tool-call-parser deepseekv41`（**连写**！与 reasoning 侧写法互不通用，写反不报错、
-功能静默缺失）、`--enable-cache-report`、`--sleep-on-idle`；以及池面固定参
+功能静默缺失）、`--enable-cache-report`；原第九参 `--sleep-on-idle` 已于 2026-10-30
+退役为**禁参**（上游 sglang #43050 idle-wake hang host 侧规避——任何路径带上即
+拒起/FAIL，勿写入）；以及池面固定参
 `--max-total-tokens 9600000`、`--context-length 600000`、`--max-running-requests 16`、
 `--chunked-prefill-size 4096`。全参面见
 [`deploy/reconstruct/0.3.2/boot/RUN-ARGS.md`](../deploy/reconstruct/0.3.2/boot/RUN-ARGS.md)
@@ -424,7 +538,10 @@ adapter 四机对表（红=先跑 `tools/adapter-sync.sh --apply` 再点火）�
 
 公开 `r3-boot-arm.sh`（md5 `9ac6e113`）与产线（`20f22bc6`）功能逐字等价，差异=8 行
 快照头+3 处用户名掩码。落到 `$HOME/migrate-assets/bin/` 后按你站点改三处：`IMAGE=`
-镜像全名、`HEAD_IP=`、`WORKERS` 三行（rank|主机|IP|权重路径|engram 路径）。改完 md5
+镜像全名（部署现役 0.3.4re 形时此处填
+`<registry:port>/dsv41-sglang-optimized:0.3.4-x6bake-20261026`，见 §2.1 分流框；
+0.3.2 历史定版形则填 `0.3.2-r032c`）、`HEAD_IP=`、`WORKERS` 三行
+（rank|主机|IP|权重路径|engram 路径）。改完 md5
 不再对 `9ac6e113` 属预期；逐字节对表法见
 [`deploy/reconstruct/0.3.2/README.md`](../deploy/reconstruct/0.3.2/README.md) §5。
 
@@ -444,6 +561,58 @@ net doctor OK（HCA 部署对逐口 ACTIVE + socket 接口在位）
 ```
 
 任一门红即 `die` 拒起——先按门名查（§9 前五行），补齐后重走 §7 的停机窗流程再点火。
+
+### 6.6 0.3.4 工具族（deploy/verify/doctor/selftest 四件套用法位）
+
+0.3.4 起部署/验收/自诊断有产品化四件套（`tools/` 下 `deploy-034.sh`/`verify-034.sh`/
+`doctor-034.sh`/`selftest-034.sh`，配套 `config-034.tsv`+`gates-034.tsv` 两正典表；
+D119-② 授权新制面）。它们是**纯编排/校验层**——启停仍包装既有正典原件
+（`r3-boot-arm.sh`/`r3-stop`/slotlock），核对面=`capture-boot-evidence.sh`，量具=
+冻结驱动内置阈值——所以本文 §6.2 手工点火与 §8 手工四查仍是底层面；从零部署走完
+§1-§5 后，起栈与验栈推荐改用工具序：
+
+```bash
+cd <repo>
+
+# ① 体检（只读零启停，任何时刻可跑；逐参数 PASS/FAIL+处置提示=自反馈自排查）
+bash tools/doctor-034.sh --preflight     # 起栈前：配置面 md5/键数/镜像 digest×4/
+                                         # engram-权重身份一致性（EQ-05）/网关 GW-1
+bash tools/doctor-034.sh --post-boot     # 起栈后：health/横幅 8/池指纹/引擎 v41 面
+
+# ② 一键部署（先看清单再实跑；=§6.2 点火+§8 验收的编排承载）
+bash tools/deploy-034.sh --dry-run       # 只列步骤与将执行的原始命令（S1 体检照跑，
+                                         # S2-S8 打印不执行）
+bash tools/deploy-034.sh --arm-tag <窗名> # 实部署：preflight→slotlock 持锁→boot :12 翻
+                                         # x6bake→起栈→静置 300s→post-boot→网关第五查
+
+# ③ 冒烟/全量验收（=§8.2 warm 面+§8.3 接线面的电池承载）
+bash tools/verify-034.sh --list          # 只列电池清单与冻结阈值，零触引擎零写
+bash tools/verify-034.sh --smoke         # 快速面：EQ-S 同盐夹心+liter C1+DE c1+500q
+bash tools/verify-034.sh --full          # 全电池：--smoke + sd_bench TTFT + B25×3 + PPL
+
+# ④ 交付包自诊断（不触引擎：比较器单元/沙箱负例/完整性走查/降级检测负例四段）
+bash tools/selftest-034.sh
+```
+
+与手工序的对应与要点：
+
+- **deploy-034 的级序**即 §6-§8 的机器化：S3 点火=§6.2（`ARM_ENV_FILE` 同指 §5
+  落位的 61 键 env）；S5 静置=health 200 后 **300s**（D113-① 新制，替代旧 1800s）；
+  S6 核对面=`capture-boot-evidence.sh`（横幅 8/池指纹 full=9600000·MRR=16·ctx=
+  600000·cps=4096/镜像身份/**BYPASS ARMED 合计=8 ∧ refusing=0** 硬门）；S7=doctor
+  --post-boot；S8=§4.5 网关第五查。
+- **doctor 降级面内建**：DG1 `mode=fork-v4-fp4 active=True`（慢带 −15~19%）/DG2
+  BYPASS 未武装（首键 TTFT 回 74s）/DG3 v41 三联缺/DG4 engram 横幅<8/DG5 池指纹
+  漂移/DG6 镜像 digest 失配——任一命中=大声警告+**退出码 2**。
+- **退出码语义**：doctor 0=FAIL 0 且降级 0｜1=有 FAIL 无降级｜2=降级命中｜3=用法
+  错/数据源缺失；deploy 0=全链绿｜1=任一级 FAIL（已停）｜2=用法错；verify 前置
+  引擎面抽查红=拒跑 rc=2（防对退化面白烧 GPU 载荷）。
+- **期望值唯一来源**=`tools/config-034.tsv`（72 参数行，doctor 按时点列筛行执行）；
+  门面期望同源于 `tools/gates-034.tsv`。本节命令行为以两件头与 runbook-034 §一为
+  正典，工具修订时以件头为准。
+- **手工等价**（工具不可用/排障时）：§6.2 点火+§7 停机窗+§8 四查原样有效；判读门
+  内置值（liter C1≥3700 快带/≤3450 退化停窗、DE c1≥91、500q 带 [0.956,0.982]/
+  地板 0.955）见 [runbook/runbook-034.md](runbook/runbook-034.md) §一。
 
 ## 7. 停机窗五步（每次重靴都用，不是首次专用）
 
@@ -497,6 +666,9 @@ ssh <H1> 'curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://127.0.0.1:<
 
 **第 5 步·沉降 ≥600s（禁以"容器已净"替代计时，就是静候）**：
 
+> 时长口径（与 §0 纪律 2 同）：**手工序（本步）≥600s**；工具序（`deploy-034.sh` S5）按
+> D113-① 用 300s；更旧的 1800s 制已废。多靴切换参考值随制式同理。
+
 ```bash
 date -u +%FT%TZ; sleep 600; date -u +%FT%TZ   # 记录起止时刻入台账
 ```
@@ -508,8 +680,11 @@ date -u +%FT%TZ; sleep 600; date -u +%FT%TZ   # 记录起止时刻入台账
 ### 8.1 四查
 
 ```bash
-# ① health 200（引擎只绑回环——必须在 head 机上打；在管理机 curl 127.0.0.1 得 000
-#    的第一反应是"我打错机器了"，不是"引擎死了"）
+# ① health 200（**先认引擎绑定形态**：公开 boot 件缺省 --host 0.0.0.0=四机可达，
+#    从 head 机或管理段任一机打 <H1> 地址均可；若你的栈按参考产线形把引擎口收敛为
+#    只绑 head 机 127.0.0.1（回环），则必须在 head 机上打——在管理机/worker 机
+#    curl 回环得 000 的第一反应是"我打错机器了"，不是"引擎死了"。两种形态都以
+#    boot 件 host 参数为准，先确认再探活）
 ssh <H1> 'curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:<PORT>/health'    # 200
 ssh <H1> 'curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:<GW_PORT>/health' # 200
 # ② printenv 键面逐字（四机容器各跑；期望零 MISMATCH 行）
@@ -608,7 +783,7 @@ ssh <H1> 'curl -s http://127.0.0.1:<TEST_PORT>/v1/chat/completions' -d '{
 | 资产面缺拒起 | adapter 目录、engram 分片、权重路径是否在位 | 按缺项补（§3/§4），不要跳过前置门 |
 | 横幅缺页（page/R1/CERT 缺） | `sitecustomize.py` 是否 `beb131ab`；adapter 是否四机同树 | 重落 adapter 复靴；**不要只改 head** |
 | `ImportError: cannot import name 'X'` | 三种来源：①镜像不对（digest/层数，§2.2）②adapter 少件（整批 13 件换齐没有）③**overlay 盖回**——先 md5 比对站点 overlay 件与容器内同名件，两侧必须同值 | 通用律：报错指向只在某版存在的符号时，先查 overlay/adapter 这类运行期覆盖面，别只怀疑镜像 |
-| 探活 000 | 你在不在 head 机上（引擎绑回环是刻意形） | 一切探活 `ssh <H1> 'curl … 127.0.0.1:<PORT>…'` |
+| 探活 000 | 先看引擎绑定形态（boot 件 host 参数）：缺省 0.0.0.0=四机可达，打 `<H1>` 地址；参考产线形收敛为 head 回环=必须 ssh 到 head 机打回环（§8.1-①） | 一切探活 `ssh <H1> 'curl … 127.0.0.1:<PORT>…'`（回环形）；000 常见原因是打错机器，不是引擎死 |
 | `BOOT_EXIT=2` | 靴槽锁被占——§6.3 三步定性（是不是别人/自起点了火） | 与持有者会话协调；两个假信号（ps 退出/锁已空）别当真 |
 | 接线闸门红 | `deepseekv41` 是否连写、`--enable-cache-report` 是否在 argv | 修 boot 参面复靴；`/health` 200 不代表接线成功 |
 | printenv 少最后一键 | env 尾字节（§5 第三件） | 补 `0a`、更新锚表、复靴 |
@@ -628,5 +803,8 @@ ssh <H1> 'curl -s http://127.0.0.1:<TEST_PORT>/v1/chat/completions' -d '{
 | boot/复原/回退规程法源 | [runbook/OPS-MANUAL-031.md](runbook/OPS-MANUAL-031.md) |
 | 形三元组与部署面指纹权威表 | [registry/FORM-REGISTRY-031.md](registry/FORM-REGISTRY-031.md) |
 | 0.3.2 全量差异与读数主表 | [release/0.3.2-RELEASE-NOTE.md](release/0.3.2-RELEASE-NOTE.md) |
+| **升级/部署到 0.3.4（镜像 x6bake/v41 三联/61 键）** | [../UPGRADE-0.3.4.md](../UPGRADE-0.3.4.md) · [release/0.3.4-RELEASE-NOTE.md](release/0.3.4-RELEASE-NOTE.md) |
+| **0.3.4 运维手册（三命令/故障矩阵/降级面）** | [runbook/runbook-034.md](runbook/runbook-034.md)（+期望正典 [tools/config-034.tsv](../tools/config-034.tsv)） |
+| **0.3.4 回退（双路正典）** | [runbook/ROLLBACK-PATHS-034.md](runbook/ROLLBACK-PATHS-034.md) |
 
 ——DEPLOY-STEP-BY-STEP / 2026-10-28（承接 DEPLOY-GUIDE.md，按时间序重排为从零主路径）

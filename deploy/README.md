@@ -7,8 +7,9 @@
 > 补丁/全文/构建配方、1017 权重与 engram 分片台账）。
 > adapter 终态=0.3.1 基底+reconstruct 覆盖，装配账=
 > [`adapter/0.3.2-MANIFEST.md5`](adapter/0.3.2-MANIFEST.md5)（87 个运行时件）。
-> `bin/r3-boot-arm.sh` 已同步 0.3.2 终态参面（SERVER_ARGS 九参含 A8/A9/
-> `--sleep-on-idle`、D15 五门、IMAGE 指针 `0.3.2-r032c`）。0.3.2 全量差异与性能见
+> `bin/r3-boot-arm.sh` 已同步 0.3.2 终态参面（SERVER_ARGS 含 A8/A9；原第九参
+> `--sleep-on-idle` 2026-10-30 退役=上游 #43050 idle-wake hang host 侧规避〔禁参，
+> 见 SPEC6-SERVE-REF〕、D15 五门、IMAGE 指针 `0.3.2-r032c`）。0.3.2 全量差异与性能见
 > [../docs/release/0.3.2-RELEASE-NOTE.md](../docs/release/0.3.2-RELEASE-NOTE.md)；
 > 逐步升级/复现/回退见 **[../UPGRADE-0.3.2.md](../UPGRADE-0.3.2.md)**。
 > 下表的 50/51 键与 md5 为 **0.3.1 历史形**；重建 0.3.2 以 CBX1A + reconstruct 包为准。
@@ -85,7 +86,7 @@ md5=[adapter/MANIFEST.md5](adapter/MANIFEST.md5)。
 | `r3-stop.sh` | 5ad87830 | 四机停靴（先存后删律配套） |
 | `r3-watchdog.sh` | — | 水位/健康看护 |
 | `r3-window.sh` | — | 窗口冒烟（拓扑一句话探针） |
-| `r3-gate-env-lint.sh` | 5337c6cf | env 键面 lint 拒绝门（红=拒起） |
+| `r3-gate-env-lint.sh` | a69f5f0e | env 键面 lint 拒绝门（红=拒起；含 EQ-03 serve 禁参组合 fail-closed 检查④） |
 | `r3-gate-assert-lint.sh` / `r3-gate-banner-contract.sh` / `r3-gate-endpoint-lint.sh` | — | 断言/横幅合同/端点 lint 三门 |
 | `boot_mvl41_native.sh` | — | **VL V4.1 原生视觉臂 boot**（零旗启用；S1-S4 三级阶梯全绿收录；用法=DEPLOY-GUIDE §9.1） |
 | `boot_mvl40exp_r2.sh` | — | **VL V4.0exp overlay 复原臂 boot**（C24+overlay 28 件 fail-closed+mm 直证；§9.2） |
@@ -112,7 +113,17 @@ V4.0exp 臂供给面（bind mount 面，非镜像内容）：源=宿主
 内嵌 OV_MAP（28 件 fail-closed 计数断言）。与 `o12c1-prod/`（产线 29 件）零交叠。
 详=DEPLOY-GUIDE §5/§9.2+`docs/research/VL-NATIVE-RESULT-20261013.md` §三。
 
-## 内网 IP 说明
+## 内网值说明（2026-10-30 更新）
 
-本目录与 docs/ 各档含内网 IP/主机名（dgxspark01-04 等）——内网部署文档性质，
-按密钥扫描策略保留（SCAN-REPORT.md）；对外发布时如需脱敏按该档处置行执行。
+- **内网 IP：全树已清零**（RFC1918 编址亲扫 0 命中，0.3.4re 起一律占位符形
+  `<registry-host>`/`<H1>`~`<H4>` 等）。
+- **主机名/内部路径：0.3.1/0.3.2 期历史存量件仍保留**——`dgxspark01-04`、`macgw`
+  等主机名与 `migrate-assets`/`luz030-opt-campaign`/`dsv41-flash-dgxsparks` 等
+  内部路径见于旧证据档、旧报告与旧工具缺省值（沿用 2026-10-13 扫描的「密钥扫描
+  策略保留」面，清单见 [../SCAN-REPORT.md](../SCAN-REPORT.md)）；0.3.4re 移植件
+  本族零命中。这些值不属密钥面；如需零命中口径须另批整树脱敏（会改写历史证据件，
+  见 KNOWN-ISSUES §7「脱敏存量面」行）。
+- **备份件注记**：`bin/r3-stop.sh.bak-pre-df03-20261030`（DF-03 修复留档，CHANGELOG
+  在案）与 `b12x/comm.bak-prerocenante-r2`、`b12x/b12x/comm/roce_ring/` 下 3 件
+  `.bak-pre-k1b`（历史窗留档）为 `.bak` 备份面，**不属任何装配面**，验收对表一律
+  排除 `*.bak*`。

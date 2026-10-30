@@ -24,7 +24,8 @@
    （docker ps 无 r3boot）后点火；**boot 命令 rc 透传**（wrapper 零行为扰动）。
 2. **ARM_TAG/SPEC 注入面**：env 件经 `ARM_ENV_FILE` 逐行进 docker -e（四秩一致
    留痕）；`GATE_FORM` 显式带即激活 env-lint 拒绝门（r3-gate-env-lint.sh
-   md5 5337c6cf，红=拒起）。
+   md5 a69f5f0e，红=拒起；EQ-03 后含 serve 禁参组合检查④——mixed-chunk/回放
+   互斥、chunked 8192 判负档/16384 永禁值面命中即拒）。
 3. **overlay 挂载面**：`SGLANG_OVERLAY_DIR=~/migrate-assets/v4vl/sglang-overlay.o12c1-prod`
    ——28 件映射逐行 -v 影子挂载（挂载计数断言==28；任一件缺=拒起；worker 远端
    在位核验前置拦）。
@@ -49,7 +50,7 @@
    部署件（adapter/overlay/env/serve 参）必须先复原至产线复原目标面，再点火
    产线 boot；禁「带窗件直接 bump 产线」。
 2. **adapter 撤件**：`bash ~/luz030-opt-campaign/tools/adapter-sync.sh --apply`
-   （权威源=dgxspark01:~/migrate-assets/dsv41/adapter；一切件变更先落 01 再
+   （权威源=<node01>:~/migrate-assets/dsv41/adapter；一切件变更先落 01 再
    下发）+`--prune` 需先存后删（差异件备份 `adapter-archive-<ts>/<host>/`）；
    撤后 `--check` 四机全等+`--expect` 锚断言（如
    `prefill_sp.py=0497e566`〔回退至 48 键形时〕）。

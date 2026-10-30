@@ -4,7 +4,7 @@
 
 用例集（双源合成；--light=阶梯复跑版〔S4 每级=官方 2 图对+canary+image_tokens〕）：
   ①knapcio 双形状图（PIL 绘 3024×588 红圆左+蓝方右；断言=red/circle/blue/square+
-    左右次序；锚=dsv41-flash-dgxsparks/boot.py:165-185 逐字式）
+    左右次序；锚=<source-repo>/boot.py:165-185 逐字式）
   ②T13 官方 2 图对（carrots+corn；断言=两食材语义）
   ③自建 OCR（s3_digits_742「图写了哪三个数字」；断言=7/4/2 序）
   ④自建双图比较（d2「第二张比第一张多几根」；断言=2/5/3——跨图计数=更强语义判据）

@@ -48,8 +48,8 @@ is_local() {
     || [ "$h" = "$(saddr "$h")" ]
 }
 
-# 远端寻址（2026-09-22 事故后加）：`ssh dgxspark02` 走 ~/.ssh/config 的
-# `Hostname 10.100.136.2`（NVIDIA Sync 写的管理网 IP），管理网 sshd 不可达时 ssh 干等
+# 远端寻址（2026-09-22 事故后加）：`ssh <node02>` 走 ~/.ssh/config 的
+# `Hostname <fabric-ip>`（NVIDIA Sync 写的管理网 IP），管理网 sshd 不可达时 ssh 干等
 # 超时 ⇒ 远端动作静默失败、只留 0 字节采样文件（本量具曾因此丢掉整机的整轮数据）。
 # /etc/hosts 里的集群侧真身是 192.168.5.x：一律用 `-o HostName=<集群 IP>` 覆盖 config
 # （命令行 -o 优先于 config），User/IdentityFile/known_hosts 仍按别名解析。

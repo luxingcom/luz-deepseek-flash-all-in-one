@@ -1,11 +1,12 @@
-# RUNTIME-PARAMETERS — 运行参数词典（env 56 键 + serve 九参 + 禁键 + 换模型 + 回退链）· 2026-10-30
+# RUNTIME-PARAMETERS — 运行参数词典（env 61 键〔0.3.4 调优终态〕 + serve 参谱 + 禁键 + 换模型 + 回退链）· 2026-10-30
 
 > **目标读者**：要改配置、要换模型、要排查参数问题的外部部署/运维工程师。
 > **本篇定位**：运行参数的**一处正典**。0.3.1 与 0.3.2 两代键值一度分叉（环网形
-> 与交换机形、51 键与 56 键并存），外部手册里出现过「拿旧代表判新站、把做对了的
-> 配置改回去」的代际混淆事故。本篇终止这种混淆：**本表只描述 0.3.2 终态在役形**，
-> 任何历史值一律标注〔0.3.1〕或〔窗级〕；两代同名键不同值的逐级对照，以
-> [`deploy/reconstruct/0.3.2/env/ENV-CHAIN.md`](../deploy/reconstruct/0.3.2/env/ENV-CHAIN.md)
+> 与交换机形、51 键与 56 键并存），0.3.3/0.3.4 又在 56 键基座上追加五行（§1.12），
+> 外部手册里出现过「拿旧代表判新站、把做对了的配置改回去」的代际混淆事故。本篇
+> 终止这种混淆：**本表基准=0.3.4 调优终态在役形（61 键）**，任何历史值一律标注
+> 〔0.3.1〕〔0.3.2〕〔0.3.3〕或〔窗级〕；0.3.1↔0.3.2 两代同名键不同值的逐级对照，
+> 以 [`deploy/reconstruct/0.3.2/env/ENV-CHAIN.md`](../deploy/reconstruct/0.3.2/env/ENV-CHAIN.md)
 > 为准，本篇不另立对照表。
 > **性质**：参数词典，不是操作规程；涉及停机、回退、判读窗的操作细节以引用的
 > 仓内正档为准。**文中所有实测数字为战役内量具读数、量级示意，不是跨站基线锚，
@@ -22,7 +23,10 @@
 | 占位符 | 含义 |
 |---|---|
 | `<H1>`~`<H4>` | 四机地址，rank0~rank3，`<H1>` 为 head |
-| `<USER>` / `<PORT>` / `<GW_PORT>` | 登录用户 / 引擎监听口 / 网关口（示例值 8899，按站点替换） |
+| `<USER>` | 登录用户（按站点替换；示例形 `user`） |
+| `<PORT>` | 引擎生产口（示例值 8899） |
+| `<GW_PORT>` | 网关对外车道口（示例值 8001，勿与 8899 混用） |
+| `<TEST_PORT>` | 引擎测试口（量具/验收专用，示例值 8898；网关上游不得指向它） |
 | `<CTN>` / `<PREFIX>` | 引擎容器名 / 容器名前缀（产线与测试线前缀可能不同） |
 | `<ENVFILE>` / `<BOOT>` | 站点形 env 文件路径 / 点火脚本（本仓对应 `tools/boot-with-slotlock.sh` 包裹的 boot 件） |
 | `<IM_*>` | 镜像（`<IM_OLD>` 旧代 / `<IM_NEW>` 新代 / `<IM_A>`、`<IM_B>` 待比对） |
@@ -32,19 +36,42 @@
 
 # 0. 代际总则（先认代际，再对表）
 
-**第一律：先认代际，再对表。** 本仓同时保留两代档案：0.3.1 环网形（4 口 CX-7
-hairpin，51 键）与 0.3.2 交换机形（双 rail 2 口，56 键）。同一个键在两代里值可能
-不同（见下表）；同一个值在两代里的**含义**也可能不同（见 §1.9 RoCE 聚合两键）。
-动手对表之前，先确认手上这张表、这个 env 文件、这个 boot 件是哪一代哪个形态的。
+**第一律：先认代际，再对表。** 本仓同时保留多代档案：0.3.1 环网形（4 口 CX-7
+hairpin，51 键）、0.3.2 交换机形（双 rail 2 口，56 键）、0.3.4 调优终态（56 键
+基座+五行新增=61 键）。同一个键在两代里值可能不同（见下表）；同一个值在两代里的
+**含义**也可能不同（见 §1.9 RoCE 聚合两键）。动手对表之前，先确认手上这张表、
+这个 env 文件、这个 boot 件是哪一代哪个形态的。
 
-**0.3.2 终态在役形（本表基准）**——五件套齐一才算一个形：
+**0.3.4 调优终态在役形（本表基准，2026-10-30 起）**——五面齐一才算一个形（正典=
+[`release/034-VERSION-LOCK-20261028.md`](release/034-VERSION-LOCK-20261028.md) §二
++ [`tools/gates-034.tsv`](../tools/gates-034.tsv) BL11）：
 
 | 面 | 件 / 值 | 验收指纹 |
 |---|---|---|
-| env | [`deploy/env/CBX1A-CERTM-spec1.env`](../deploy/env/CBX1A-CERTM-spec1.env)（56 键） | md5 `0729e18d` |
-| serve 参 | SPEC6 九参（§2） | 归一指纹 `9d64a5de`（预登记） |
+| env | [`deploy/env/CBX1A-CERTM-spec1.env`](../deploy/env/CBX1A-CERTM-spec1.env)（**61 键**=56 基座+§1.12 五行；仓内为脱敏拷贝） | 内部正典锚 md5 `4370aab9`（四机在役件）；仓内拷贝 `1dd2cd3e`（`B12X_ROCE_HCA` 占位 `<hca-names>`） |
+| tp4/guards | `.env.tp4` `:87` v41 + `guards.conf` `:161` envpin v41 | `e225c391` · `418414c3`（锁档 §二） |
+| serve 参 | SPEC6 八参（第 9 参退役=禁参，UP43050） | 归一指纹 `6b12a445`（§2） |
+| 镜像 | `0.3.4-x6bake-20261026`（74 层=r033d 73+1） | RepoDigest `sha256:80e4c957…8f7d0` |
+| profile/overlay | `prod-profile.env`（W-f 重钉 `:8/:9/:12`）· overlay 29 件 | `77d7fa67` · map `efd7d89b`+清单 `fd59c03b` |
+
+**键面演进链（env 件键行数口径）**：〔0.3.1〕51 →〔0.3.2 CBX1A〕56（md5
+`0729e18d`，件在
+[`deploy/reconstruct/0.3.2/env/`](../deploy/reconstruct/0.3.2/env/ENV-CHAIN.md)）→
+〔0.3.3〕+K16 两键（`:60-61`）=58 →〔0.3.4 修复固化〕+`SGLANG_DSV4_KV_LAYOUT=v41`
+尾行（`:62`）=59（锚 `ba4be586`）→〔D121（内部决策台账编号：BYPASS=2048 采用）〕
++`DSV41_PREFILL_BYPASS=2048`（`:63`）
+=60 →〔W-f 调优终态〕+`DSV41_ENGRAM_CACHE_GIB=2` 尾行（`:64`）=**61**（正典锚
+`4370aab9`）。**键数口径一律按 gates-034 BL11 判据「61 键」表述**；60/59 为历史
+时点值。
+
+**〔0.3.2〕基线面（本表 2026-10-30 前的基准；史档保留）**——五件套齐一才算一个形：
+
+| 面 | 件 / 值 | 验收指纹 |
+|---|---|---|
+| env | [`deploy/reconstruct/0.3.2/env/CBX1A-CERTM-spec1.env`](../deploy/reconstruct/0.3.2/env/CBX1A-CERTM-spec1.env)（56 键） | md5 `0729e18d` |
+| serve 参 | SPEC6 九参（§2；第 9 参 2026-10-30 退役） | 归一指纹 `9d64a5de`（史档） |
 | boot 链 | `deploy/bin/r3-boot-arm.sh` | 产线 `20f22bc6`；公开件 `9ac6e113`（快照头+掩码） |
-| 镜像 | `<IM_NEW>`＝tag `0.3.2-r032c`（registry 地址按站点配置） | digest `sha256:47f6d91a…ffc4`；71 层 |
+| 镜像 | `<IM_OLD>`＝tag `0.3.2-r032c`（registry 地址按站点配置） | digest `sha256:47f6d91a…ffc4`；71 层 |
 | adapter/overlay | 0.3.1 基底 + reconstruct 覆盖（87 运行时件） | 装配账 [`deploy/adapter/0.3.2-MANIFEST.md5`](../deploy/adapter/0.3.2-MANIFEST.md5) |
 
 一个形 = **env 键面 + serve 参 + adapter/overlay 件面**三元组齐一
@@ -81,15 +108,18 @@ hairpin，51 键）与 0.3.2 交换机形（双 rail 2 口，56 键）。同一�
 
 ---
 
-# 1. env 56 键逐键词典
+# 1. env 61 键逐键词典（0.3.4 调优终态）
 
-本节覆盖 CBX1A 56 键**全部**（`grep -c '^[A-Z0-9_]*='` = 56）。按功能族分九张表；
-表列＝键名 / 现值 / 作用（一句话，说给新人听）/ 何时需要改 / 改错会怎样 / 代际注记。
-三个重点键（RoCE 聚合两键、engram 缓存配额、环网映射表）另设专节展开（§1.9-§1.11）。
+本节覆盖 0.3.4 现役 env **全部 61 个键行**（`grep -c '^[A-Z0-9_]*='` = 61；=56 键
+基座〔§1.1-§1.8 九张分族表〕+0.3.3/0.3.4 新增五行〔§1.12〕；唯一键名 60 个——
+`DSV41_ENGRAM_CACHE_GIB` 同键双行，见 §1.12）。基座表表列＝键名 / 现值 / 作用
+（一句话，说给新人听）/ 何时需要改 / 改错会怎样 / 代际注记；新增五行用五列制
+（键/值/作用/命名陷阱/直证，§1.12）。四个重点键（RoCE 聚合两键、engram 缓存
+配额、环网映射表、0.3.4 新增族）另设专节展开（§1.9-§1.12）。
 
 **通用读法**（适用于下文所有「开关型」键，不逐行重复）：
 
-- 这 56 键绝大多数是**优化路径开关**：`1`/`0` 严格布尔，值域基本只有开/关两档。
+- 这 61 键绝大多数是**优化路径开关**：`1`/`0` 严格布尔，值域基本只有开/关两档。
   普通运维**永远不需要动它们**；只有对应优化面的回退窗/排障窗才会 unset（unset =
   构造性回退到上游缺省路径，引擎不会因此拒起，性能/行为回到旧实现）。
 - 不进判读面就不动键面；一个判读窗内 env/serve/adapter 三元组不许中途切换
@@ -105,7 +135,7 @@ hairpin，51 键）与 0.3.2 交换机形（双 rail 2 口，56 键）。同一�
 | `DSV41_INDEXER_HOIST` | 1 | 接管稀疏索引器的三处挂点（模型/打分/元数据） | 索引器面对拍/排障 | unset=索引计算回上游路径 | 两代同值 |
 | `DSV41_PREFILL_EMPTY_CACHE_TOKENS` | 8192 | 预填充阶段判定「缓存为空」的 token 阈值，低于它走空缓存路径 | 一般不改 | 调大调小=空缓存路径的触发边界移动，行为漂移 | 两代同值 |
 | `DSV41_IDLE_RELEASE` | 1 | 引擎空闲窗口主动释放缓存，压长稳内存水位 | 内存面排障 | unset=空闲期不释放，长稳水位偏高 | 两代同值 |
-| `DSV41_ENGRAM_CACHE_GIB` | 0.5 | engram 行缓存的容量配额（GiB）——**每层**一份，见 §1.10 专节 | 扩容/缩容窗 | 见专节 | 两代同值 0.5；boot 固定面缺省 1 靠 last-wins 被本键覆盖 |
+| `DSV41_ENGRAM_CACHE_GIB` | 生效 **2**（`:64` 尾行胜） | engram 行缓存的容量配额（GiB）——**每层**一份，见 §1.10 专节+§1.12 尾行条目 | 扩容/缩容窗 | 见专节 | 〔0.3.1/0.3.2〕0.5→〔0.3.3/0.3.4 W-d〕`:8`=1.0→〔W-f I8〕`:64`=2 双注入尾行胜 |
 | `DSV41_WO_A_W8` | 1 | 注意力输出投影族走 W8A8 量化路径（族总开关） | wo_a 面回退窗 | unset=族内三键全失效，回非量化路径 | 两代同值 |
 | `DSV41_WO_A_W8_MID` | 1 | 同族：中段投影的量化分支 | 同上 | 同上 | 两代同值 |
 | `DSV41_WO_A_W8_DROP` | 1 | 同族：dropout 段的量化分支 | 同上 | 同上 | 两代同值 |
@@ -187,7 +217,7 @@ hairpin，51 键）与 0.3.2 交换机形（双 rail 2 口，56 键）。同一�
 | `LUZ_SWITCH_ROCE_FLAT` | 1 | 拓扑选择门：选 flat/one-shot 交换机运行时（优先级最高） | 拓扑换代工程窗 | 环网形误带=拓扑混拼（fail-closed 或走错口对） | 〔0.3.1 无此键〕交换机专属键 |
 | `B12X_ROCE_TOPOLOGY` | switched | C 层拓扑声明=交换机 fabric：关掉环网 2 跳假设与 flow-label 技巧 | 同上 | 非 ring/switched 的值=报错退出（fail-closed）；环网形禁带 | 〔0.3.1 无此键〕交换机专属键 |
 | `B12X_ROCE_TRAFFIC_CLASS` | 106 | RoCE 报文流量类=106→DSCP26→交换机 SP3/TC3/PFC prio3 受保护档 | 交换机 QoS 规划不同的站点按本站实测 | 照抄外部形 96=无本系列交换机验证、可能掉出受保护档；须与 boot 固定面 `NCCL_IB_TC=106` 同档（对称载流） | 〔0.3.1 无此键〕**我方值，不照抄外部 96** |
-| `B12X_ROCE_HCA` | rocep1s0f0,roceP2p1s0f1 | b12x RoCE 用的网卡部署对：跨 PCIe 域各取一口（见 §1.11） | 换机器/换布线时**本站实测** | 照抄旧 4 口裸列=与 2 口部署对冲突，起机炸 | 〔0.3.1〕4 口裸列；〔FB54〕收口为 2 口对 |
+| `B12X_ROCE_HCA` | rocep1s0f0,roceP2p1s0f1（作者站点值） | b12x RoCE 用的网卡部署对：跨 PCIe 域各取一口（见 §1.11） | 换机器/换布线时**本站实测** | 照抄旧 4 口裸列=与 2 口部署对冲突，起机炸 | 〔0.3.1〕4 口裸列；〔FB54〕收口为 2 口对；0.3.4 公开 env 拷贝该键为占位 `<hca-names>`（脱敏，填本站实测值） |
 | `B12X_ROCE_TWO_WAVE_THRESHOLD_BYTES` | 0 | 显式关掉 two-wave 分波（与 C 层 switched 同向双保险） | — | flat 运行时**无读点=零行为差**（自文档化）；ring 支改它才改行为 | 两代同值=0 |
 | `SGLANG_ROCE_MAX_SIZE` | 1179648 | RoCE all-reduce 单发字节上限 → **§1.9 绑定律专节** | **★见专节（不许动）** | **★见专节** | 〔0.3.1〕262144→〔FB54〕524288→〔E16B1〕1179648 |
 | `DSV41_ROCE_GATHER` | 1179648 | RoCE all-gather 单发限幅（adapter 侧 gather 面）→ **§1.9 专节** | **★见专节（不许动）** | **★见专节** | 〔0.3.1〕524288→〔E16B1〕1179648 |
@@ -234,7 +264,7 @@ hairpin，51 键）与 0.3.2 交换机形（双 rail 2 口，56 键）。同一�
 524288/262144——那不是「env 回退」，是**通信档位回滚**，只应随整栈换代（回到
 0.3.1 引擎）一起做（§5.6 红框）。
 
-## 1.10 ★专节：`DSV41_ENGRAM_CACHE_GIB` 的 per-store 语义（0.5）
+## 1.10 ★专节：`DSV41_ENGRAM_CACHE_GIB` 的 per-store 语义（0.3.4 生效 2.0）
 
 engram 是本栈的长上下文行缓存（从权重打包出的稀疏索引数据，按需 pread 读取，
 严禁整体加载）。本键是它的**页缓存配额**，三个最容易判错的点：
@@ -248,13 +278,18 @@ engram 是本栈的长上下文行缓存（从权重打包出的稀疏索引数�
 2. **守卫只记 warning、不阻起**。超限守卫（超 `min(4GiB, 10%MemAvail)` 档）只在
    日志告警，不会拒起（[`CALIBER-AND-MEASUREMENT.md`](CALIBER-AND-MEASUREMENT.md)
    §5.3）。所以**「没报警」推不出「没事」**——要自己按层数乘完再对上限。
-3. **boot 固定面另有缺省值 1**（`COMMON_ENV` 注入 `-e DSV41_ENGRAM_CACHE_GIB=1`），
-   env 件的 0.5 靠 last-wins 覆盖它（§0 第二律）。因此**删掉 env 里这行 ≠ 回到 0**，
-   而是回到 1——扩容/缩容操作要改值，不要靠删行。
+3. **本键在 0.3.4 面=三重 last-wins 链**：boot 固定面缺省 1（`COMMON_ENV` 注入
+   `-e DSV41_ENGRAM_CACHE_GIB=1`）← env 件 `:8`=1.0（0.3.3/0.3.4 W-d 基线行，
+   覆盖固定面）← env 件 `:64`=2（W-f I8 采纳尾行，**最晚注入=生效值**；§0
+   第二律）。因此**删掉 `:64` 尾行 ≠ 回到 0**，而是回到 `:8` 的 1.0；改 `:8`
+   不改 `:64` 则完全无效。扩容/缩容操作改尾行值，不要靠删行/改中间行。
 
 **扩容收益怎么看：看淘汰（驱逐）次数趋零，不看命中率。** 战役内实测（0.5 →
 2.0 每层）：淘汰次数从每轮 1000-2100 次降到整窗累计 7 次；命中率 58.8% → 99.6%。
-判读要点：
+**0.3.4 I8 采纳面**（W-f，1.0→2.0 单变量 A/B 四预注册门全过）：DE c1 +2.30%
+（93.83 vs 91.37）/c2 +4.66%，liter C1 3910.3（快带偏上）；活体直证=engram 横幅
+8/8 全 `cache=2.0GiB (7893344 slots, 16-way, 8.2% of owned rows)`——对 1.0GiB
+形（3946672 slots/4.1%）恰翻倍。判读要点：
 
 - **冷启动命中率低是常态**：缓存逐层预热需要真实流量，新靴后头几轮命中率低
   不是配额不足的证据；
@@ -291,6 +326,26 @@ engram 是本栈的长上下文行缓存（从权重打包出的稀疏索引数�
   两形可取件边界见 [`docs/RING-0.3.2-COMPAT.md`](RING-0.3.2-COMPAT.md)。
   boot 件 `WORKERS` 表的 PEER_HCA 末列在 0.3.2 保留为史档、不再注入。
 
+## 1.12 0.3.3/0.3.4 新增五行（逐键五列：值 / 作用 / 命名陷阱 / 直证）
+
+0.3.4 现役 env 相对 0.3.2 的 56 键基座**恰增五行**（实测 `grep -c` 口径 61 行 /
+唯一键名 60 个；本表数据源=[`deploy/env/CBX1A-CERTM-spec1.env`](../deploy/env/CBX1A-CERTM-spec1.env)
+`:60-64`）：K16 两键（0.3.3 入役，`:60-61`）+ v41 尾键（0.3.4 修复固化核心，
+`:62`）+ BYPASS 尾键（D121 采用，`:63`）+ engram I8 采纳尾行（W-f 调优终态，
+`:64`）。四条尾行被 gates-034 BL11 逐行独立钉死（缺任一=对应增益/修复面丢失，
+停窗呈报）。
+
+| 键（行位） | 现值 | 作用 | 命名陷阱 | 直证法 |
+|---|---|---|---|---|
+| `SGLANG_DSV41_EFFORT_DEFAULT`（`:60`） | 1 | K16 协议面**总门**：max_tokens 策略——开=缺省 effort 注入（reasoning effort=Max→131072、其他→65536，thinking 门控）+显式值收敛/pin（512k 档 pin 65536）+写回日志（input/original/clamped[/pinned]）+显式 >131072 报 400；关=完全惰性，现役链（None→1<<30→`SGLANG_MAX_NEW_TOKENS_LIMIT`→ctx）原样承载，行为逐字节不变 | 前缀 **DSV41**（带 1）；值面严格真值集 {1,true,on,yes}，未设/空白/其他串一律视为关；**判读窗禁切**（K16 两键之一，违=该窗读数作废） | env `:60` 独立行+容器 printenv；开时请求级写回日志行；语义正典=[`tools/proto/k16_protocol.py`](../tools/proto/k16_protocol.py)（overlay 内嵌段逐字一致强制） |
+| `SGLANG_DSV41_RF_INJECT`（`:61`） | 1 | K16 response_format 注入门：开=`json_schema` 注入首条 system 提示（`json_object` 走 grammar 不注入；tools 在场不注入）；关=messages 原样返回 | **史料异写**：版本锁档等处曾写作 `SGLANG_DSV4_RF_INJECT`（少 1）——正键名=**DSV41**（env/代码旗标同拼）；休眠子键 `SGLANG_DSV41_RF_REGEX` 默认关、无客户流量证据不得开；**判读窗禁切** | env `:61`+printenv；G-RF 负向护栏 [`tests/quality/test_no_go_render_contract.py`](../tests/quality/test_no_go_render_contract.py)；注入生效=json_schema 请求首条 system 变化 |
+| `SGLANG_DSV4_KV_LAYOUT`（`:62`） | v41 | KV 布局选择：**v41**=backend 直调 flashinfer 0.7.2 原生 V41 分支（快带）；**缺本键时** boot `:411` 常设门 `DSV41_FP4KV_PORT=1` 自动注入 `fork-v4-fp4`=退化面（repack 桥承载，慢带 −15~19%，PPL tf 签名 1.0691/0.4511 vs v41 正典 1.1359/0.4212） | 前缀 **DSV4（不带 41）**——与 K16 两键的 DSV41 前缀不同族写法，照抄 K16 前缀拼错=键不被读、静默落退化面；值域 v41/fork-v4-fp4（`v4` 为实验形，池指纹会变）；须与 `.env.tp4` `:87`+guards `:161` 三联一致 | 四机 `docker logs` 末态 `[kv_fp4] gate=1 mode=v41 active=False`（见 `mode=fork-v4-fp4 active=True` 即退化面停窗）；三联面 env `:62`/tp4 `:87`/guards `:161`；doctor --post-boot 与 DG1/DG3 承载 |
+| `DSV41_PREFILL_BYPASS`（`:63`） | 2048 | 长冷预填期的**分块准入门**（2048 vs 缺省 SCAN 32）：524288-token 长预填在飞时短请求 TTFT 中位 74.191s→1.971s（**−97.3%**，G-M1 残差比 0.0266≤0.25 显著带；副作用面零反向：G-M2≤1.03、EQ-S GREEN 6/6） | **机制量非吞吐尺度量**（改值≠线性调速）；生效需**三件齐**：本键+`sitecustomize.py` 钩（md5 `dd69c59a`）+`prefill_bypass.py`（`c4875258`；仓内正典副本=[`tools/bypass/`](../tools/bypass/)）——只带 env 键不带钩件=未武装面（DG2），首键 TTFT 回 74s 慢带 | `bypass-armed-gate`：四机 ARMED 行 ×2/机（**armed 合计=8**）∧ `refusing-to-arm=0`（BL-BYP2/deploy-034 S6 硬门；doctor DG2 承载） |
+| `DSV41_ENGRAM_CACHE_GIB` 尾行（`:64`） | 2 | I8 采纳面：engram 行缓存每层配额 1.0→2.0GiB（W-f 单变量 A/B 四预注册门全过：DE c1 +2.30%/c2 +4.66%）；per-store 语义与扩容判读见 §1.10 专节 | **同键双行**：`:8`=1.0（W-d 基线行）与 `:64`=2（I8 尾行）并存，boot 注入序尾行最晚生效=2——删 `:64` ≠回 0 而是回 1.0（=路 B 回置形）；改 `:8` 不动 `:64` 无效；env 末行缺换行会整行静默丢失（PITFALLS P2-1，本键恰居末行高危） | engram 横幅 8/8 全 `cache=2.0GiB (7893344 slots, 16-way, 8.2% of owned rows)`（1.0GiB 形=3946672/4.1%，恰翻倍）；gates-034 BL11 / config-034 CFG-65 尾行独立检查 |
+
+（第三休眠键 `SGLANG_DSV41_RF_REGEX` 不在 61 键内——P6「无客户证据不启用」，
+默认关，登记于 K16 语义正典，见上行命名陷阱列。）
+
 ---
 
 # 2. serve 九参词典（SPEC6 九参）
@@ -299,12 +354,15 @@ serve 参数分**两个注入面**（这是外部最容易拼错的地方）：
 
 - 第 1-6 参经 `SPEC_EXTRA_ARGS` 环境变量在点火时传入（空格分词追加面，缺省
   no-op——漏传不报错，行为静默偏离定型形）；
-- 第 7-9 参写死在 boot 件 `SERVER_ARGS` 固定面（`deploy/bin/r3-boot-arm.sh`）；
+- 第 7/8 参写死在 boot 件 `SERVER_ARGS` 固定面（`deploy/bin/r3-boot-arm.sh`）；
+  原第 9 参（`--sleep-on-idle`）2026-10-30 退役为**禁参**（上游 sglang #43050
+  idle-wake hang host 侧规避；在场即拒起/FAIL，见下行表与 §2.5）；
 - `SPEC=1` 时另追加 `--speculative-algorithm DSPARK`（投机解码总开关，不计入
-  九参谱）。
+  八参谱）。
 
-正典谱表=[`deploy/SPEC6-SERVE-REF.md`](../deploy/SPEC6-SERVE-REF.md)；九参归一
-指纹=`9d64a5de`（旧六参 `33d7161f`、旧八参 `6b12a445` 为史档，保留不覆写）。
+正典谱表=[`deploy/SPEC6-SERVE-REF.md`](../deploy/SPEC6-SERVE-REF.md)；现役八参归一
+指纹=`6b12a445`（旧六参 `33d7161f`、九参 `9d64a5de` 为史档，保留不覆写；八参值
+=W-C 窗预登记复用，2026-10-30 离线复算逐位复核）。
 
 | # | 参数 | 值 | 作用 | 命名/书写陷阱 | 直证法 |
 |---|---|---|---|---|---|
@@ -316,11 +374,12 @@ serve 参数分**两个注入面**（这是外部最容易拼错的地方）：
 | 6 | `--swa-prefix-tails` | 256 | SWA 前缀尾巴保留 256（召回窗口；〔0.3.1 早期〕64→256 转正在役） | 调小=长上下文召回退化 | argv 值直读 |
 | 7 | `--tool-call-parser` | `deepseekv41` | 工具调用解析器：让 `tool_calls` 结构化成型（issue #1 修复；只对带 `tools` 的请求生效） | **连写**（无连字符）。写 `deepseek-v41` 不认、DSML 原样返回纯文本；`/health` 仍 200（静默降级） | `serve_flags_gate.sh`/`/get_server_info` 的 `tool_call_parser` |
 | 8 | `--enable-cache-report` | （flag） | 响应里上报 `usage.prompt_tokens_details.cached_tokens`（issue #2 修复；缺省关，面板缓存命中恒 0%） | flag 类不带值 | `serve_flags_gate.sh`/`enable_cache_report` |
-| 9 | `--sleep-on-idle` | （flag） | 空闲时调度器休眠：空闲忙转从约 1 核降到近零（每台省 10-12W 级；仅空闲态，请求路径零变化） | flag 类不带值 | argv 存在性 |
+| 9 | ~~`--sleep-on-idle`~~ | **禁参（UP43050-20261030 退役）** | 原用=空闲时调度器休眠省 CPU（约 1 核/10-12W 每台）；上游 sglang [#43050](https://github.com/sgl-project/sglang/issues/43050)：同构栈（GB10+DSv4.1-Flash+DSPARK）空闲 10-20 分钟后被任意请求唤醒即死 prefill（`_low_ratio_index_topk_dense` 唤醒重捕获路径缺 host 同步点），报告者实测去参即正常 ⇒ 退役。替代=低峰期主动 `/release_memory` 或定时重启 | flag 类不带值；**在场即违例**：env-lint EQ-03 拒起 + serve_flags_gate FAIL + selfcheck-prod FAIL | argv **缺席性** |
 
 **旗标-能力对照**（缺了会怎样）与判据表见 SPEC6「旗标-能力-生效值对照表」；
 逐条要点：第 7 参缺=工具调用纯文本输出；第 8 参缺=缓存字段恒 null；第 2 参偏=
-并发/背压行为偏离定型形；第 9 参缺=空闲期 CPU 忙转。
+并发/背压行为偏离定型形；第 9 参**在场**=#43050 idle-wake hang 违例
+（缺席=正态，2026-10-30 起判据方向反转）。
 
 ## 2.5 直证法（判「参数真的生效」的唯一正道）
 
@@ -526,6 +585,14 @@ adapter 接线。）env 件内注释块还留有战役窗级回指注记（WE52/
 [`docs/release/0.3.2-RELEASE-NOTE.md`](release/0.3.2-RELEASE-NOTE.md) §六的
 摘要链跳过了 E16B1 级，逐级正典以 ENV-CHAIN 为准。
 
+**0.3.4 面（61 键）不接入上表逐级链**：0.3.4 在役 env 的回退正典=
+[`runbook/ROLLBACK-PATHS-034.md`](runbook/ROLLBACK-PATHS-034.md) 双路——路 A=
+0.3.3 全回退（七面联动：env 58 键+boot+overlay 必须同窗）；路 B=撤 I8 采纳回
+W-d 修复面，**恰 3 行差**（env ×4 机去 `:64` 尾行+profile `:8/:9` 回钉+锚表
+6 处值重钉——注意锚表**仅值重钉、禁整件回拷 .bak**）。§1.12 的 v41/BYPASS 两
+尾行在两路中均**不回退**（路 A 反丢 BYPASS 面、v41 两版同快形——映射律见
+runbook-034 §8.2）。
+
 ## 5.2 镜像：单行回指
 
 boot 件 `IMAGE=` 单行回指旧 tag（r032c → r032b 在库 → 0.3.1 基座 tag）+复靴；
@@ -556,8 +623,11 @@ boot 件 `IMAGE=` 单行回指旧 tag（r032c → r032b 在库 → 0.3.1 基座 
 
 ## 5.5 boot 参面：单参回退
 
-- 第 9 参：去 `--sleep-on-idle` 单行重靴（或回拷启动器件 `.bak-pre-wg`
-  `9f3cdaac`；零 env 耦合、零 A8/A9 耦合）。
+- 第 9 参（`--sleep-on-idle`）：**2026-10-30 UP43050 窗已整体退役为禁参**——现行
+  状态即「无此参」，无需回退动作；W-G 窗登记的「回拷 `.bak-pre-wg`〔9f3cdaac〕
+  单参回退面」**作废禁用**（回拷=重新引入上游 #43050 idle-wake hang；三面硬门
+  拦截：env-lint EQ-03 拒起+serve_flags_gate FAIL+selfcheck-prod FAIL）。空闲
+  资源回收走低峰期 `/release_memory` 或定时重启。
 - A8/A9：回拷对应旧启动器件（SPEC6 注入面注记）。
 - 换 boot 件后同样四查；公开件与产线件 md5 差异（快照头+掩码）见
   [`UPGRADE-0.3.2.md`](../UPGRADE-0.3.2.md) §8。
@@ -576,9 +646,13 @@ boot 件 `IMAGE=` 单行回指旧 tag（r032c → r032b 在库 → 0.3.1 基座 
 
 | 引用档 | 用途 |
 |---|---|
-| [`../deploy/env/CBX1A-CERTM-spec1.env`](../deploy/env/CBX1A-CERTM-spec1.env) | 0.3.2 现役 56 键（本表数据源） |
-| [`../deploy/reconstruct/0.3.2/env/ENV-CHAIN.md`](../deploy/reconstruct/0.3.2/env/ENV-CHAIN.md) | 51→56 键逐级演进链（两代对照正典） |
-| [`../deploy/SPEC6-SERVE-REF.md`](../deploy/SPEC6-SERVE-REF.md) | serve 九参正典+命名陷阱+旗标对照表 |
+| [`../deploy/env/CBX1A-CERTM-spec1.env`](../deploy/env/CBX1A-CERTM-spec1.env) | **0.3.4 现役 61 键（本表数据源；仓内为脱敏拷贝）** |
+| [`../deploy/reconstruct/0.3.2/env/CBX1A-CERTM-spec1.env`](../deploy/reconstruct/0.3.2/env/CBX1A-CERTM-spec1.env) · [`../deploy/reconstruct/0.3.2/env/ENV-CHAIN.md`](../deploy/reconstruct/0.3.2/env/ENV-CHAIN.md) | 0.3.2 期 56 键原位件 + 51→56 键逐级演进链（两代对照正典） |
+| [`release/034-VERSION-LOCK-20261028.md`](release/034-VERSION-LOCK-20261028.md) | 0.3.4 身份锁档（五面锚/K16 读数口径/键面演进正典） |
+| [`../tools/gates-034.tsv`](../tools/gates-034.tsv) · [`../tools/config-034.tsv`](../tools/config-034.tsv) | 0.3.4 门面期望（BL11 键数口径）/参数期望唯一来源（CFG-04/65 等） |
+| [`runbook/runbook-034.md`](runbook/runbook-034.md) · [`runbook/ROLLBACK-PATHS-034.md`](runbook/ROLLBACK-PATHS-034.md) | 0.3.4 运维手册（三命令/降级面）/回退双路正典 |
+| [`../UPGRADE-0.3.4.md`](../UPGRADE-0.3.4.md) · [`release/0.3.4-RELEASE-NOTE.md`](release/0.3.4-RELEASE-NOTE.md) | 0.3.4 升级路径/发布说明（56→61 键替换与镜像面差异） |
+| [`../deploy/SPEC6-SERVE-REF.md`](../deploy/SPEC6-SERVE-REF.md) | serve 参正典+命名陷阱+旗标对照表（八参在役/第 9 参禁参） |
 | [`runbook/OPS-MANUAL-031.md`](runbook/OPS-MANUAL-031.md) | 禁键三级/boot 规程/回退律（0.3.1 手册，禁键章仍为正典） |
 | [`release/0.3.2-RELEASE-NOTE.md`](release/0.3.2-RELEASE-NOTE.md) | 硬守门表/回退面/升级路径 |
 | [`../deploy/bin/r3-boot-arm.sh`](../deploy/bin/r3-boot-arm.sh) | boot 固定面（NCCL/env 缺省/GATE_FORM lint/池门断言） |
@@ -591,5 +665,7 @@ boot 件 `IMAGE=` 单行回指旧 tag（r032c → r032b 在库 → 0.3.1 基座 
 | [`../tools/serve_flags_gate.sh`](../tools/serve_flags_gate.sh) | 起栈接线闸门（§2.5 直证法） |
 | [`RING-DEPLOY.md`](RING-DEPLOY.md) | 环网物理接线/逐秩映射部署正档（§1.11 实测法；织网件取自基础设施仓，取件指引在该档 §2） |
 
-——2026-10-30 公开仓文档治理批次建立。参数面再演进时：本表随代际滚动，历史值
-一律加〔代际〕标不删行（判读线零事后改同律）。
+——2026-10-30 公开仓文档治理批次建立；同日 0.3.4re 部署/参数批把基准面从 0.3.2
+56 键扩到 0.3.4 调优终态 61 键（§0 基准表+§1.12 新增五行；56 键基座表原样保留为
+代际底稿）。参数面再演进时：本表随代际滚动，历史值一律加〔代际〕标不删行（判读
+线零事后改同律）。

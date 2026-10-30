@@ -9,9 +9,17 @@
 # 硬门：起栈前四机对称 drop_caches + UMA 总账（MemAvailable ≥ 100G）；生产容器守卫。
 set -euo pipefail
 
-IMAGE="192.168.0.202:5000/lmsysorg/sglang:main-79cafec0"
-HEAD_IP="192.168.0.201"
-# net-rebuild-20261015 镜像同步：管理段重编址三处通道址→192.168.0.201-204（IMAGE/HEAD_IP/WORKERS；
+# ── 20261030 脱敏：以下内网值（registry 主机/管理段地址/节点主机名）改经环境变量注入，缺参拒跑 ──
+IMAGE="${IMAGE:?缺环境变量 IMAGE（<registry-host>:5000/lmsysorg/sglang:main-79cafec0），拒跑}"
+HEAD_IP="${HEAD_IP:?缺环境变量 HEAD_IP（head 节点 <mgmt-node-ip>），拒跑}"
+NODE01_HOST="${NODE01_HOST:?缺环境变量 NODE01_HOST（<node01>），拒跑}"
+NODE02_HOST="${NODE02_HOST:?缺环境变量 NODE02_HOST（<node02>），拒跑}"
+NODE03_HOST="${NODE03_HOST:?缺环境变量 NODE03_HOST（<node03>），拒跑}"
+NODE04_HOST="${NODE04_HOST:?缺环境变量 NODE04_HOST（<node04>），拒跑}"
+NODE02_IP="${NODE02_IP:?缺环境变量 NODE02_IP（<mgmt-node-ip>），拒跑}"
+NODE03_IP="${NODE03_IP:?缺环境变量 NODE03_IP（<mgmt-node-ip>），拒跑}"
+NODE04_IP="${NODE04_IP:?缺环境变量 NODE04_IP（<mgmt-node-ip>），拒跑}"
+# net-rebuild-20261015 镜像同步：管理段重编址三处通道址→管理段四址（IMAGE/HEAD_IP/WORKERS；
 # 语义参数零动；本镜像 vs 产线现役形的参面差〔NCCL 面/A8/A9/环网补丁链退役〕留后续交付同步窗）。
 DIST_PORT="20000"
 API_PORT="${API_PORT:-8899}"   # L10 用 8898：避开 concurrency-proxy→8899 的活生产转发路径（㉑/㉕ 防污染）
@@ -27,14 +35,14 @@ ENG_HOST_WORKER="\$HOME/dsv41-engram"  # rank1/2/3 打包分片（2026-10-10 ENV
 
 # rank|host|ip|宿主权重路径|engram 宿主路径（绝对路径，四机同用户）|该秩 PEER_HCA
 # 权重面（2026-09-29 事故后定稿）：rank2/3 走 /data/models/dsv41-net = NFS 全量树
-# （03←10.100.140.1=01 主源；04←10.20.0.9=02 备源，均 ro nfs4 nconnect=4，已入 fstab）。
+# （03←<fabric-ip>=01 主源；04←<fabric-ip>=02 备源，均 ro nfs4 nconnect=4，已入 fstab）。
 # stock main 的 filter_duplicate_safetensors_files 在装载前做全 48 分片在位校验——
 # 03/04 曾本地置 47/48 尾分片（逐文件直读设计态，2026-10-10 ENV-UNIFY 清理=设计未采用 R-批4）：
 # 尾分片已删，47/48 与其余分片同走 NFS 全量树；索引校验全树可见 ⇒ NFS 硬前置不变。
 WORKERS=(
-  "1|dgxspark02|192.168.0.202|/data/models/DeepSeek-V4.1-Flash|/home/liux***ya/dsv41-engram|0=rocep1s0f1,roceP2p1s0f1;2=rocep1s0f0,roceP2p1s0f0"
-  "2|dgxspark04|192.168.0.204|/data/models/dsv41-net|/home/liux***ya/dsv41-engram|1=rocep1s0f0,roceP2p1s0f0;3=rocep1s0f1,roceP2p1s0f1"
-  "3|dgxspark03|192.168.0.203|/data/models/dsv41-net|/home/liux***ya/dsv41-engram|0=rocep1s0f0,roceP2p1s0f0;2=rocep1s0f1,roceP2p1s0f1"
+  "1|${NODE02_HOST}|${NODE02_IP}|/data/models/DeepSeek-V4.1-Flash|/home/liux***ya/dsv41-engram|0=rocep1s0f1,roceP2p1s0f1;2=rocep1s0f0,roceP2p1s0f0"
+  "2|${NODE04_HOST}|${NODE04_IP}|/data/models/dsv41-net|/home/liux***ya/dsv41-engram|1=rocep1s0f0,roceP2p1s0f0;3=rocep1s0f1,roceP2p1s0f1"
+  "3|${NODE03_HOST}|${NODE03_IP}|/data/models/dsv41-net|/home/liux***ya/dsv41-engram|0=rocep1s0f0,roceP2p1s0f0;2=rocep1s0f1,roceP2p1s0f1"
 )
 PEER_HCA_HEAD="1=rocep1s0f1,roceP2p1s0f1;3=rocep1s0f0,roceP2p1s0f0"
 HEAD_MODEL_SRC="/data/models/DeepSeek-V4.1-Flash"
@@ -81,7 +89,7 @@ guard_node() {
   info "$name: 无容器、GPU 空闲"
 }
 info "== 前置守卫 =="
-guard_node "head dgxspark01" -
+guard_node "head ${NODE01_HOST}" -
 for w in "${WORKERS[@]}"; do IFS='|' read -r _rk _h _ip _ _ _ph <<<"$w"; guard_node "worker $_h" "$_h"; done
 
 

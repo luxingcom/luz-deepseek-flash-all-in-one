@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SRC_DIR="${1:-$(cd "$(dirname "$0")" && pwd)}"
-OWNER="${SUDO_USER:-liuxiaoya}"
+OWNER="${SUDO_USER:-liux***ya}"
 HOME_DIR="$(getent passwd "$OWNER" | cut -d: -f6)"
 DEST="$HOME_DIR/migrate-assets/prod"
 

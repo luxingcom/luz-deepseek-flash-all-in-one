@@ -4,14 +4,14 @@
 
 | 项 | 值 |
 |---|---|
-| tag（正典/push 实证） | `192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c` |
-| 本地孪生 tag | `192.168.5.187:5000/dsv41-sglang-optimized:0.3.2-r032c`（.187 命名连续性；push 通道以 .202 为准） |
+| tag（正典/push 实证） | `<registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c` |
+| 本地孪生 tag | `<registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c`（原 .187 命名连续性；push 通道以正典段为准） |
 | manifest digest（三方一致） | `sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4`（本地 RepoDigest = docker push 报文 = registry Docker-Content-Digest 亲核 200） |
 | 内容身份 cid（RootFS 层链 sha256 前 16） | `6e379f6fe0531c9c`（71 层=基座 70+1） |
 
 ## 构成形
 
-- 基座：`192.168.0.202:5000/lmsysorg/sglang:main-79cafec0`（image `80e1ea8979c5`＝现役形；70 层；零 pull）
+- 基座：`<registry-host>:5000/lmsysorg/sglang:main-79cafec0`（image `80e1ea8979c5`＝现役形；70 层；零 pull）
 - 增量：单 COPY 层 71 层；载荷=16 件 → `/sgl-workspace/sglang/{python,test}/…`
 - 重演树：`/tmp/bt-r032` @ `f9d89b02`（tree `dab49d96d33839480e30a1d24ac9e6cdb0a9c29d`）＝ r032b（e0693e96）+ 位级保持补件
   （scoring.py 恢复 stock 79cafec0 候选序排序；+16/−5；diff md5 d0dd3341）
@@ -40,7 +40,7 @@
 
 ```bash
 bash tools/packages/_bake/build-0.3.2-r032c.sh        # 构建+读回+py_compile+import 审计+collection
-docker push 192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c
+docker push <registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c
 ```
 
 回退：零部署（不 pull 不 reload 生产）——在库待上靴窗（任务书 §12-4 验收门）；r032b 同态在库。

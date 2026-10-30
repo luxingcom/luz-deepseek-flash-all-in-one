@@ -8,6 +8,10 @@ GSM8K 质量门驱动器（8-shot CoT，默认 200 题；--nq 500 用于复现�
 判分: extract_content（boxed{}->last_num(content)）+ extract_marker 双口径
 数据: GSM8K test.jsonl（每行含 question/answer；--data 或 GSM8K_DATA 指定）
 输出: raw jsonl + summary json + stdout summary
+EQ-11 参数面统一（0.3.4re，2026-10-30）：--base 与别名 --base-url 三形通吃
+      （origin/v1基/全路径 → 统一 v1 基，bench_url 唯一构造处；旧正确形=origin，
+      归一后请求 URL 逐字节不变；带 /v1 的旧 404 形现可用）；URL 错形与 argparse
+      拒起一律首行 `ERROR[gsm8k_dsv41.py]: …` 到 stderr + exit 2（不再等到逐题 404）。
 """
 import argparse
 import json
@@ -16,6 +20,9 @@ import re
 import sys
 import time
 import urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bench_url  # noqa: E402  # EQ-11 共享构造处（URL 三形归一 + 拒起首行 ERROR 摘要）
 
 BASE = "http://127.0.0.1:8899"  # 网关；测试窗可用 --base 指向 127.0.0.1:8898
 MODEL = "deepseek-v4.1-flash"
@@ -73,7 +80,7 @@ def chat(prompt):
         "stream": False,
     }
     req = urllib.request.Request(
-        BASE + "/v1/chat/completions",
+        BASE + "/chat/completions",  # EQ-11：BASE 已是 v1 基（bench_url 归一），拼接只补方法段
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json",
                  "Authorization": f"Bearer {API_KEY}"},
@@ -129,8 +136,11 @@ def extract_marker(content, reasoning):
 
 def main():
     global BASE, MODEL, API_KEY, MAX_TOKENS, TEMPERATURE, DATA
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--base", default=BASE)
+    ap = bench_url.BenchArgumentParser(prog="gsm8k_dsv41.py")  # EQ-11：拒起首行 ERROR 摘要 + exit 2
+    ap.add_argument("--base", "--base-url", default=BASE,
+                    help="引擎/网关口。EQ-11 三形通吃：origin（http://127.0.0.1:8899）/"
+                         " v1 基（…/v1）/ 全路径（…/v1/chat/completions），统一归一到 v1 基；"
+                         "--base-url 是 --base 的等价别名")
     ap.add_argument("--api-key", default=API_KEY)
     ap.add_argument("--model", default=MODEL)
     ap.add_argument("--temperature", type=float, default=TEMPERATURE)
@@ -142,13 +152,17 @@ def main():
     ap.add_argument("--out-summary", default=OUT_SUMMARY)
     args = ap.parse_args()
 
-    BASE = args.base.rstrip("/")
+    # EQ-11：三形归一到 v1 基（bench_url 唯一构造处）；错形在此即拒起（首行 ERROR
+    # 摘要 + exit 2），不再等到逐题 HTTP 404 记进 err 字段。
+    BASE = bench_url.v1_base(args.base, flag="--base", prog="gsm8k_dsv41.py")
     API_KEY = args.api_key
     MODEL = args.model
     TEMPERATURE = args.temperature
     MAX_TOKENS = args.max_tokens
     DATA = os.path.expanduser(args.data)
     nq = args.nq
+    if nq < 1:  # EQ-11 同族收口：--nq 0 旧版裸 IndexError traceback（rc=1），改契约化拒起
+        bench_url.fail("gsm8k_dsv41.py", f"--nq 必须 ≥1（got {nq}）")
     out_raw = os.path.expanduser(args.out_raw)
     out_summary = os.path.expanduser(args.out_summary)
     for p in (out_raw, out_summary):

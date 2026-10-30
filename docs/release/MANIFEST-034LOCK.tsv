@@ -1,0 +1,154 @@
+# MANIFEST-034LOCK.tsv — 0.3.4 版本锁档束清单（固化件面 + 工具冻结锚面两段）
+#
+# 法源：用户 2026-10-28 批文（封包/固化/交付全权）+ D118-③（固化终态四机亲核值=期望唯一来源）
+#   + D119-③（本束交付物）。建束窗=2026-10-28T16:4x-17:xxZ（纯桌面：零靴/零容器/零 sudo/零 git 写；
+#   活体读=只读 md5sum/grep + registry tags 只读 GET）。
+# 读数口径：【本窗活读】=2026-10-28 建束窗 01 只读；【转引】=档载值（出处列明）。md5 一律全值 32-hex。
+# 掩码律：束内密钥行掩码形=***MASKED-034LOCK***（.env.tp4 :135；proxy.env 承 033 束掩码形原样）。
+#
+# ── 段一：固化件面（仿 033-lock 束形；列=filename/source_machine/source_path/live_md5/archive_md5/four_machine_consistency）──
+filename	source_machine	source_path	live_md5	archive_md5	four_machine_consistency
+CBX1A-CERTM-spec1.env	__PROD_HOST_01__	__ASSETS_ROOT__/dsv41/env/CBX1A-CERTM-spec1.env	4370aab9c501cd0cfd3d89bb0137c433	ba4be5860b82f5a9ae8d1d33be406b56	IDENTICAL x4（D118-③ 亲核+PINFIX §四 2026-10-28 四机复读+本窗 01 活读三源同；59 键：:8 DSV41_ENGRAM_CACHE_GIB=1.0、K16 两键 :60-61、尾行 SGLANG_DSV4_KV_LAYOUT=v41）；D121 重钉（60 键+尾键 BYPASS=2048；追记二）；W-f I8 采用重钉（61 键+第 61 键 DSV41_ENGRAM_CACHE_GIB=2 尾行 :64；追记三）
+r3-boot-arm.sh	__PROD_HOST_01__	__ASSETS_ROOT__/bin/r3-boot-arm.sh	4bb4884afbdcc68b8ce9e64d5614e0cf（EQ-02 断言族点火在役形=现役；=W-f 点火基座+2026-10-30 尾行守护修复〔公开仓 round 91 fix #1〕+EQ-02 RoCE 双键 fail-closed 门〔035-W0 §EQ-02〕；存储回置形 5240a98d=点火形 :12 翻回 r032c 的 sed 单行复演派生合法〔旧代际 50700486/d41323dd 复现=断言族回滚面即漂移；.bak-pre-eq02-20261030=53d31751 回退锚〕；gates-034 BL09 允差/CFG-01 双合法归一注记内；追记四注记刷新）	50700486996405514a3f2f07b11feb48（束内=存储正典形：自活读点火形 sed :12 单行复演回置，md5 全值逐位验证=50700486；:12=r032c 占位、:465 -eq 29）	IDENTICAL x4（PINFIX §四 2026-10-28 四机复读=50700486；点火形 d41323dd 仅窗内合法，窗毕必回置）
+guards.conf	__PROD_HOST_01__	__GUARDS_KIT_DIR__/guard/guards.conf（在役位；__ASSETS_ROOT__/dsv41/kit 与 deploy/kit 下同名件=非在役副本勿误钉）	418414c3b735265cb47e22eb73b688d5	418414c3b735265cb47e22eb73b688d5	IDENTICAL x4（:161 sglang-kv-layout envpin 内容钉 .env.tp4::SGLANG_DSV4_KV_LAYOUT=v41；D118-③+本窗 01 活读）
+.env.tp4	__PROD_HOST_01__	__FLEET_ENV_DIR__/.env.tp4	e225c39126aa454b366ef75ac30689d3	3863126fffc76ce2c331fb74419db9b9	IDENTICAL x4（:87 EXTRA_DOCKER_ENV 内 SGLANG_DSV4_KV_LAYOUT=v41+DSV41_SPARK_PREFILL_TP_SPLIT=1；archive=:135 API_KEY 行掩码（MASKED-034LOCK，单行差，033 同制）
+prod-profile.env	__PROD_HOST_01__	__ASSETS_ROOT__/prod/prod-profile.env	77d7fa67384d41c91f8268581d3048f5	1be1c37c811f8a87d71a3def0c0a89d5	01-ONLY face by design（head 机；PINFIX-20261028 自洽形：:8 env=ba4be586/:9 59 键/:12 COUNT=29/:18 boot=50700486/:20-21 镜像钉 x6bake 80e4c957；回退锚=.bak-pre-pinfix-20261028=9b7dcca2 精确快照）；D121 重钉（:8/:9；追记二）；W-f I8 采用重钉 :8/:9（4370aab9/61 键；:10 PROD_SPEC_EXTRA_ARGS 零改；追记三）
+overlay-md5.txt	__PROD_HOST_01__	__ASSETS_ROOT__/prod/overlay-md5.txt	fd59c03bee7866aea29ecd35b7e14cf5	fd59c03bee7866aea29ecd35b7e14cf5	01-ONLY face by design（29 行；backend 行=73c80259 件内自洽；md5sum -c 29/29 PASS=REPAIR phase0 证）
+deepseek_v4_backend.py	__PROD_HOST_01__	__ASSETS_ROOT__/v4vl/sglang-overlay.o12c1-prod/deepseek_v4_backend.py	73c802597f9494685227e7a5b6ee040f	73c802597f9494685227e7a5b6ee040f	IDENTICAL x4（X6-R1 重锚面 53cc9d61→73c80259；D118-③+本窗 01 活读；伴随锚 model 5b5ced03/mhc 982a0ad0 同面不动）
+overlay-map.tsv	__PROD_HOST_01__	__ASSETS_ROOT__/v4vl/sglang-overlay.o12c1-prod/overlay-map.tsv	efd7d89b860a83b9ad0bb84826e2ddf2（29 行）	efd7d89b860a83b9ad0bb84826e2ddf2	IDENTICAL x4（行数锚 29=gates-034 BL15 期望；033 束无此件=本束新增交付件，boot-prod.sh :52 计数门输入）
+concurrency_proxy_v2.py	__GATEWAY_HOST__ (__GATEWAY_IP__)	__MAC_USER_HOME__/gateway-migration-staging/apps/mac-stack/proxy-docker/concurrency_proxy_v2.py	be9b0abae49ea14e5d516a7c693e420b（033 锁档 Mac 亲核锚；033→034 网关面零变更，GW-1 2026-10-28 live 亲读 rc3.8.7 sampling-on 维持）	be9b0abae49ea14e5d516a7c693e420b（转拷 archives/033-lock-20261026/ 原件，逐字节）	Mac-ONLY face（:274 VERSION=rc3.8.7；判读窗禁切律随身）
+proxy.env	__GATEWAY_HOST__ (__GATEWAY_IP__)	__MAC_USER_HOME__/gateway-migration-staging/apps/mac-stack/proxy-docker/proxy.env	3f510eaddb35be2df233e4a2bfd9eafa（033 锁档 live 形锚；19 键末行 GW_SAMPLING_POLICY=1=sampling-on 基线）	4ad560c894b200bd994ef80c968b1d3a（掩码形，转拷 033-lock 束原件逐字节；GW_API_KEY 行 MASKED-033LOCK 承前）	Mac-ONLY face（零变更；本束未新做 Mac 直读，以 033 束+GW-1 2026-10-28 live 行为证双源）
+#
+# ── 段二：工具冻结锚面（D115 工具复用律+量具冻结红线；列=tool/role/source_path/md5(冻结或正典)/注记）──
+tool	role	source_path	md5	注记
+r3-stop.sh	拆栈正典件（D8 三查：容器计数/8899/8898）	__ASSETS_ROOT__/bin/r3-stop.sh	75cc94d264486b8ad69dce7eec0709dc	启停链本体禁改；生产拆栈必带 CTN_PREFIX=r3prod R3_STOP_VERIFY=1	DF-03 停栈内建硬断言形（2026-10-30：四机目标前缀容器=0+双端口 000 无条件断言、任一红 exit 1 禁入沉降/点火，R3_STOP_VERIFY 开关作废恒跑；法源=035-W0-TASKBOOK §DF-03 树内工具件；.bak-pre-df03-20261030=5ad878303821a3afafc6bf65ac31bb58 回退锚；追记四）
+boot-with-slotlock.sh	点火治理 wrapper（P0 强制 slotlock）	__REPO_ROOT__/tools/boot-with-slotlock.sh	d7bc18209ff1030c46b65b193f930ab7	r3-boot-arm.sh 零侵入；任何点火必经此件（033-DOSSIER §一）
+capture-boot-evidence.sh	boot 核对面正典件（D110）	__REPO_ROOT__/tools/capture-boot-evidence.sh	0b9117cb10c9110a143a8734f7561c70	用法=bash tools/capture-boot-evidence.sh <输出目录>；期望横幅 8/8+池指纹+镜像面；量具冻结不涉（观测面）	D121-③ 增 [12] BYPASS 段（追记二）
+conc_pr_driver.py	量具·liter C1 512k（判读主门≥3700）	__REPO_ROOT__/tools/conc_pr_driver.py	333033ce2fae98b28187d106f7cbb14f	量具冻结零改动零降门
+sd_bench.py	量具·TTFT/512k repeated（B25/TTFT 锚）	__DEPLOY_WORKSPACE__/tools/bench/sd_bench.py	410f543d4cc363defa66ffd54d190c9a	量具冻结零改动零降门
+de_c48_bench.py	量具·DE c1（判读门≥91）	__REPO_ROOT__/tools/de_c48_bench.py	a337f64e835a20b75f905ed5d11d6e4e	量具冻结零改动零降门
+x5_mixed_ttft.py	量具·混合 TTFT 探针（BYPASS A/B M1 面）	__REPO_ROOT__/logs/S-034-X5-RUN-20261027/tool/x5_mixed_ttft.py	0b9a520001e2315695be732a20fe83e5	量具冻结零改动零降门；快面 M1 实测锚缺（73.3s 系推导锚，ROOTFIX §5.1-3）
+gsm8k-500 冻结帧	量具锚·500q 冻结帧（带 [0.956,0.982]/地板 0.955）	各窗 bench/gsm8k-500-summary.json 对表（制帧档 S0DESK-20261025）	帧 md5 7e4deefc（帧锚，非单文件全档）	RB033 §二.5/REPAIR §二.5 在档；MV-12 读数 0.958=479/500 带内
+EQ-S 同盐	量具锚·EQ-S 夹心对比同盐	各窗 eqgate/{pre,post,compare}.log	R1EQ2026（盐标识）	MV-12 GREEN 6/6（REPAIR §4.1）；033 两窗同盐先例
+PPL golden	量具锚·PPL golden key A/A×2	各窗 ppl/AA-summary.txt	Δtf=0.0000 口径（v41 面 tf short 1.1359/long 0.4212）	量值锚非文件锚；v41 面签名≠fork 面 1.0691/0.4511（REPAIR §3.2）
+census_capture_w3.sh	census 采集正典件（W-a 制式单拍；G1=8192MB/A0H=6656MB 不降）	__REPO_ROOT__/tools/census_capture_w3.sh	6e073acd73b506e8e256be6f5924bca0	census v3.1 家族正典入包（D119-②）；七处 docker 硬绑 01=换机执行不合法（NCCL-WINDOW-DESIGN §三）
+w1_longctx_bench.py	census 配套 bench（三量具锚预核之一）	__REPO_ROOT__/logs/R1CERT3-20261004/w1_longctx_bench.py	941a853bfbbb7c3ab9b96f00efd91044	正典位=历史档目录；REPAIR §0.6 预核锚
+census_stream.py	census v3.1 家族	__REPO_ROOT__/tools/census_stream.py	eeb498b72b82817e34ee93825aa63491	原件正典（本表 md5=本窗 01 活算）
+census_window.py	census v3.1 家族	__REPO_ROOT__/tools/census_window.py	2fec1d14fcd665e70f62577f42fbc728	原件正典（同上）
+census_aggregate_v31.py	census v3.1 家族（聚合 v3.1）	__REPO_ROOT__/tools/census_aggregate_v31.py	c8ed9b0f3d42fb630e56b2935c3f40ff	原件正典（同上）
+census_capture_pr.sh	census 家族（pr 形；G1 立法本意档）	__REPO_ROOT__/tools/census_capture_pr.sh	cc8f8b0565c913c8bea3eebc0b1bd9ee	:27-31=2026-09-30 四节点冻结事故立法源
+dcgm-collector.sh	dcgm 采集件原件（五族+RDMA 四口，60s×四机）	__REPO_ROOT__/logs/S-034-RB033-20261028/phase3-payloads/dcgm/dcgm-collector.sh	50460f66df1c2e38351c87d985135eee	原件位=RB033 staged 目录（D116-⑦ 逐字节复用验收）；窗内 staged 形仅 W 行替换（KVARM1/REPAIR 形 ecb037b8 族另注，非原件）
+gates-034.tsv	0.3.4 基线门期望正典（8 门：BL09/BL11/BL12/BL15/BL16/GOV-3/IMG-1/GW-1）	__REPO_ROOT__/tools/gates-034.tsv	94142411427416d0a30f9a8e42b99e4a	PINFIX-20261028 建表；doctor 类核验命令数据源；01 面行除外逐条四机可跑	守卫完善窗 +BL-BYP1/2=10 门（追记二）；W-f 重钉 BL11 五检（md5 4370aab9/61 键/v41/BYPASS/CACHE_GIB=2）+BL16 profile=77d7fa67（追记三）
+REBOOT-RECOVERY-baseline-verify-20261026-wb.sh	基线门脚本现役版（-wb）	__REPO_ROOT__/tools/REBOOT-RECOVERY-baseline-verify-20261026-wb.sh	7c27341b639e7afe3de525af5541258e	BASELINE-GATE-CURRENT.txt 指认；对账制=PINFIX §三（FAIL 集=授权面恰集）；重锚=后续窗以 gates-034.tsv 为源
+# 新工具套件（D119-② 产品化新件四件套；2026-10-28 交付工作流产品化臂落盘，本窗 17:0xZ 补记实 md5）
+deploy-034.sh	一键部署编排件（--dry-run/--arm-tag；S1 只读体检照跑+S2-S8 动作级）	__REPO_ROOT__/tools/deploy-034.sh	de9c4ab509c2daf5438b70c95b2adee7	纯编排层：包装既有正典原件（doctor/slotlock/boot 链），禁改启停链本体	守卫完善窗 S6 ARMED 硬门+S1 在役拒起门（追记二）；EQ-05 窗 S1 engram-权重身份一致性前置注记+EQ-09 窗 S8 网关第五查（config CFG-62=现值锚；追记四承接）
+verify-034.sh	电池器（--smoke=EQ-S 夹心+liter+DE+500q；--full=+TTFT/B25×3/PPL；--list 零触）	__REPO_ROOT__/tools/verify-034.sh	5e664a22d1b224eaecf7153505f674d3	包装冻结量具（md5 见上段），阈值内置 FROZEN（3700/91/带 [0.956,0.982]）	守卫窗引擎面前置+主会话修复 B3 mkdir/B7 MAG（追记二终值）；EQ-09 窗 B0 网关第五查（config CFG-63=现值锚；追记四承接）
+doctor-034.sh	两级只读自排查器（--preflight/--post-boot；退出码 0/1/2/3，2=降级面命中；零写零启停零 sudo）	__REPO_ROOT__/tools/doctor-034.sh	14a3a51ba1e9a49e33f0844c69c8593c	期望值唯一来源=config-034.tsv；post-boot 引擎停机设计态时以 MV-12 正档承载判读（[SRC=archive] 注记）	守卫完善窗状态感知分轨+ISVC（追记二终值）；守卫降级窗 DG1..DG6+退出码 2 类（追记三）；EQ-05 窗 preflight engram 身份组（CFG-68..72）承载注记形（config CFG-64=现值锚；追记四承接）
+config-034.tsv	参数清单正典（56 参数行；时点 pre|post|any；期望/核验命令/失败提示）	__REPO_ROOT__/tools/config-034.tsv	4e89a6e3a70bf627c8c29d1a8dc0a969	doctor 唯一期望值来源（单一事实源）；与 gates-034.tsv 门面期望同源（D118-③）；md5 记录时点=2026-10-28T17:0xZ 稳定双读（产品化臂曾中途修订 8754612d→2800297e，以本行为准）	67 参数行=调优终态（D121 61 行+W-f CFG-65 新行+守卫降级窗 CFG-64 重钉/CFG-66/67 新自锚）；追记三终值；EQ-05 窗 +CFG-68..72 engram 身份五行+EQ-02 代际 CFG-01/03 重钉=72 参数行（追记四终值）
+# 注：四件包验收确定性门（bash -n+doctor 只读实跑+dry-run/--list，D119-④）=交付工作流合判相执行；
+#   上表 md5=落盘形，若验收相有修订以主会话终检重算为准（追记于此）。
+# 追记（主会话终检，2026-10-28T19:3xZ，D120-缺口2/opens-6 兑付）：
+#   doctor-034.sh 终值=9057d4a04c832bf00a16c7b4077ba6ec（19:29 修订：档证面计数排除「出现次数」自描述报告行，修复 CFG-46/47 假 FAIL〔PACKAGE-ACCEPTANCE 缺口1〕；修后 --post-boot 档证面 PASS=49 FAIL=0 EXIT=0 亲跑在案）——表内 34b9f932 行作废以本行为准；
+#   config-034.tsv 终值=79dc298fd25fd35eb296b25deef52974·55 参数行（CFG-01..55 亲数）——表内 2800297e·56 行为落盘时点旧形作废；
+#   DELIVERY-NOTES §二-F/§三 同步以本追记为准（该件 P4 预留追记位兑付）。
+# 追记二（主会话终检，2026-10-29 收口窗施加〔源=STANDARD-TESTS-CLOSURE-20261029.md §五 预稿，
+#   verify/config 两值以主会话兑付后终值为校正〕；D121 BYPASS 采用+守卫完善窗（GUARD-HARDENING-20261029）
+#   +主会话 verify 两编排缺陷修复（B3 mkdir dec48-early+B7 MAG float 数值化）终值兑付）：
+#   段一 live 面三行现值（束内 archive 副本不动=束建束时点快照自洽保持）：
+#     CBX1A-CERTM-spec1.env live=f9fec92f79a99f762b33de88ce533065·60 键（D121 第 60 键
+#       DSV41_PREFILL_BYPASS=2048；表内 ba4be586·59 行以本行为准）；
+#     prod-profile.env live=a15da8051177ffbc2471c4b0a4dbfe66（D121 重钉 :8 env/:9 60 键；
+#       表内 1be1c37c 行以本行为准）；
+#     扩展面 adapter 整树=0beb4bee（8-hex 集签名）·99 件+sitecustomize dd69c59a1098b735dd20e8aec1baaee9
+#       +prefill_bypass c487525873cc2c0e09436414efb22115（表内 d52b0e3d·98 行以本行为准）。
+#   段二工具锚六行现值（守卫完善窗+D121 采集面+主会话终检）：
+#     capture-boot-evidence.sh=0b9117cb10c9110a143a8734f7561c70（D121-③ 增 [12] BYPASS 采集段；
+#       表内 7cc69694 行作废以本行为准）；
+#     gates-034.tsv=c87f8a063107e666231af04b41a1785d·10 门（+BL-BYP1/BL-BYP2；表内 96ad27fa·8 门行作废）；
+#     deploy-034.sh=352aa409eab6bd30f6233d0c0dcd21ba（S6 ARMED 硬门+S1 在役拒起门）；
+#     verify-034.sh=199b36925b0cefdf6a776ec0b851b88b（守卫窗 P2 引擎面抽查前置门+主会话修复
+#       B3 mkdir/B7 MAG 数值化=终值；预稿 05708f1b 中间态作废）；
+#     doctor-034.sh=012cc53b252a56d19ba9a68ef1e1324d（preflight 状态感知分轨+ISVC 身份核；
+#       前追记 9057d4a0 行作废以本行为准）；
+#     config-034.tsv=c44dd62053171ab723103d7ea5d96210·64 参数行（CFG-01..61=D121 采用态+
+#       CFG-62/63/64 编排件自锚 3 行〔CFG-63=verify 终值 199b3692 重钉〕；前追记 79dc298f·55 行作废）；
+#     新增：selftest-034.sh=39fe03e1ee33c76def8a6ae570055fe9（自诊断三段器：A 比较器单元+B 沙箱负例
+#       7/7 自反馈闭环+C 完整性走查 105 行；2026-10-29）。
+#   登记缺口注记：tools/pr_ladder6.sh 现役 HEAD=ed303431a648f1f3d09cca33d6dbb182（fa062c9 F-6a.2
+#     sanctioned 2026-10-09）全树无锚登记；判例 SPARKDASH-ALIGN §四 f72b06f5=旧版历史登记。本窗
+#     sparkdash 阶梯载体=sd_bench.py CFG-31 锚实体（410f543d 实测一致）直调（prl6 对 8899 硬拒 G5 门
+#     +BENCH_REPO 树灭失=退役注记，dwfq-62d8bdec-2 裁定在案）。
+# 追记二补（主会话终检 2026-10-29，selftest §C 终值行精确格式）：
+#   doctor-034.sh 终值=012cc53b252a56d19ba9a68ef1e1324d（守卫完善窗状态感知分轨形；前追记 9057d4a0 为时点值由本行承接）
+#   config-034.tsv 终值=c44dd62053171ab723103d7ea5d96210·64 参数行（前追记 79dc298f·55 行为时点值由本行承接）
+#   verify-034.sh 终值=199b36925b0cefdf6a776ec0b851b88b（主会话两编排缺陷修复后终值）
+#   selftest-034.sh 终值=1f228d3edb0c0e740cd3ac37298ce328（head -1→tail -1 追记时间序语义修复后）
+# 追记三（重定版终值，2026-10-29 定版封包窗=锁包 v2〔D124-④ 次序：W-f 全链绿后的重封包相〕；
+#   源=WD-TUNED-FINAL-20261029.md（W-f 终靴）+GUARD-DEGRADED-20261029.md（守卫降级窗）；
+#   表体五行已同追记二制式就地更新（env/profile/boot 注记/gates/doctor/config），本块=总账）：
+#   ① 重定版终面指纹（调优终态=在役生产，ARM_TAG=WD-034TUNED-20261029-151019，health 200）：
+#     CBX1A-CERTM-spec1.env live=4370aab9c501cd0cfd3d89bb0137c433·61 键（W-f I8 采纳=60 键 f9fec92f
+#       尾增第 61 键 DSV41_ENGRAM_CACHE_GIB=2〔:64 尾行〕；产 env↔arms/DEOPT-I8-spec1.env cmp 逐字节同；
+#       ×4 机同步 md5 亲核；回退锚=.bak-pre-deopt-adopt-20261029=f9fec92f 四机在位）；
+#     prod-profile.env live=77d7fa67384d41c91f8268581d3048f5（:8/:9 重钉 4370aab9/61；:10 args 零改=
+#       args 类采纳项为零；回退锚 .bak-pre-deopt-adopt-20261029=a15da805）；
+#     adapter 整树=0beb4bee·99 件（+sitecustomize dd69c59a+prefill_bypass c4875258）——W-f 零写零动，
+#       追记二值原样有效；tp4 e225c391/guards 418414c3/overlay 四件+镜像 80e4c957 同零写；
+#     boot=d41323dd 点火形=在役合法态（W-f 终靴留置；存储形 50700486 双合法，BL09/CFG-01 归一）。
+#   ② 新锚行（tools/config-034.tsv·1fcc0fa9 形+tools/gates-034.tsv·94142411 形）：
+#     CFG-04→4370aab9c501cd0cfd3d89bb0137c433/CFG-05→61/CFG-12→77d7fa67384d41c91f8268581d3048f5/
+#     CFG-13 钉行/CFG-14→61/CFG-65 新行（DSV41_ENGRAM_CACHE_GIB=2 第 61 键核验行）；BL11 五检
+#     （md5/键数/v41/BYPASS/CACHE_GIB=2）/BL16（profile=77d7fa67·2026-10-29 W-f I8 采用重钉）。
+#   ③ 调优窗采纳/回退清单（D124-③ 批文八臂收口）：W-e0=时代基线（恒 ADOPT，arm=产 env 逐字节零差量）；
+#     DEOPT-I8=ADOPT（engram CACHE_GIB 1.0→2 单变量 A/B，四预注册门全过，法源=
+#     logs/S-034-DEOPT-I8-20261029/DEOPT-I8-REPORT-20261029.md）；I4/I5/I6=REVERT、I7=SKIP
+#     （args 类采纳项=零，各自窗内零残留，产面从未携带）。
+#   ④ W-f 全链绿（证据=logs/S-034-DEPLOY-20261029-151025/+S-034-VERIFY-20261029-152532/）：
+#     doctor --preflight 重钉后 PASS=73 FAIL=0（+1=CFG-65）；deploy S1-S8 全链绿（S1 73 PASS；
+#     S6 横幅 8/8 全 cache=2.0GiB〔7893344 slots/16-way/8.2%〕+ARMED 8/8 refusing=0；S4 health 200
+#     @15:19:59Z；S7 post-boot 59 PASS 0 FAIL）；verify --full PASS=5 WARN=2 FAIL=0（rc=0）。
+#   ⑤ 重锚读数（W-f 终面）：liter C1 3910.3/DE c1 de_c48 93.83（+2.39% 对正典）/sd_bench 93.47（+2.00%）/
+#     500q 0.96（480/500 err=0）/PPL A/A Δtf=0.0000/EQ-S GREEN 6/6（盐 R1EQ2026）；PR 阶梯 arb 中位
+#     32k-512k=6485.2/6532.0/6259.6/5603.8/4411.8（对 T33-03 +0.62~+1.31 全 IN-BAND）；DE 全梯
+#     c1/c2/c4/c8/c16=93.47/133.12/175.61/257.12/348.88（c8/c1=2.750×；c16/c1=3.732×）；c16 NEW-TIER
+#     族锚=360.42（三样本仲裁中位 PROBE 362.33/W-e0 360.42/W-f 348.88；61 键面子带 n=2 待第三样本）；
+#     era 靴对 W-e0→W-f c1 +2.30%（I8 增益在产面复现）。
+#   ⑥ 段二工具锚现值（守卫降级窗后，本窗 2026-10-29 亲算 md5sum）：
+#     doctor-034.sh 终值=2772022f1511ed607e85f62f4dec49bb（DG1..DG6 降级面检测+大声警告+退出码 2 类；
+#       追记二补 012cc53b 为时点值由本行承接）
+#     config-034.tsv 终值=1fcc0fa910258dc4c7a9e2ea0a3ee16e·67 参数行（CFG-64 重钉+CFG-66/67 新自锚；
+#       追记二补 c44dd620 为时点值由本行承接）
+#     gates-034.tsv=94142411427416d0a30f9a8e42b99e4a·10 门（W-f BL11/BL16 重钉后形，守卫降级窗零改亲核；
+#       追记二 c87f8a06 为时点值由本行承接）
+#     selftest-034.sh 终值=71d89087548448a217627faf3b2587f5（三段器→四段器，+§D 降级检测负例；
+#       追记二补 1f228d3e 为时点值由本行承接）
+#     新增登记：ROLLBACK-PATHS.md=7275f36a84ab7105b76fc9be4a53bcd4（回退双路正典，束内件；
+#       config CFG-67 锚）；deploy-034.sh=352aa409/verify-034.sh=199b3692/capture-boot-evidence.sh
+#       =0b9117cb 三值零改（追记二/二补值原样有效）。
+#   ⑦ 口径注记：本追记后表体+束内 archive 副本自洽（archive 面=建束时点快照不动制式维持）；
+#     selftest-034.sh §C 对本表复算应全绿（C1-live/C1-tool/C1-追记 三面均以本追记现值为准）。
+# 追记四（守卫收口窗，2026-10-30；源=selftest-034 十项 FAIL 逐项兑付〔docs/plan/034-W1/SELFTEST
+#   报告 integrityFail 清单〕；法源=035-W0-TASKBOOK-20261030 §EQ-02/§DF-03/§EQ-05/§EQ-09+
+#   公开仓 round 91 fix #1〔env 尾行守护〕；「主会话终检重算为准」追记律，表体就地更新制式随追记二/三）：
+#   ① 段一 live 面一行：r3-boot-arm.sh live=4bb4884afbdcc68b8ce9e64d5614e0cf（EQ-02 断言族点火在役形
+#     =W-f 点火基座 d41323dd+2026-10-30 尾行守护修复+EQ-02 RoCE 双键 fail-closed 门；.bak-pre-eq02-
+#     20261030=53d31751d75f832e6d5b3a9e204f98fc 回退锚；存储回置形=5240a98d52ff24b452cc13b53280fd2e
+#     〔:12 sed 单行复演派生，窗毕回置制式〕；EQ-02 前旧代际 50700486/d41323dd 复现=断言族回滚面即
+#     漂移；config CFG-01 重钉/CFG-03 :465→:499 行移位重钉〔断言本体零改〕）。
+#   ② 段二工具锚五行现值（EQ 窗+DF-03 窗后，本窗 2026-10-30 亲算 md5sum）：
+#     r3-stop.sh 终值=75cc94d264486b8ad69dce7eec0709dc（DF-03 停栈内建硬断言形；表内 5ad87830 行
+#       作废以本行为准）；
+#     deploy-034.sh 终值=de9c4ab509c2daf5438b70c95b2adee7（EQ-05 S1 engram 前置注记+EQ-09 S8 网关
+#       第五查；追记三 352aa409 为时点值由本行承接）；
+#     verify-034.sh 终值=5e664a22d1b224eaecf7153505f674d3（EQ-09 B0 网关第五查；追记三 199b3692
+#       为时点值由本行承接）；
+#     doctor-034.sh 终值=14a3a51ba1e9a49e33f0844c69c8593c（EQ-05 preflight engram 身份组承载注记形；
+#       追记三 2772022f 为时点值由本行承接）；
+#     config-034.tsv 终值=4e89a6e3a70bf627c8c29d1a8dc0a969·72 参数行（EQ-05 +CFG-68..72 五行+
+#       EQ-02 代际 CFG-01/03 重钉；追记三 1fcc0fa9·67 行为时点值由本行承接）。
+#   ③ 口径注记：本追记后表体+config CFG-01/03 与 live 面自洽（archive 面=建束时点快照不动制式维持）；
+#     selftest-034.sh §C 对本表复算应全绿（C1-live/C1-tool/C1-追记 三面均以本追记现值为准）。
+#     滞后呈报（本窗未越权处置，留后续窗呈批兑付）：gates-034.tsv BL09 注记（:16-19/:30）、
+#     deploy-034.sh:57-58 MD5_STORE/MD5_IGNITE 常量、prod-profile.env:18 PROD_BOOT_SCRIPT_MD5 仍钉
+#     EQ-02 前旧代际值——各该件均有自锚（改则连带自身 md5 重钉）或属生产 env 面，不在本登记收口窗
+#     职权内；boot 断言族执法仍由 config CFG-01 行承载不受影响。

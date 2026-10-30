@@ -26,7 +26,7 @@
 | PFC / trust | `0,0,0,1,0,1,0,0` / `dscp` |
 | GPU 频率 | 默认，无 `-lgc/-lmc/-ac` 上限；硬件 max SM 3003 MHz |
 | GPU 温控 | EC 自动（`nvfancontrol` 模块未加载；负载 72–86°C，无 SW/HW 降频） |
-| 镜像 | `192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c` |
+| 镜像 | `<registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c`（registry 主机已脱敏） |
 | 镜像 digest | `sha256:47f6d91a…e2ffc4` |
 | adapter 指纹 | `c41b1a45`（97 件，四机一致） |
 | recipe | 0.2.0；`serving_chat.py` md5 `3151a2ed…`，`dsv41_recipe.py` md5 `da98467d…` |
@@ -46,7 +46,7 @@ bash ~/migrate-assets/prod/selfcheck-prod.sh --post-boot  # 起靴后全检 + 64
 bash ~/migrate-assets/prod/selfcheck-prod.sh --perf       # 只跑 warm
 
 # 版本锁只读检查（四机都要装；boot-prod/selfcheck 会调用）
-ssh dgxspark01 'bash /usr/local/sbin/version-lock.sh check'
+ssh <node01> 'bash /usr/local/sbin/version-lock.sh check'
 # 维护窗内重放 hold/pin/auto-upgrade 屏蔽（需要 root）
 sudo /usr/local/sbin/version-lock.sh apply
 ```
@@ -165,7 +165,7 @@ PR 每档 3 次独立采样，DE mt400 五次（取中位），同口径对照 A
   `SW Power Cap`、`HW Thermal Slowdown` 均 Not Active。
 - EC 自动风扇正常；但 `nvfancontrol` 的 DKMS 模块在 Secure Boot 下加载失败：
   `insmod: Key was rejected by service`。模块此前为 7.0.0 编译，签名密钥
-  `dgxspark01 Secure Boot Module Signature key` 不在 MOK 列表，
+  `<node01> Secure Boot Module Signature key` 不在 MOK 列表，
   `/var/lib/shim-signed/mok/MOK.der` 未注册。因此 `nvfancontrol max/auto/rpm`
   目前不可用，EC 默认曲线是唯一可用控温方式。要手动控风扇需在控制台完成
   MOK 注册（本次未改安全启动）。

@@ -37,10 +37,15 @@ BOOT_GRACE=$((15 * 60))     # 靴窗宽限：容器启动后 15 分钟内不要�
 WATER_M=1500                # 水位红线（MemAvailable MB；= oom_gate -f 1.5）
 WATER_WARN_M=6000           # 预警线（= oom_gate -w 6）
 WATER_N=3                   # 红线连续确认次数（= oom_gate -n 3；兜底慢环）
-HEAD_IP="192.168.5.186"
+# ── 20261030 脱敏：内网值改经环境变量注入，缺参拒跑（本包件为旧址段形态的史档副本）──
+HEAD_IP="${HEAD_IP:?缺环境变量 HEAD_IP（head 节点 <mgmt-node-ip>），拒跑}"
+NODE01_HOST="${NODE01_HOST:?缺环境变量 NODE01_HOST（<node01>），拒跑}"
+NODE02_HOST="${NODE02_HOST:?缺环境变量 NODE02_HOST（<node02>），拒跑}"
+NODE03_HOST="${NODE03_HOST:?缺环境变量 NODE03_HOST（<node03>），拒跑}"
+NODE04_HOST="${NODE04_HOST:?缺环境变量 NODE04_HOST（<node04>），拒跑}"
 API_PORT=8898
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=8)
-WORKERS=(dgxspark02 dgxspark04 dgxspark03)
+WORKERS=("${NODE02_HOST}" "${NODE04_HOST}" "${NODE03_HOST}")
 INCIDENT_DIR="$HOME/l10-incident"
 HOLD_F="/tmp/r3-watchdog-hold"       # 量具 hold：census/kineto 采样窗内暂停 health 计数
 HOLD_MAX_S=$((25 * 60))              # hold 契约窗（≤25min；H-TTL 据此忽略超龄）
@@ -160,8 +165,8 @@ main() {
           log "head health 探测失败 ${fail}/${FAIL_N}（MemAvail=${m}M）"
           if (( fail >= FAIL_N )); then
             # 确认 head 真亡：ssh 不通 或 head 容器非 running；若 head 仍活则留给 head 哨
-            if ! ssh "${SSH_OPTS[@]}" dgxspark01 "true" 2>/dev/null \
-               || [[ "$(ssh "${SSH_OPTS[@]}" dgxspark01 "docker inspect -f '{{.State.Status}}' r3boot-head 2>/dev/null" | tr -d '\r')" != "running" ]]; then
+            if ! ssh "${SSH_OPTS[@]}" "${NODE01_HOST}" "true" 2>/dev/null \
+               || [[ "$(ssh "${SSH_OPTS[@]}" "${NODE01_HOST}" "docker inspect -f '{{.State.Status}}' r3boot-head 2>/dev/null" | tr -d '\r')" != "running" ]]; then
               teardown "head 亡故确认（health×${FAIL_N} 失败且 ssh/容器死）——workers 联动拆除"
             else
               log "head health 失败但 head 容器+ssh 存活——交给 head 哨处理，本哨复位"

@@ -2,7 +2,9 @@
 # env_lint_boot.sh — boot 前置 env lint 拒绝门（GATE-MATRIX L8/L10-A4；QA-GATEHARDEN 20261005）
 #
 # 法源：RE-CERT-CARD-4 §八三禁令 + R1BISECT-ADJUDICATION §五（E′ 键面 PREFILL 缺位断言）+
-#       BOOT-TEMPLATE-REVIEW-20261004 §3-A4（0731 键黑名单）。
+#       BOOT-TEMPLATE-REVIEW-20261004 §3-A4（0731 键黑名单）+
+#       EQ-03（0.3.4re：判负/互斥禁键组合真 fail-closed——清单正典=RUNTIME-PARAMETERS
+#       §3.1/§3.2 + SPEC6-SERVE-REF 判负节（SPEC7 8192 判负档）+ CHANGELOG 0.3.1 T1）。
 # 检查面（fail-closed：文件不可读/形态未注册/解析失败=拒绝启动）：
 #   ① 全形态禁键：SGLANG_ENABLE_DETERMINISTIC_INFERENCE（任何值）；
 #      PYTORCH_CUDA_ALLOC_CONF 含 expandable_segments:True（False=合法在役值，勿一刀切）；
@@ -12,6 +14,16 @@
 #   ③ 期望键面合同：--form r1prime = R1′ 五键精确值（CONSUME=1/TIER=triton/ADMISSION=1/
 #      CTX_CAP=600000/MRR=16）且 DSV41_SPARSE_LOCAL_PREFILL 必须缺位（防误带）；
 #      --form v2 = DSV41_SPARSE_LOCAL_* 族全缺位。
+#   ④ serve 禁参组合（EQ-03，全形态，值面注入位=SPEC_EXTRA_ARGS/EXTRA_SGLANG_ARGS 等
+#      空格分词进 SERVER_ARGS 的面）：--enable-mixed-chunk（判负旗标；与 SPEC6 第 4 参
+#      回放旗标 --enable-decoder-swa-bounded-replay 互斥——正典形恒带回放旗标，故该
+#      旗标任何进场即互斥违例；在役正态无此旗标）；--chunked-prefill-size 8192
+#      （SPEC7 判负档不进形，正典值=4096）；--chunked-prefill-size 16384（永禁死刑令）；
+#      回放旗标 token 与 mixed-chunk token 同场=互斥违例加报。台账判负不再是空窗。
+#      UP43050-20261030 增：--sleep-on-idle（上游 sglang #43050 禁参——GB10+
+#      DSv4.1-Flash+DSPARK 空闲 10-20 分钟后被任意请求唤醒即死 prefill，py-spy 卡
+#      _low_ratio_index_topk_dense 唤醒重捕获路径；报告者实测同硬件去参即正常；
+#      SPEC6 第 9 参已退役，任何值面携带即拒起）。
 # 用法: env_lint_boot.sh --form <v2|r1prime|v40731> <envfile> [envfile2 …]
 #   envfile=KEY=VAL 行式（# 注释/空行跳过）；ARM_ENV_FILE 与产 env 均适用。
 #   出口 0=过门 1=REFUSE（拒绝启动）2=用法错。
@@ -84,8 +96,41 @@ for f in "${FILES[@]}"; do
           printf '[env-lint][REFUSE] %s:%d v40731 形黑名单键 %s（BOOT-TEMPLATE-REVIEW §3-A4：v41 专属机制 0731 无对象）\n' "$f" "$lineno" "$key" >&2; refuse=1 ;;
       esac
     fi
+
+    # ④ serve 禁参组合（EQ-03 fail-closed）：值面=空格分词注入位（boot 链 SPEC_EXTRA_ARGS
+    #    经 read -a 直追加 SERVER_ARGS；dsv41 kit 世系 EXTRA_SGLANG_ARGS 同理）。
+    #    命中即拒起并打印命中的禁组合——台账判负从登记升为机器硬门。
+    if printf '%s' "$val" | grep -q -- '--enable-mixed-chunk'; then
+      printf '[env-lint][REFUSE] %s:%d 禁参组合：值携带判负旗标 --enable-mixed-chunk（RUNTIME-PARAMETERS §3.2 判负；与 SPEC6 第 4 参回放旗标 --enable-decoder-swa-bounded-replay 互斥，在役正态无此旗标；EQ-03）key=%s\n' "$f" "$lineno" "$key" >&2
+      refuse=1
+    fi
+    if printf '%s' "$val" | grep -qE -- '--chunked-prefill-size([[:space:]]+|=)8192([^0-9]|$)'; then
+      printf '[env-lint][REFUSE] %s:%d 禁参组合：--chunked-prefill-size 8192（SPEC7 判负档不进形，SPEC6-SERVE-REF 谱注/COMBO 门 1；正典值=4096；EQ-03）key=%s\n' "$f" "$lineno" "$key" >&2
+      refuse=1
+    fi
+    if printf '%s' "$val" | grep -qE -- '--chunked-prefill-size([[:space:]]+|=)16384([^0-9]|$)'; then
+      printf '[env-lint][REFUSE] %s:%d 禁参组合：--chunked-prefill-size 16384（永禁死刑令，CHANGELOG 0.3.1 T1；EQ-03）key=%s\n' "$f" "$lineno" "$key" >&2
+      refuse=1
+    fi
+    # UP43050-20261030：上游 sglang #43050 禁参——空闲唤醒即死 prefill 挂起
+    #   （_low_ratio_index_topk_dense 唤醒重捕获路径）；SPEC6 第 9 参已退役，
+    #   任何值面（SPEC_EXTRA_ARGS/EXTRA_SGLANG_ARGS 等注入位）携带即拒起。
+    if printf '%s' "$val" | grep -q -- '--sleep-on-idle'; then
+      printf '[env-lint][REFUSE] %s:%d 禁参组合：值携带 --sleep-on-idle（上游 sglang #43050：GB10+DSv4.1-Flash+DSPARK 空闲 10-20 分钟后被任意请求唤醒即死 prefill 挂起；SPEC6 第 9 参 2026-10-30 退役=禁参；EQ-03/UP43050）key=%s\n' "$f" "$lineno" "$key" >&2
+      refuse=1
+    fi
   done < "$f"
 done
+
+# ④b 互斥对加报（EQ-03）：mixed-chunk 与回放旗标 token 同在生效值面=互斥违例点名
+#    （正典回放旗标在 boot SERVER_ARGS 固定面恒在；env 面再带 mixed-chunk 即成对——
+#    上方单旗标检查已拒，此处按互斥律显式加报组合名，报因可读）。
+mc_n=$(printf '%s\n' "${SEEN[@]}" | grep -c -- '--enable-mixed-chunk' || true)
+rp_n=$(printf '%s\n' "${SEEN[@]}" | grep -c -- '--enable-decoder-swa-bounded-replay' || true)
+if [ "$mc_n" != 0 ] && [ "$rp_n" != 0 ]; then
+  printf '[env-lint][REFUSE] 禁参组合（互斥违例）：--enable-mixed-chunk × --enable-decoder-swa-bounded-replay 同场（RUNTIME-PARAMETERS §3.2 互斥律：回放旗标在场 ⇒ 混合批必须不在场；EQ-03）\n' >&2
+  refuse=1
+fi
 
 # ③ 期望键面合同（形态注册面内判定；缺位/错值/带禁键都红）
 contract_red=0

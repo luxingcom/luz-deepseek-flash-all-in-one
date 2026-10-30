@@ -31,17 +31,17 @@
 - **PEER_HCA_MAPS**（`B12X_ROCE_PEER_HCA_MAPS`）
   环网形态逐秩声明「到每个对端机器走哪个网卡口」的属主映射表，必须按本机秩位生成、照抄邻机的值必挂；交换机形态不用此键。详见：[PITFALLS-AND-FAQ.md](PITFALLS-AND-FAQ.md) P1-3 · [RING-0.3.2-COMPAT.md](RING-0.3.2-COMPAT.md) §1
 - **交换机 flat 形**
-  0.3.2 现役网络形态：每机两口上联以太交换机，通信走 C 层 flat/one-shot 运行时（拓扑键选 switched）；与环网形整套互斥、不可混拼。详见：[RING-0.3.2-COMPAT.md](RING-0.3.2-COMPAT.md) §1
+  0.3.2 起现役网络形态（0.3.3/0.3.4 同形）：每机两口上联以太交换机，通信走 C 层 flat/one-shot 运行时（拓扑键选 switched）；与环网形整套互斥、不可混拼。详见：[RING-0.3.2-COMPAT.md](RING-0.3.2-COMPAT.md) §1
 
 ## 二、部署面
 - **形 / 形三元组**
   一次可启动、可判读的完整配置身份 = env 键面 + serve 参数 + adapter/overlay 面，三面同批对齐才算一形，任何改动必须三面一起动。详见：[README.md](../README.md) §三 · [GETTING-STARTED.md](GETTING-STARTED.md) §1.1
 - **env 面**
-  三元组第一面：一份几十键的环境变量文件（0.3.2 现役参考形 56 键），把网络拓扑、内存配比、各优化开关全部钉死；改后必须复靴，热改无效。详见：[RUNTIME-PARAMETERS.md](RUNTIME-PARAMETERS.md) · [deploy/README.md](../deploy/README.md)
+  三元组第一面：一份几十键的环境变量文件（现役 0.3.4 参考形 61 键；0.3.2 历史形 56 键），把网络拓扑、内存配比、各优化开关全部钉死；改后必须复靴，热改无效。详见：[RUNTIME-PARAMETERS.md](RUNTIME-PARAMETERS.md) · [deploy/README.md](../deploy/README.md)
 - **serve 参数（SPEC）**
-  三元组第二面：boot 时传给引擎进程的命令行参数谱，现役为九参（调度间隔、排队上限、推理/思考流两个 parser、缓存上报、空闲降耗等），由 boot 脚本固定面注入。详见：[deploy/SPEC6-SERVE-REF.md](../deploy/SPEC6-SERVE-REF.md)
+  三元组第二面：boot 时传给引擎进程的命令行参数谱，现役为八参（调度间隔、排队上限、推理/思考流两个 parser、缓存上报等），由 boot 脚本固定面注入；第九参 `--sleep-on-idle` 空闲降耗 2026-10-30 因上游缺陷退役（九参谱转史档，禁参三门拦截）。详见：[deploy/SPEC6-SERVE-REF.md](../deploy/SPEC6-SERVE-REF.md)
 - **adapter**
-  三元组第三面的一半：boot 时注入 SGLang 进程的自研优化件集合（装配后 87 个运行时件，经 sitecustomize.py 装载缝挂入），与引擎镜像按绑定律同批切换。详见：[deploy/adapter/README.md](../deploy/adapter/README.md)
+  三元组第三面的一半：boot 时注入 SGLang 进程的自研优化件集合（0.3.2 装配 87 个运行时件；0.3.4 现役 99 件＝98 个修复固化件+BYPASS 采用新增 1 件，98 件为 2026-10-28 锁档时点值），经 sitecustomize.py 装载缝挂入，与引擎镜像按绑定律同批切换。详见：[deploy/adapter/README.md](../deploy/adapter/README.md)
 - **overlay（影子挂载）**
   三元组第三面的另一半：宿主目录里的上游同名源码文件，boot 时逐个挂进容器盖住镜像内版本（挂载计数 fail-closed 断言），从而不改镜像修正上游行为。详见：[DEPLOY-GUIDE.md](DEPLOY-GUIDE.md) §5 · [PITFALLS-AND-FAQ.md](PITFALLS-AND-FAQ.md) P2-2
 - **engram**
@@ -51,7 +51,7 @@
 - **靴槽锁**
   保证四机整簇同一时刻只有一个 boot 流程的文件锁（点火必须经锁包装器转起）；点火返回码 2 常见原因是锁被占，而不是启动失败。详见：[PITFALLS-AND-FAQ.md](PITFALLS-AND-FAQ.md) P2-8/P2-9
 - **沉降**
-  拆掉旧栈到点燃新栈之间强制等待至少 600 秒的纪律，等内存与页缓存回落，否则新靴读数被旧栈残留污染。详见：[DEPLOY-GUIDE.md](DEPLOY-GUIDE.md) §7
+  拆掉旧栈到点燃新栈之间强制等待的纪律，等内存与页缓存回落，否则新靴读数被旧栈残留污染。时长两口径：手工部署序 ≥600 秒；工具序（deploy-034 S5）按新制 300 秒；更旧的 1800 秒制已废。详见：[DEPLOY-GUIDE.md](DEPLOY-GUIDE.md) §7 · [DEPLOY-STEP-BY-STEP.md](DEPLOY-STEP-BY-STEP.md) §0/§7
 - **四查**
   boot 后的四步验收：health 探活 200、四机环境变量与 env 文件逐字一致、横幅直读判在役态、四机面指纹全等；漏跑等于白烧一靴。详见：[DEPLOY-GUIDE.md](DEPLOY-GUIDE.md) §7 · [UPGRADE-0.3.2.md](../UPGRADE-0.3.2.md) §9
 - **横幅**
@@ -63,7 +63,7 @@
 
 ## 三、运行面
 - **网关与车道**
-  引擎只绑 head 机回环口，由并发代理网关把它转成对外服务口并按端口分车道（文本/视觉、鉴权、背压、模型容量补全）；引擎测试口与网关口是两个口，用途分工明确。详见：[DEPLOY-GUIDE.md](DEPLOY-GUIDE.md) §9.3-§9.4 · [CALIBER-AND-MEASUREMENT.md](CALIBER-AND-MEASUREMENT.md) §0.2
+  并发代理网关把引擎口转成对外服务口并按端口分车道（文本车道为主，视觉车道已撤除留回退线；鉴权、背压、模型容量补全）；引擎绑定两形态——公开 boot 件缺省 0.0.0.0（四机可达），参考产线形收敛为只绑 head 机回环（此时探活/量具须 ssh 到 head 机打回环）；引擎测试口与网关口是两个口，用途分工明确。详见：[DEPLOY-STEP-BY-STEP.md](DEPLOY-STEP-BY-STEP.md) §4.5 · [CALIBER-AND-MEASUREMENT.md](CALIBER-AND-MEASUREMENT.md) §0.2
 - **cache per-store**
   某些缓存配额键的语义是「每层一份」额度（整机=键值×层数），且对应守卫只告警不阻起——「没报警所以没事」不成立，要自己按层数乘完再对上限。详见：[CALIBER-AND-MEASUREMENT.md](CALIBER-AND-MEASUREMENT.md) §5.3
 - **radix 前缀缓存**
@@ -99,7 +99,7 @@
 
 ## 五、治理面
 - **代际**
-  本仓同时保留多代并存的档案（0.3.1 与 0.3.2、环网与交换机），同一键两代取值不同；对表、抄配置、看旧报告前必须先认它的代际。详见：[PITFALLS-AND-FAQ.md](PITFALLS-AND-FAQ.md) 卷首一
+  本仓同时保留多代并存的档案（0.3.1、0.3.2 与 0.3.4，环网与交换机），同一键不同代取值不同；对表、抄配置、看旧报告前必须先认它的代际。详见：[PITFALLS-AND-FAQ.md](PITFALLS-AND-FAQ.md) 卷首一
 - **fail-closed**
   「证据不足就拒绝放行」的校验哲学：校验不了、断言不齐、缺件缺证一律判红拒起，而不是默认放行——与「没报警=没事」的直觉相反。详见：[deploy/SPEC6-SERVE-REF.md](../deploy/SPEC6-SERVE-REF.md) · [RING-0.3.2-COMPAT.md](RING-0.3.2-COMPAT.md)
 - **判负不进形**

@@ -1,4 +1,8 @@
-"""Verify the distributed Engram shards on dgxspark02/04/03 and rank0 locally."""
+"""Verify the distributed Engram shards on the three worker nodes and rank0 locally.
+
+20261030 脱敏：远端主机改经环境变量 HOST_R1/HOST_R2/HOST_R3 注入（<node02>/<node04>/<node03>
+的 <nfs-server-ip> 侧地址），缺参拒跑。
+"""
 import hashlib
 import json
 import os
@@ -6,7 +10,16 @@ import subprocess
 
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.dirname(TOOLS)
-HOSTS = {1: "10.10.1.21", 2: "10.10.1.41", 3: "10.10.1.31"}
+
+
+def _required_env(name):
+    value = os.environ.get(name)
+    if not value:
+        raise SystemExit(f"缺少环境变量 {name}（内网值已脱敏为 <nfs-server-ip> 占位），拒跑")
+    return value
+
+
+HOSTS = {1: _required_env("HOST_R1"), 2: _required_env("HOST_R2"), 3: _required_env("HOST_R3")}
 REMOTE_DIR = os.environ.get("ENGRAM_REMOTE_DIR", "dsv41-engram-1017")
 
 man = json.load(open(os.path.join(TOOLS, "bins-manifest.json")))

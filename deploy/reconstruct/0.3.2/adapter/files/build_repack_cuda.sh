@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build the DSV4.1 fp4-KV repack CUDA extension (repack_cuda.cu -> librepack_cuda.so).
 #
-# One-shot from the HOST (dgxspark01..04; the adapter mount is read-only inside
+# One-shot from the HOST (<node01>..<node04>; the adapter mount is read-only inside
 # the container, so the product is copied back out with docker cp):
 #   bash /home/<deploy-user>/migrate-assets/dsv41/adapter/build_repack_cuda.sh
 # The compile + unit smoke run INSIDE the r3boot-head container (nvcc 13.0,

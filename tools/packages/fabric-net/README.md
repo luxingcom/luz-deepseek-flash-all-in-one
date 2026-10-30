@@ -38,7 +38,7 @@
 | 类 | 件 | 来源/在役位 |
 |---|---|---|
 | 织网 weave/ | lutune.sh（RX_TARGET=4096 裁定值；幂等 apply） | dev/lutune/（部署位 /opt/dsv41-mesh/bin/） |
-|  | topology.json（canonical 路由+gid3 期望态） | ~/dsv41-flash-dgxsparks/scripts/ring_mesh/（部署位 /opt/dsv41-mesh/） |
+|  | topology.json（canonical 路由+gid3 期望态） | ~/<source-repo>/scripts/ring_mesh/（部署位 /opt/dsv41-mesh/） |
 |  | netplan-templates/97-roce-mtu+99-nvidia-sync-cluster（.template；期望态登记非部署件） | 四机 /etc/netplan/ 同名件（root-0600 部署面，部署窗 diff 核） |
 | 守护 guards/ | fabric-guard.sh（F-G1..F-G10+Q1-Q7 判据+四路大声+熔断） | dev/lutune/（宿主 systemd 周期件） |
 |  | fabric-sentinel.sh（15min 32MB AR 性能哨兵；idle 双确认门） | dev/lutune/ |
@@ -63,7 +63,7 @@
 
 1. **判读线零改**：NCCL_IB_GID_INDEX=3 不动（集群一致性律）；ring 4096 档为现役裁定值。
 2. **白名单硬界**：只碰 DEVLIST 四口；enP7s7 管理口与 01 机 macgw /30 副地址
-   （192.168.0.2）永不在任何动作面。
+   （<mgmt-node-ip>）永不在任何动作面。
 3. **熔断+人工复位律**：heal 1h 内 ≥2 次=熔断停手（state/heal-fuse.reset 人工复位）；
    双法皆败=停手 CRIT 不盲目重试。
 4. **判读语义零改律**：本包收编=复制+包装，不改各件判读逻辑；md5 漂移=selfcheck 红

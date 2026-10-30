@@ -5,6 +5,12 @@
 #   （仓侧谱系件）；README.md 与本件自身不计。md5sum -c 可直验（# 注释行容忍）。
 # 真源=宿主 ~/migrate-assets/dsv41/adapter/（bind mount 供给面，四机全等律）；
 #   分类口径参见 tools/packages/cfgmgmt/payload/out/ADAPTER-MANIFEST.regenerated（CODE31 D.3）。
+# 格式律（EQ-12，2026-10-30 定规范）：本清单只允许三类行——①条目行=^[0-9a-f]{32}+两空格+
+#   相对路径（md5sum -c 同形，禁绝对路径与 .. 段）；②注释行=统一 # 前缀（本头部，
+#   不可混淆前缀，md5sum -c 容忍）；③空行。其余任何行=格式红（fail-loud 拒比对）。
+# 校验工具=tools/adapter-manifest-verify.sh（只读、内建注释过滤、逐件 md5 对 manifest、
+#   输出「N 件差异」机器可判结果）。勿拿清单行数 vs 文件数判缺件——本头部注释行不是条目
+#   （外部手册 P3-7 假缺件教训：注释逐词被当路径=凭空多出假缺件）。
 ffdd73ec12640fd888a5dbf342aacad5  ./a23_parity_core.py
 237a96f33924622114e28f4a6265e712  ./a23_prefill_ar.py
 ecabf17bf87448a0c17a4b3c3cbfa4e3  ./admission_gate.py

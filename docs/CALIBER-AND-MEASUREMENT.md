@@ -77,9 +77,9 @@ ssh <USER>@<H1> 'curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:<TEST
 
 | 量具 | 参数风格 | URL 参数名与形态 | 并发参数写法 | 尺寸/题量参数名 | 输出文件字段结构 | 典型错法 → 报错码 |
 |---|---|---|---|---|---|---|
-| **qeval**（75 题质量门） | **子命令式**：`run <label>` / `compare <a> <b>`；`--key-file` 等是**顶层参数，必须写在子命令之前** | `--url`，**全路径**，带 `/v1/chat/completions`；默认 `http://127.0.0.1:<PORT>/v1/chat/completions` | `run --concurrency N`（默认 1；正典=1，>1 时 compare 会注记批噪声） | 无尺寸档：75 题固定；`--limit N` 取前 N 题冒烟，`--only code,math` 筛类别 | `~/qeval-results/qeval-<label>.json`（`--out-dir`/`QEVAL_OUT` 覆盖）：`{label, url, concurrency, wall_s, utc, median_tok_s, truncated, results:[{id, category, pass, why, content, finish_reason, completion_tokens, seconds, tok_s, …}]}`；`compare` 输出终端表格+McNemar p 值，不落文件 | 只给根路径 → 前置门 TRANSPORT 拒跑 **exit 2**（打印 http 405/404）；401/403 → AUTH 拒跑 **exit 2**；`--key-file` 放 `run` 之后 → argparse **exit 2**；不带子命令 → 打印帮助 **exit 64** |
-| **sd_bench**（PR/DE 主量具） | **旗标式**：`--mode pr|de` 必填（`--selfcheck` 时可省） | `--base-url`，**带 `/v1`**（脚本自拼 `/chat/completions`）；**默认=生产口 8899**，跑量具必须显式指 `<TEST_PORT>` | `--concurrency N` **单值**，只许 `{1,2,3,4,5,6,8,10,12,16,24,32}`；空格多值直接拒 | **`--sizes`**（`nargs="+"`，空格多值**合法**：`--sizes 8192 32768`）；**没有 `--targets`** | PR 模式：`{label, pr:[{target, prompt_tokens, ttft_s, tok_s, prompt_chars, chars_per_token, filler}]}`；DE 模式：`{label, de:[{type, conc, per, per_all, agg, completion}]}`——**每轮一行**（`--runs 5` ⇒ `de[]` 5 行）；**没有** `agg_tok_s`/`tok_s` 字段，单流看 `per`、聚合看 `agg` | `--targets 8192` → argparse **exit 2**；`--concurrency 1 2 4` → **exit 2**（`unrecognized arguments: 2 4`）；`--concurrency 7` → **exit 2**（允许清单外）；`--base-url …/v1/chat/completions` → 拼成 `/chat/completions/chat/completions` → **404**；忘传 `--base-url` → 打到生产口 |
-| **gsm8k**（GSM8K 质量门） | **旗标式**（无子命令） | `--base`，**不带 `/v1`**（脚本自拼 `/v1/chat/completions`）；默认网关 `<PORT>` | **无并发参数**：源码并发恒为 1，顺序出题（与历史口径一致） | 无尺寸档：题量 `--nq N`（默认 200；复现发布读数用 `--nq 500`），`--skip N` 跳题 | `--out-raw` jsonl，每行 `{i, gold, pred_content, pred_marker, ok_content, ok_marker, ct, sec, err}`；`--out-summary` json：`{accuracy_content, accuracy_marker, correct_content, correct_marker, err, median_ct, median_elapsed, nq, temperature, shots, concurrency, …}` | `--base-url …` → argparse **exit 2**（不识别）；`--base http://…:<TEST_PORT>/v1` → 拼成 `/v1/v1/chat/completions` → 每题 **HTTP 404**——**记进 err 字段、照常出 summary**（404 被算成错题，先看 `err` 计数再谈准确率） |
+| **qeval**（75 题质量门） | **子命令式**：`run <label>` / `compare <a> <b>`；`--key-file` 等是**顶层参数，必须写在子命令之前** | `--url`，**EQ-11 三形通吃**（origin / v1 基 / 全路径统一归一，见 §1.2 机读表）；默认 `http://127.0.0.1:<PORT>/v1/chat/completions`；旧正确形（全路径）请求 URL 逐字节不变，根路径/带 `/v1` 的旧 405/404 形现可用 | `run --concurrency N`（默认 1；正典=1，>1 时 compare 会注记批噪声） | 无尺寸档：75 题固定；`--limit N` 取前 N 题冒烟，`--only code,math` 筛类别 | `~/qeval-results/qeval-<label>.json`（`--out-dir`/`QEVAL_OUT` 覆盖）：`{label, url, concurrency, wall_s, utc, median_tok_s, truncated, results:[{id, category, pass, why, content, finish_reason, completion_tokens, seconds, tok_s, …}]}`；`compare` 输出终端表格+McNemar p 值，不落文件 | 参数错一律**exit 2 + 首行 `ERROR[qeval.py…]: …` 到 stderr**（EQ-11 契约，管道 `2>&1|grep ERROR` 必命中）：错 URL 形（无 scheme/无 host）→ 起跑即拒（不进前置门）；`--key-file` 放 `run` 之后 → argparse 拒起；缺 `label`/缺子命令 → 拒起（旧 exit 64 已废）；401/403 → 前置门 AUTH 拒跑 **exit 2**（运行时门，stdout 打 `REFUSED`） |
+| **sd_bench**（PR/DE 主量具） | **旗标式**：`--mode pr|de` 必填（`--selfcheck` 时可省） | `--base-url`，**EQ-11 三形通吃**（origin / v1 基 / 全路径统一归一，见 §1.2 机读表）；**默认=生产口 8899**，跑量具必须显式指 `<TEST_PORT>`（此点未变）；旧正确形（带 `/v1`）请求 URL 逐字节不变，全路径旧 `/chat/completions/chat/completions` 404 形现可用 | `--concurrency N` **单值**，只许 `{1,2,3,4,5,6,8,10,12,16,24,32}`；空格多值直接拒 | **`--sizes`**（`nargs="+"`，空格多值**合法**：`--sizes 8192 32768`）；**`--targets` 是 `--sizes` 的等价别名（EQ-11）** | PR 模式：`{label, pr:[{target, prompt_tokens, ttft_s, tok_s, prompt_chars, chars_per_token, filler}]}`；DE 模式：`{label, de:[{type, conc, per, per_all, agg, completion}]}`——**每轮一行**（`--runs 5` ⇒ `de[]` 5 行）；**没有** `agg_tok_s`/`tok_s` 字段，单流看 `per`、聚合看 `agg` | 参数错一律**exit 2 + 首行 `ERROR[sd_bench.py]: …` 到 stderr**（EQ-11 契约）：错 URL 形 → **Client 构造即拒**（不再等到请求 404）；错档型名（`--type bogus`）/`--concurrency 7`/`--concurrency 1 2 4`（unrecognized）/未知旗标 → 拒起首行可 grep；忘传 `--base-url` → 仍打生产口（默认值未动，用 `pr_ladder6.sh` 的 8899 硬拒护栏） |
+| **gsm8k**（GSM8K 质量门） | **旗标式**（无子命令） | `--base`（**别名 `--base-url`，EQ-11**），**三形通吃**（origin / v1 基 / 全路径统一归一，见 §1.2 机读表）；默认网关 `<PORT>`；旧正确形（origin）请求 URL 逐字节不变，带 `/v1` 的旧 `/v1/v1/…` 逐题 404 形现可用 | **无并发参数**：源码并发恒为 1，顺序出题（与历史口径一致） | 无尺寸档：题量 `--nq N`（默认 200；复现发布读数用 `--nq 500`），`--skip N` 跳题 | `--out-raw` jsonl，每行 `{i, gold, pred_content, pred_marker, ok_content, ok_marker, ct, sec, err}`；`--out-summary` json：`{accuracy_content, accuracy_marker, correct_content, correct_marker, err, median_ct, median_elapsed, nq, temperature, shots, concurrency, …}` | 参数错一律**exit 2 + 首行 `ERROR[gsm8k_dsv41.py]: …` 到 stderr**（EQ-11 契约）：错 URL 形 → **起跑即拒**（不再逐题 404 记进 err）；`--nq 0` → 拒起（旧版裸 IndexError traceback 已收口）；未知旗标/错前缀歧义 → argparse 拒起 |
 | **needle**（长上下文探针） | **旗标式**（无子命令） | `--base`，**不带 `/v1`**；默认 `http://127.0.0.1:8898`（即测试口） | 无并发参数（单问单答） | **`--sizes`**（空格多值；默认 `8192 32768 65536 131072`；600k 档须显式 `--form r1`） | `{seed, base, form, form_limit, water_m, rows:[{target_tokens, est_tokens, magic, prompt_tokens, completion_tokens, elapsed_s, answer_head, status: PASS/FAIL/SKIP, reason|error}], n_pass, n_fail, n_skip, gate_pass}` | `--base …/<TEST_PORT>/v1` → `/v1/v1/…` → 异常 → 全行 **SKIP**（`gate_pass:false`，无证据不得放行）；600k 不带 `--form r1` → **SKIP**「形态门：form=unknown 上限 131072，档 600000 超限」 |
 
 补充一个**伴生量具**（不在四行表里，但同属量具族）：`tools/accept_window.py`
@@ -94,20 +94,27 @@ ssh <USER>@<H1> 'curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:<TEST
 
 - 参数风格/URL：`--help` 实测输出为旗标式（`--mode {de,pr}`、`--type`、`--sizes
   [SIZES ...]`、`--pr-filler {repeated,random,real}` 等）。源码 `main()`：
-  `--base-url` 缺省 `http://127.0.0.1:8899/v1`（生产口+带 `/v1`）；`Client.stream()`
-  实际 POST 到 `f"{self.base}/chat/completions"`——所以 `--base-url` 带不带
-  `/v1` 的分界就在这一行：**带 `/v1`，不要带 `/chat/completions`**。
+  `--base-url` 缺省 `http://127.0.0.1:8899/v1`（生产口；EQ-11 后默认值未动）；
+  EQ-11 起 `Client.__init__` 经共享构造处 `bench_url.v1_base()` **三形通吃归一**
+  （origin / v1 基 / 全路径 → v1 基），`Client.stream()` 实际 POST 到
+  `f"{self.base}/chat/completions"`。旧正确形（带 `/v1`）归一后请求 URL
+  **逐字节不变**（`--selfcheck` §EQ-11 断言）；错 URL 形在 Client 构造时即
+  **exit 2 + 首行 `ERROR[sd_bench.py]: …`**，不再等到请求 404。
 - 并发：`--concurrency` 是 `type=int` 的**单值**参数；取值必须落在
-  `ALLOWED_CONC = (1,2,3,4,5,6,8,10,12,16,24,32)`，否则打印
-  `concurrency 必须是 (1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 24, 32)` 并 **exit 2**
-  （实测复现）。`--concurrency 1 2 4` 里 argparse 只吃 `1`，`2 4` 变成多余位置
-  参数 → `unrecognized arguments: 2 4`，**exit 2**（实测复现）。并发档必须
-  **逐档串行循环**。
+  `ALLOWED_CONC = (1,2,3,4,5,6,8,10,12,16,24,32)`，否则首行
+  `ERROR[sd_bench.py]: --concurrency 必须是 (1, 2, …, 32)（got N）` 并
+  **exit 2**（EQ-11 契约化）。`--concurrency 1 2 4` 里 argparse 只吃 `1`，
+  `2 4` 变成多余位置参数 → `unrecognized arguments: 2 4`，**exit 2**（实测
+  复现）。并发档必须**逐档串行循环**。
 - 尺寸：参数名是 `--sizes`，`nargs="+"`（`--sizes 8192 16384 32768` 合法）。
-  **不存在 `--targets`**：写 `--targets 8192` → `unrecognized arguments:
-  --targets 8192`，**exit 2**（实测复现）。特别注意：这个错如果在管道里接了
-  `grep`，会变成**静默空输出**，看着像"量具坏了"——量具命令要么先裸跑一次
-  看退出码，要么确认 json 落了地，别拿空输出当"跑过了"。
+  EQ-11 起 **`--targets` 是 `--sizes` 的等价别名**（同一 dest，写哪个都行）。
+  注意 argparse 默认**前缀缩写**仍开着（既有语义，未动）：`--target` 会命中
+  `--targets`、`--size` 会命中 `--sizes`（都不报错）；真正未知的名字（如
+  `--tiers`/`--tier`）→ 首行 `ERROR[sd_bench.py]: unrecognized arguments: …`
+  + **exit 2**（实测复现）。EQ-11 前这个错在管道里接 `grep` 会变成**静默空
+  输出**；现在 stderr 首行就是可 grep 的 `ERROR[...]` 摘要——量具命令仍建议
+  先裸跑一次看退出码，但空输出不再是唯一线索。另：**别拿缩写当挡箭牌**——
+  缩写命中后若忘传 `--base-url`，量具仍会打默认生产口（见 §0.2）。
 - `--runs` 语义：只进 `run_de(..., a.runs)`，**DE 模式生效**（每轮一行写进
   `de[]`）；`run_pr()` 的签名里根本没有 runs——**PR 模式 `--runs` 被忽略**，
   一次调用每个尺寸只发一发。所以"64k×3 取中位"= **三次独立调用**，不是
@@ -131,12 +138,17 @@ ssh <USER>@<H1> 'curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:<TEST
   **顶层 parser** 上。`run` 的 `run --help` 实测只列出
   `--url/--timeout/--concurrency/--only/--limit`——顶层参数放到子命令之后会
   `unrecognized arguments`，**exit 2**（实测复现；源码头注记录过 2026-09-25
-  两次照抄错示例撞上此坑）。不带子命令 → `ap.print_help()` + **exit 64**。
-- URL：`DEFAULT_URL = "http://127.0.0.1:8899/v1/chat/completions"`，**全路径、
-  逐字使用、不自拼**。只给根路径/`/v1` 时 POST 打到错误路径，返回 405/404；
-  qeval 的**前置门** `preflight()` 把非 2xx 分类为 TRANSPORT（401/403 → AUTH），
-  打印 `REFUSED: 前置门未过（…）—— 不出质量分` 并 **exit 2**——它宁可拒跑
-  也不把传输错误读成"质量全红"。
+  两次照抄错示例撞上此坑）。EQ-11 起不带子命令 → 首行
+  `ERROR[qeval.py]: 缺子命令：…` + **exit 2**（旧 `print_help` 到 stdout +
+  exit 64 已废）。
+- URL：`DEFAULT_URL = "http://127.0.0.1:8899/v1/chat/completions"`，**全路径**
+  （旧正确形，EQ-11 归一后请求 URL 逐字节不变）。EQ-11 起 `--url` 经共享构造处
+  `bench_url` **三形通吃**：origin / v1 基 / 全路径统一归一到
+  `…/v1/chat/completions`（旧「只给根路径/`/v1` → 405/404」形现可用）；错
+  URL 形（无 scheme/无 host）起跑即 **exit 2 + 首行 `ERROR[qeval.py]: …` 到
+  stderr**，不进前置门。运行时门不变：`preflight()` 把非 2xx 分类为 TRANSPORT
+  （401/403 → AUTH），打印 `REFUSED: 前置门未过（…）—— 不出质量分` 并
+  **exit 2**——它宁可拒跑也不把传输错误读成"质量全红"。
 - 并发：`run --concurrency`，默认 1。正典口径=1（题序固定时 greedy 才
   run-to-run 可复现）；>1 时 `compare` 会注记 `some flips may be batching noise`。
 - 输出：`os.makedirs(out_dir)` 后写 `qeval-<label>.json`，顶层字段
@@ -144,22 +156,27 @@ ssh <USER>@<H1> 'curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:<TEST
 - 佐证（离线，不连引擎；先准备含 `API_KEY=` 的 env 文件再跑正式量）：
   ```bash
   python3 <repo>/tools/bench/qeval.py --selftest
-  # 期望末行：selftest 15/15
+  # 期望末行：selftest 20/20
   ```
 
 **gsm8k（`tools/bench/gsm8k_dsv41.py`）**
 
 - 参数风格：`--help` 实测为旗标式：`--base/--api-key/--model/--temperature/
-  --max-tokens/--nq/--skip/--data/--out-raw/--out-summary`。**没有 `--base-url`、
-  没有任何并发参数**（源码 `CONC = 1` 常量，顺序出题，与历史口径一致）。
-- URL：`BASE = "http://127.0.0.1:8899"`（网关、**不带 `/v1`**）；请求行
-  `BASE + "/v1/chat/completions"`，`--base` 值先 `rstrip("/")`。所以：
-  - `--base http://127.0.0.1:<TEST_PORT>` → 正确拼出 `/v1/chat/completions`；
-  - `--base http://127.0.0.1:<TEST_PORT>/v1` → 拼出 `/v1/v1/chat/completions`
-    → 每题 HTTP 404（离线复现拼接结果）。**gsm8k 没有前置门**：每题的异常被
-    `except` 捕获、写进该行 `err` 字段，`ok_content=False` 照常计入准确率——
-    全 404 时 summary 会给你一个难看的 `accuracy_content: 0.0` 和
-    `err: nq`。**先看 `err` 计数，err 大就是取数面问题，不是质量面问题。**
+  --max-tokens/--nq/--skip/--data/--out-raw/--out-summary`。EQ-11 起 **`--base-url`
+  是 `--base` 的等价别名**；仍然**没有任何并发参数**（源码 `CONC = 1` 常量，
+  顺序出题，与历史口径一致）。
+- URL：`BASE = "http://127.0.0.1:8899"`（网关）；EQ-11 起 `--base`/`--base-url`
+  经共享构造处 `bench_url.v1_base()` **三形通吃归一**（origin / v1 基 / 全路径
+  → v1 基），请求行 `BASE + "/chat/completions"`。所以：
+  - `--base http://127.0.0.1:<TEST_PORT>` → 旧正确形，请求 URL **逐字节不变**；
+  - `--base http://127.0.0.1:<TEST_PORT>/v1`（旧 `/v1/v1/…` 逐题 404 形）→
+    归一后**可用**；
+  - 错 URL 形（`not-a-url`/`http://`）→ 起跑即 **exit 2 + 首行
+    `ERROR[gsm8k_dsv41.py]: …` 到 stderr**（旧版要等逐题 404 记进 err 才能看出）。
+    `--nq 0` 同契约拒起（旧版裸 IndexError traceback 已收口）。
+    **取数面运行时纪律不变**：可达但路径/鉴权错时每题异常仍被 `except` 捕获、
+    写进该行 `err` 字段，`ok_content=False` 照常计入准确率——**先看 `err`
+    计数，err 大就是取数面问题，不是质量面问题**。
 - 题量/题源：`--nq`（默认 200）+`--skip`；题源 `--data`（默认
   `~/data/gsm8k_test.jsonl`，或环境变量 `GSM8K_DATA`）。本仓不附题集，需自备
   GSM8K `test.jsonl`（每行含 `question`/`answer`）。
@@ -194,6 +211,59 @@ ssh <USER>@<H1> 'curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:<TEST
 fallback 需 `--census`（须与 DE 同窗的 census json）+ `--de`（可多份 sd_bench
 DE json）。有 `--selfcheck` 离线自测。
 
+### 1.2 机读参数对照表（EQ-11；JSON，供脚本/校验器消费）
+
+三件 bench 量具的 URL 参数面自 0.3.4re EQ-11 起统一由共享构造处
+`tools/bench/bench_url.py` 承担（三形通吃归一 + 拒起首行 ERROR 摘要）。
+下表为机读对照（`url_forms` 三形等价；`error_contract` 为一切参数错的统一契约）：
+
+```json
+{
+  "table_id": "bench-cli-params-v2",
+  "origin_unit": "EQ-11 (0.3.4re, 2026-10-30)",
+  "shared_module": "tools/bench/bench_url.py",
+  "url_join_rule": "request_url = v1_base(flag_value) + '/chat/completions'; v1_base: strip trailing '/', strip trailing '/chat/completions', empty path -> append '/v1'",
+  "error_contract": {"exit_code": 2, "stderr_first_line_prefix": "ERROR[<prog>]:", "pipe_grep": "… 2>&1 | grep ERROR"},
+  "tools": {
+    "sd_bench.py": {
+      "url_flags": ["--base-url"], "url_default": "http://127.0.0.1:8899/v1",
+      "url_forms": ["origin", "v1_base", "full_path"],
+      "tier_flags": ["--sizes", "--targets"], "tier_note": "--targets is alias of --sizes (same dest)",
+      "concurrency_flag": "--concurrency (single int, allowed {1,2,3,4,5,6,8,10,12,16,24,32})",
+      "legacy_correct_form": "v1_base", "legacy_bad_forms_now_fixed": ["full_path -> was /chat/completions/chat/completions 404"],
+      "offline_check": "python3 tools/bench/sd_bench.py --selfcheck  # 末行 SELFCHECK PASS（含 §EQ-11 断言）"
+    },
+    "qeval.py": {
+      "url_flags": ["run --url"], "url_default": "http://127.0.0.1:8899/v1/chat/completions",
+      "url_forms": ["origin", "v1_base", "full_path"],
+      "tier_flags": [], "note": "no tiers; --limit N / --only cats",
+      "concurrency_flag": "run --concurrency (default 1; canon=1)",
+      "legacy_correct_form": "full_path", "legacy_bad_forms_now_fixed": ["origin/v1_base -> was 405/404 preflight refusal"],
+      "misc": "missing subcommand now exit 2 + ERROR first line (was help-to-stdout exit 64)",
+      "offline_check": "python3 tools/bench/qeval.py --selftest  # 末行 selftest 20/20（含 S11-S13 EQ-11 断言）"
+    },
+    "gsm8k_dsv41.py": {
+      "url_flags": ["--base", "--base-url"], "url_default": "http://127.0.0.1:8899",
+      "url_forms": ["origin", "v1_base", "full_path"],
+      "tier_flags": [], "note": "no tiers; --nq N (default 200), --skip N; --nq 0 rejected exit 2",
+      "concurrency_flag": null,
+      "legacy_correct_form": "origin", "legacy_bad_forms_now_fixed": ["--base-url unrecognized; v1_base form -> was /v1/v1/chat/completions per-question 404"],
+      "offline_check": "python3 -m py_compile tools/bench/gsm8k_dsv41.py; 错 URL 形/错参数负例 exit 2 且 stderr 首行 ERROR[gsm8k_dsv41.py]:"
+    },
+    "needle_probe.py": {
+      "url_flags": ["--base"], "url_default": "http://127.0.0.1:8898",
+      "url_forms": ["origin only"], "note": "EQ-11 未接入共享构造处（tools/ 面，冻结量具另批）：带 /v1 仍会 /v1/v1/… → 该档 SKIP",
+      "tier_flags": ["--sizes"], "concurrency_flag": null
+    }
+  },
+  "invariant": "对三件已接入量具：旧正确形传参（sd_bench 带 /v1 / gsm8k 不带 /v1 / qeval 全路径）归一后的请求 URL 与旧版逐字节相同；输出 schema 零变更"
+}
+```
+
+抽样对表纪律：改任一件参数面后，跑 `sd_bench --selfcheck`/`qeval --selftest`
+（含 EQ-11 断言）+ 上表 `offline_check` 所列负例（错 URL 形/错档位名逐件
+exit 2 且 stderr 首行 `ERROR[…]`），再更新本表 `table_id` 版本号。
+
 ---
 
 ## 2. 各量具正典命令与判据
@@ -205,7 +275,7 @@ DE json）。有 `--selfcheck` 离线自测。
 ```bash
 python3 <repo>/tools/bench/sd_bench.py --selfcheck   # 期望末行：SELFCHECK PASS
 python3 <repo>/tools/needle_probe.py --selfcheck     # 期望末行：SELFCHECK PASS
-python3 <repo>/tools/bench/qeval.py --selftest       # 期望末行：selftest 15/15
+python3 <repo>/tools/bench/qeval.py --selftest       # 期望末行：selftest 20/20
 ```
 
 ### 2.1 PR 七档（prefill 吞吐）
@@ -290,7 +360,7 @@ python3 <repo>/tools/bench/gsm8k_dsv41.py \
 
 ```bash
 # 判别力自检（不连引擎）
-python3 <repo>/tools/bench/qeval.py --selftest          # 期望 selftest 15/15
+python3 <repo>/tools/bench/qeval.py --selftest          # 期望 selftest 20/20
 
 # 改配置前 / 后各跑一次（--key-file/--key-var 是顶层参数，必须在 run 之前）
 python3 <repo>/tools/bench/qeval.py --key-file ~/gateway.env --key-var API_KEY run before
@@ -360,8 +430,11 @@ boot rc=0 且 health 200 后的**第一动作**是 warm 请求步（64k×2），
 
 - 判据：**`prompt_tokens` 与前一次完全一致 ⇒ 耗时差异来自缓存，不是性能变化**。
 - 量具侧已内置：sd_bench PR 每次调用 fresh salt（uuid）防跨调用前缀缓存、
-  needle 靠 seed 播种换文本。**但手发 curl 不享受这些**——自己发请求必须把
-  独立 nonce 放进提示词开头：
+  needle 靠 seed 播种换文本。EQ-11 复核（2026-10-30）：sd_bench `run_pr` 的
+  warmup/单发/`--runs N>1` 逐发**各自独立 uuid4 salt** 且产物行内记 salt、
+  `--selfcheck` 对 shots salt 重复必红——**无需再加显式 `--nonce` 参数**
+  （salt 即 nonce，且可事后对账）。**但手发 curl 不享受这些**——自己发请求
+  必须把独立 nonce 放进提示词开头：
 
 ```bash
 ssh <USER>@<H1> 'curl -s http://127.0.0.1:<TEST_PORT>/v1/chat/completions \
@@ -439,6 +512,34 @@ EOF
 独立测试都复现才写进报告，并注明"现象已复现、根因未查"。另一面，"越并越慢且
 单请求也掉"的单调恶化是通信面退到慢路径的指纹，与噪声可分——那是排障词典的
 领域（见文末分工）。
+
+### 3.9 外部 prose 双读数：同文档两组反向，先分组再引用（bug #20 落锚）
+
+外部移植报告（switch-v2026.10.15-b20）在同一文档里给过两个方向相反的 prose
+C1 读数：**83.77**（组 C）与 **80.77**（组 D）。两组成立条件不同，外部本身
+未合并解释——这不是"哪个数对"的问题，是**两组口径各自成立**：
+
+- **组 C=83.77**：完整 2048-token 输出；与 hybrid_v2 同提示交叉控制；C1 配对
+  完整流 3/3（外部 `reports/RESULTS.md`「四场景展示表」，`UPSTREAM-REPORT`
+  §2.3 同表）。
+- **组 D=80.77**：不改动公开 sd_bench（SHA256 `060884e4…`）；DE prose；
+  max-tokens=400；自然停止；每类 5 次取中位；五次实际输出全部为 400=打满上限
+  截断形（`UPSTREAM-REPORT` §2.1）。
+- **两口径之间没有换算式**：输出预算（2048 完整 vs 400 截断）、统计形（配对
+  完整流 vs 5 次中位）与用途（交叉控制排名 vs 对锚差值）均不同。**不平均、
+  不反向择用、不把差值（+3.0，约 +3.7%）归因任何一方**；跨组比较的唯一合法
+  路径=同口径复测。
+- 带差定位（各自对同一参照锚 82.17 现役锚=FL6-PROMO warm；TRI-MATRIX TSV
+  81.83 同带、81.67 V4.1 历史锚；**仅注记，非换算系数**）：组 C **+1.95%**、
+  组 D **−1.70%**——「同文档双读数反向」即由此来。
+- 纪律：**凡引用任一外部 prose 读数必须带组标签（C/D）与成立条件**（不辨
+  口径即引用=判负，负表#16 先例）；组 D 与本仓 mt400 正典（§2.2）形制相近，
+  但器不同（外部公开 sd_bench vs 本仓冻结件）、栈不同，**仍属带外**——本仓
+  一切判读只对本仓 mt400 正典锚。
+- 登记出入：F5-PREP-HANDOFF §四 预登记表组 C 括注「自然停止、每类 5 次」实为
+  组 D（§2.1）的条件描述，与外部原文不符；本落锚（0.3.4re DF-12，2026-10-30）
+  以外部报告原文为准。量具侧摘要同律见
+  [`tools/bench/README.md`](../tools/bench/README.md) §3.1。
 
 ---
 
@@ -547,7 +648,8 @@ ssh <USER>@<H1> 'nvidia-smi -q -d PERFORMANCE | grep -E "Performance State|Clock
 ### 6.2 三不比：跨量具 / 跨填充 / 跨代际
 
 - **跨量具不比**：sd_bench 的 `per`/`agg` 与别的工具的 tok/s 不是同一算式
-  （§1.1 字段差异）；仪表盘数字、mt64 数字不与 mt400 正典对照。
+  （§1.1 字段差异）；仪表盘数字、mt64 数字不与 mt400 正典对照；外部报告的
+  prose 双读数（83.77/80.77）按 C/D 口径分组引用、不合并不换算（§3.9）。
 - **跨填充不比**：repeated/random/real 三档互不可比（§3.4）。
 - **跨代际不比**：旧代引擎上做的 A/B 结论，换代后全部失效必须重做；报告里
   写清"这是哪一代引擎上的读数"，否则下一个人会拿旧结论覆盖你的。

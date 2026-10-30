@@ -10,7 +10,7 @@
 #                          （与模型自带 SHA256SUMS 首行逐字一致）
 #       tokenizer_config.json 存在但无 added_tokens_decoder（added token 表只在
 #                          tokenizer.json 的 added_tokens 数组，HF fast 格式）
-#   - 本机同源副本：/home/liuxiaoya/models/DeepSeek-V4-Flash-Vision-Exp
+#   - 本机同源副本：/home/<deploy-user>/models/DeepSeek-V4-Flash-Vision-Exp
 #       tokenizer.json     sha256 与 1017 逐字节相同（c90dfa01…476b）
 #   - 官方对照样本（不作为我方断言目标，E4 带外，EV-05-005）：
 #       deepseek-recipe static/tokenizers/v41 —— 修改副本，id 129264 = <｜image｜>

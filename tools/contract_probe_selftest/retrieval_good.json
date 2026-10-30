@@ -1,0 +1,17 @@
+{
+  "id": "chatcmpl-fixture-retrieval-good",
+  "object": "chat.completion",
+  "created": 1760000003,
+  "model": "deepseek-v4.1-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "3f2a9c1d"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {"prompt_tokens": 33124, "completion_tokens": 8, "total_tokens": 33132}
+}

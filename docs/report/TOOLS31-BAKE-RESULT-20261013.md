@@ -1,7 +1,7 @@
 # TOOLS31-BAKE-RESULT-20261013 — LuZ-0.3.1 容器烘焙停机窗结果档
 
 > 法源：BAKE-PENDING-FINAL-GATE.md 案头批全序+TOOLS31-PACKAGE-PLAN §五+ARCHIVE-EXEC1 §五
-> 第二批八项+用户窗令（含 G7 追加与 S9 暂缓两裁定）。执行机：dgxspark01（head）+四机栈；
+> 第二批八项+用户窗令（含 G7 追加与 S9 暂缓两裁定）。执行机：<node01>（head）+四机栈；
 > 执行窗 2026-10-13 15:27:33Z–17:0xZ UTC（OUTAGE 15:29:52Z→16:53:52Z，两靴窗含沉降
 > 1800s×2）。判读线 G1-G6 开窗冻结+G7 用户指令追加冻结（run.log 在档零事后改；执行中
 > 勘正 1-6 均量具面/判据场景面缺陷，原行永留可溯）。
@@ -24,7 +24,7 @@
 
 | 项 | 值 |
 |---|---|
-| tag | 192.168.5.187:5000/dsv41-sglang-optimized:0.3.1（registry 新 repo；lmsysorg/sglang 原位不动） |
+| tag | <registry-host>:5000/dsv41-sglang-optimized:0.3.1（registry 新 repo；lmsysorg/sglang 原位不动；registry 主机已脱敏） |
 | image id / registry digest | sha256:79e701ab4658013ce51855cc8ed97b09f892b20287bebd58b204934a1267cfd5 |
 | 内容身份 cid | 658a5fe6436510ed（RootFS 层链 sha256 前 16 位；四机全等亲证×4） |
 | 体量/层数 | docker images SIZE=48.6GB（共享基座面）/inspect .Size=14,439,685,902B/71 层（70 基座+1 COPY） |
@@ -38,7 +38,7 @@
 
 ## 三、产线复原态亲证（S6）
 
-- 复原靴 BAKE031R：**原基座镜像** 192.168.5.187:5000/lmsysorg/sglang:main-79cafec0
+- 复原靴 BAKE031R：**原基座镜像** <registry-host>:5000/lmsysorg/sglang:main-79cafec0
   （r3prod-head Image= 直证；boot 脚本=~/migrate-assets/bin/r3-boot-arm.sh 原位零触碰
   c051bb41）+**51 键终值形**（ENV51 2ac74586/51 键+sitecustomize 55b1e412+fl6_recall
   b87cbb5e ×4+overlay o12c1-prod 29+SPEC6）。

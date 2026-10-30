@@ -23,9 +23,10 @@
 ## §1 四机审计（只读，30 秒）
 
 ```bash
-for h in 186 187 188 189; do
-  echo "── 0$((h-185)):"
-  ssh 192.168.5.$h 'show_gids | grep -v fe80; echo; \
+# 注：占位符 <node0N>/<fabric-ip> 为 20261030 脱敏，实际执行时替换为真实主机名/IP。
+for h in <node01> <node02> <node03> <node04>; do
+  echo "── $h:"
+  ssh $h 'show_gids | grep -v fe80; echo; \
     for c in rocep1s0f0 rocep1s0f1 roceP2p1s0f0 roceP2p1s0f1; do
       t=$(cat /sys/class/infiniband/$c/ports/1/gid_attrs/types/3 2>/dev/null)
       [ "$t" = "RoCE v2" ] || echo "HOLE: $c idx3=[$t]"
@@ -42,9 +43,9 @@ done
 add 同地址。GID 表随即紧凑重建（v1@2、v2@3）。
 
 ```bash
-# 例：03 的 rocep1s0f1（netdev 名查法见下）挂 10.100.138.2/24
-ssh 192.168.5.188 'sudo -S sh -c "ip addr del 10.100.138.2/24 dev enp1s0f1np1 && \
-  ip addr add 10.100.138.2/24 dev enp1s0f1np1 && echo CYCLE-OK"' < ~/.sudopw
+# 例：03 的 rocep1s0f1（netdev 名查法见下）挂 <fabric-ip>/24
+ssh <node03> 'sudo -S sh -c "ip addr del <fabric-ip>/24 dev enp1s0f1np1 && \
+  ip addr add <fabric-ip>/24 dev enp1s0f1np1 && echo CYCLE-OK"' < ~/.sudopw
 
 # HCA → netdev 名映射（勿背表，动态查）：
 cat /sys/class/infiniband/rocep1s0f1/ports/1/gid_attrs/ndevs/2   # → enp1s0f1np1
@@ -99,7 +100,7 @@ bash ~/w6-kit/s4_bench.sh verify
   `spbm` power11_cap≈20W vs 健康 140W）
 - 集群杀伤：TP4 单机楔死 ⇒ 全体 collective 等它 ⇒ **prefill 均匀减半**
   （2026-09-21 实测 5000→2500 t/s，排除链走完镜像/env/ctx/表/fabric 全洗脱才落到这）
-- 2026-09-21 实锤：dgxspark02 钉 721MHz（96%util/15W），01/03/04 健康 2380+MHz
+- 2026-09-21 实锤：<node02> 钉 721MHz（96%util/15W），01/03/04 健康 2380+MHz
 
 **修复（社区多帖确认的唯一有效法）**：
 1. 关机 → **拔墙上 AC 插座（不是机箱端 USB-C！）1-2 分钟**（有帖建议按住电源键

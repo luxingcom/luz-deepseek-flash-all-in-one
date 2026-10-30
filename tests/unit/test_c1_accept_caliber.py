@@ -21,7 +21,7 @@ import pytest
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 MODULE_PATH = os.path.join(REPO, "tools", "obs", "c1_accept_caliber.py")
-REAL_DATA = "/home/liuxiaoya/luz030-opt-campaign/logs/S-W4-20261024/bench/sched-stats-tp0-lines.txt"
+REAL_DATA = "/home/<deploy-user>/luz030-opt-campaign/logs/S-W4-20261024/bench/sched-stats-tp0-lines.txt"
 REAL_MD5 = "ad740fffd4eca6c0f400a17d27455593"
 
 _spec = importlib.util.spec_from_file_location("c1_accept_caliber", MODULE_PATH)

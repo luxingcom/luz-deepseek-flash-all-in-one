@@ -12,7 +12,7 @@
 #      +CRIT-STANDING 驻留文件（6 轮绿滞回清除）。
 #   尾部（01 机）：fabric-restore-gate.sh Phase1（引擎死态五判据 READY-TO-BOOT 广播）。
 # 铁律遵守：RX_EXPECT=8192 本窗不动（ring4096 裁降未执行）；02 机双单元零触碰；
-#   01 机 macgw /30 副地址（192.168.0.2）不在任何动作面。
+#   01 机 macgw /30 副地址（<mgmt-node-ip>）不在任何动作面。
 set -u
 
 # ── CFG（阈值一处集中；5min 窗口径；一切阈值=推荐值实施窗可调）───────────────
@@ -654,7 +654,9 @@ fi
 echo "[fabric-guard] $(hostname) $fg_ts verdict=$VERDICT($vstr) red=[${RED_PARAM## }] warn=[${WARN_FACE## }] flap1h=${n1h_v:-0} flap24h=${n24h_v:-0} heal1h=${heal_n1h:-0} fecΔ=$fec_tot crcΔ=$crc_tot oobΔ=$oob_tot p0dΔ=$p0d_tot oosΔ=$oos_tot cnpΔ=$cnp_tot first_round=$first_round"
 
 # ── 尾部：restore-gate Phase1（仅 01 机；五判据 READY-TO-BOOT 广播）─────────
-if [ "$(hostname)" = "dgxspark01" ] && [ -x "$GATE_SH" -o -f "$GATE_SH" ]; then
+# 20261030 脱敏：01 机判定改经 NODE01_HOST 注入；未注入时本 01 专属分支按未命中
+# 跳过（worker 机行为不变），01 机部署必须注入 NODE01_HOST 才能保留该门。
+if [ -n "${NODE01_HOST:-}" ] && [ "$(hostname)" = "${NODE01_HOST}" ] && [ -x "$GATE_SH" -o -f "$GATE_SH" ]; then
   bash "$GATE_SH" >/dev/null 2>&1 || true
 fi
 exit 0

@@ -39,7 +39,7 @@
 |---|---|
 | 节点 | 4× NVIDIA DGX Spark（GB10，SM121，ARM aarch64，UMA 架构） |
 | 拓扑 | TP4；**0.3.2 现役=双 rail 以太交换机**，每机 2 口 HCA 部署对 `rocep1s0f0,roceP2p1s0f1`，`B12X_ROCE_TOPOLOGY=switched`+`LUZ_SWITCH_ROCE_FLAT=1`+`TC=106`；NCCL 用同一部署对 + `NCCL_IB_TC=106`。4 口 CX-7 hairpin 环网=0.3.1 及更早历史形，两形不可混拼 |
-| 角色 | rank0=head dgxspark01（192.168.0.201）；rank1=dgxspark02（.202）；rank2=dgxspark04（.204）；rank3=dgxspark03（.203）〔net-rebuild-20261015 管理段重编址〕 |
+| 角色 | rank0=head <node01>（<mgmt-node-ip>）；rank1=<node02>（<mgmt-node-ip>）；rank2=<node04>（<mgmt-node-ip>）；rank3=<node03>（<mgmt-node-ip>）〔net-rebuild-20261015 管理段重编址；IP 具体值已脱敏〕 |
 
 ## 2. 系统依赖（版本锚——系统级件不随仓分发，逐项对版）
 
@@ -56,7 +56,7 @@
 ## 3. 镜像获取
 
 见 [README §二](../README.md#二镜像下载内网-registry-直链)：现役基座
-`192.168.0.202:5000/lmsysorg/sglang:main-79cafec0`（48.6GB，
+`<registry-host>:5000/lmsysorg/sglang:main-79cafec0`（48.6GB，
 sha256 `0f075735…cf3ae`）。四机 `docker pull` 后以 RepoDigest 对表指纹。
 0.3.2 现役=**`dsv41-sglang-optimized:0.3.2-r032c`**（digest
 `sha256:47f6d91a…e2ffc4`，71 层=基座 70+1）；可直接 pull，或按
@@ -79,8 +79,8 @@ VL 线已切 SGLang 单基座（vLLM 两形移历史/备份注记，见 README �
 
 | 机 | 路径 | 内容 |
 |---|---|---|
-| dgxspark01/02 | `/data/models/DeepSeek-V4.1-Flash-1017/` | 1017 权重 84 文件 / 510,311,045,870 B（`config.json` sha256 `8be45ce0…21879`） |
-| dgxspark03/04 | `/data/models/dsv41-net/`（符号链接 `/data/models/DeepSeek-V4.1-Flash-1017`） | 同权重 NFS 只读位（源 10.10.1.11/21） |
+| <node01>/<node02> | `/data/models/DeepSeek-V4.1-Flash-1017/` | 1017 权重 84 文件 / 510,311,045,870 B（`config.json` sha256 `8be45ce0…21879`） |
+| <node03>/<node04> | `/data/models/dsv41-net/`（符号链接 `/data/models/DeepSeek-V4.1-Flash-1017`） | 同权重 NFS 只读位（源 <nfs-server-ip>×2） |
 
 逐文件 sha256=`deploy/reconstruct/0.3.2/weights/DeepSeek-V4.1-Flash-1017.sha256`
 （84 行）；NFS 导出/挂载/秩映射=`weights/WEIGHTS.md`。
@@ -131,8 +131,9 @@ engram 分片（**宿主生成物，约 189G，不随仓分发**）：`~/dsv41-e
 | **51 键 FL6 形（0.3.1 历史）** | `PROD-R51W5-FL6FIX-spec1.env` / 2ac74586（服务器位名=`PROD-R51W5FL6-spec1.env`） | 0.3.1 定型形；0.3.2 下为历史/复现样本 |
 | **50 键形（深回退）** | `PROD-R51W5-spec1.env` / 15767aa6 | 0.3.1 一级回退（摘第 51 键即得） |
 
-serve 参=**SPEC6 九参**（六参基座 + A8 `--tool-call-parser deepseekv41` + A9
-`--enable-cache-report` + W-G `--sleep-on-idle`；`deploy/SPEC6-SERVE-REF.md`）。
+serve 参=**SPEC6 八参**（六参基座 + A8 `--tool-call-parser deepseekv41` + A9
+`--enable-cache-report`；原第九参 W-G `--sleep-on-idle` 已于 2026-10-30 退役为
+禁参=上游 #43050 idle-wake hang host 侧规避，`deploy/SPEC6-SERVE-REF.md`）。
 0.3.1 键面回退链 **51→50→48→47→45 键五级**仍有效（45 键=零 overlay 深回退一级，
 `PROD-R1STDLL128L2PF6-spec1.env`=34977bf0——见 `docs/registry/FORM-REGISTRY-031.md`
 §一 L3；48/47/45 键件在 `tools/packages/cfgmgmt/payload/env/`）。0.3.2 的新回退链=
@@ -147,7 +148,7 @@ adapter 终态装配与 87 件逐件账见 `deploy/adapter/0.3.2-ASSEMBLY.md` /
 1. 点火（0.3.2 现役）：`ARM_TAG=r3prod ARM_ENV_FILE=~/migrate-assets/dsv41/env/CBX1A-CERTM-spec1.env SPEC=1 SPEC_EXTRA_ARGS="--prefill-decode-interval 16 --max-queued-requests 32 --min-free-slots-delay 1 --enable-decoder-swa-bounded-replay --reasoning-parser deepseek-v41 --swa-prefix-tails 256" bash tools/boot-with-slotlock.sh bash ~/migrate-assets/bin/r3-boot-arm.sh`（靴槽锁+四机容器净核）。注：wrapper 缺省锁位=`~/luz030-opt-campaign/.slot-lock`（`CAMPAIGN=<目录>` 环境变量可覆写；全新机器无该目录时先 `mkdir -p` 或设 CAMPAIGN 指向任一可写目录，否则锁文件打开失败即拒起）。
 2. 沉降 600s 律（前栈拆靴→点火 ≥600s）。
 3. **四查**：①health GET 200；②printenv 四机真键核（与 CBX1A env 逐字）；③横幅直读（banner29+O12/R1/FL6/page/CERT 在役态）；④面指纹四机全等（adapter/overlay/IMAGE 对表）。
-3b. **起栈接线闸门**：`tools/serve_flags_gate.sh --container r3prod-head --container r3prod-worker`——从运行进程 argv 直证 A8/A9/`--sleep-on-idle`；`/health` 200 不能证明接线（静默降级），故此门 fail-closed。
+3b. **起栈接线闸门**：`tools/serve_flags_gate.sh --container r3prod-head --container r3prod-worker`——从运行进程 argv 直证 A8/A9 在场 + 禁参 `--sleep-on-idle` **缺席**（UP43050-20261030：上游 #43050 idle-wake hang 规避判据）；`/health` 200 不能证明接线（静默降级），故此门 fail-closed。
 4. warm 请求步 64k×2 第一动作→warm 门（64k×3 中位 ≥4500 绿/≥5000 入役绿线）。
 5. **target_verify 45s 健康带（免费预测哨兵，V1 登记律）**：boot 期 `Engine startup
    timings` 的 target_verify 值健康带=**44-46s**（49s 绿/102s 红带 2/2 分离先例；

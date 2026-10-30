@@ -8,8 +8,22 @@
 # 2026-10-30 公开面修复（外部站点 bug 报告）：ARM_ENV_FILE 注入循环加尾行守护
 #  （env 文件末尾缺换行时旧版静默丢末行）——修复后 md5 以 md5sum 实测为准，
 #  变更记录见 CHANGELOG.md 2026-10-30 条。参面=NCCL 部署双 rail 对
+# 2026-10-30 EQ-02 修复（0.3.4re 缺陷修复单元；035-W0-TASKBOOK §EQ-02）：ARM_ENV_FILE
+#  注入前新增 RoCE 通信聚合双键条件式 fail-closed 断言（SGLANG_ROCE_MAX_SIZE/
+#  DSV41_ROCE_GATHER：env 声明两键时在役值必须双双=1179648，回滚值/单边缺键=拒起；
+#  未声明〔新代际形〕不断言放行）——把「不许回滚这两键」台账铁律变成机器可执行硬门；
+#  md5 以 md5sum 实测为准，变更记录见 CHANGELOG.md 2026-10-30 条。
+# 2026-10-30 UP43050 上游缺陷 host 侧规避窗（公开面单元；上游 sglang #43050）：
+#  SERVER_ARGS 去 --sleep-on-idle 单参（原第九参；空闲 10-20 分钟后唤醒即死 prefill，
+#  _low_ratio_index_topk_dense 唤醒重捕获路径缺 host 同步点——报告者实测同硬件去参即正常；
+#  SPEC6 谱 9→8 参、归一指纹回 6b12a445；史注原样保留，参行注释化）。禁参固化面=
+#  r3-gate-env-lint.sh EQ-03 禁参组合+tools/serve_flags_gate.sh 缺席判据+
+#  deploy/prod/selfcheck-prod.sh 禁参表。md5 以 md5sum 实测为准，变更记录见
+#  CHANGELOG.md 2026-10-30 条。
 # rocep1s0f0,roceP2p1s0f1+NCCL_IB_TC=106（TOS/PEER_HCA 退役）+环网补丁链全链退役（RETIRED 注记）+
-# SERVER_ARGS 九参（含 A8 --tool-call-parser deepseekv41/A9 --enable-cache-report/--sleep-on-idle）
+# SERVER_ARGS 八参（A8 --tool-call-parser deepseekv41/A9 --enable-cache-report；原第九参
+# --sleep-on-idle 已于 2026-10-30 退役=上游 #43050 idle-wake hang host 侧规避，见 SERVER_ARGS
+# 段 RETIRED-UP43050-20261030 注记）
 # +D15 五门断言段在役。与源形唯一差异=用户名路径掩码（/home/liux***ya/，三处；源形为实值）。
 # 快照律：本仓件不随产线滚动自动更新——后续产线滚动须另开同步窗重钉本注记指纹。
 # r3-boot.sh — R3 梯级：main-79cafec0 引擎 + fabric 资产 + adapter pread engram
@@ -22,9 +36,17 @@
 # 硬门：起栈前四机对称 drop_caches + UMA 总账（MemAvailable ≥ 100G）；生产容器守卫。
 set -euo pipefail
 
-IMAGE="192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c"
-HEAD_IP="192.168.0.201"
-# net-rebuild-20261015: 管理段重编址→192.168.0.201-204（IMAGE registry 源/HEAD_IP/WORKERS 三处通道址改新；
+# ── 20261030 脱敏：以下内网值（registry 主机/管理段地址/节点主机名）改经环境变量注入，缺参拒跑 ──
+IMAGE="${IMAGE:?缺环境变量 IMAGE（<registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c），拒跑}"
+HEAD_IP="${HEAD_IP:?缺环境变量 HEAD_IP（head 节点 <mgmt-node-ip>），拒跑}"
+NODE01_HOST="${NODE01_HOST:?缺环境变量 NODE01_HOST（<node01>），拒跑}"
+NODE02_HOST="${NODE02_HOST:?缺环境变量 NODE02_HOST（<node02>），拒跑}"
+NODE03_HOST="${NODE03_HOST:?缺环境变量 NODE03_HOST（<node03>），拒跑}"
+NODE04_HOST="${NODE04_HOST:?缺环境变量 NODE04_HOST（<node04>），拒跑}"
+NODE02_IP="${NODE02_IP:?缺环境变量 NODE02_IP（<mgmt-node-ip>），拒跑}"
+NODE03_IP="${NODE03_IP:?缺环境变量 NODE03_IP（<mgmt-node-ip>），拒跑}"
+NODE04_IP="${NODE04_IP:?缺环境变量 NODE04_IP（<mgmt-node-ip>），拒跑}"
+# net-rebuild-20261015: 管理段重编址→管理段四址（IMAGE registry 源/HEAD_IP/WORKERS 三处通道址改新；
 # 语义参数零动；registry 同一容器换址，:5000 实测 200。golden MANIFEST.image 同批重锚。）
 # net-rebuild-wc-20261015（W-C sglang 起机窗，法源=NCCL 结果档 §S4.2/§S4.3+ADDENDUM §十）：
 #   ① NCCL_IB_HCA 4 口裸列→部署双 rail 对 rocep1s0f0,roceP2p1s0f1；新增 NCCL_IB_TC=106；NCCL_IB_TOS=46 退役；
@@ -56,15 +78,15 @@ ENG_HOST_WORKER="\$HOME/dsv41-engram-1017"  # rank1/2/3 打包分片（MODEL-SWI
 # net-rebuild-wc-20261015 起不再注入 NCCL_IB_PEER_HCA——键在在役 ringonly 2.30.7/ncclpin.so 零命中=惰性，
 # 且用户令弃用 per-rank HCA 变通，走正常网面修复；列保留作环网期史档）
 # 权重面（2026-09-29 事故后定稿）：rank2/3 走 /data/models/dsv41-net = NFS 全量树
-# （03←10.100.140.1=01 主源；04←10.20.0.9=02 备源，均 ro nfs4 nconnect=4，已入 fstab）。
+# （03←<fabric-ip>=01 主源；04←<fabric-ip>=02 备源，均 ro nfs4 nconnect=4，已入 fstab）。
 # net-rebuild-20261015: 上行 NFS 源址为旧编址记载，fstab 四机实况未证（L4 §三.5.h 待查项）——本窗仅注记不改语义。
 # stock main 的 filter_duplicate_safetensors_files 在装载前做全 48 分片在位校验——
 # 03/04 曾本地置 47/48 尾分片（逐文件直读设计态，2026-10-10 ENV-UNIFY 清理=设计未采用 R-批4）：
 # 尾分片已删，47/48 与其余分片同走 NFS 全量树；索引校验全树可见 ⇒ NFS 硬前置不变。
 WORKERS=(
-  "1|dgxspark02|192.168.0.202|/data/models/DeepSeek-V4.1-Flash-1017|/home/liux***ya/dsv41-engram-1017|0=rocep1s0f1,roceP2p1s0f1;2=rocep1s0f0,roceP2p1s0f0"
-  "2|dgxspark04|192.168.0.204|/data/models/dsv41-net|/home/liux***ya/dsv41-engram-1017|1=rocep1s0f0,roceP2p1s0f0;3=rocep1s0f1,roceP2p1s0f1"
-  "3|dgxspark03|192.168.0.203|/data/models/dsv41-net|/home/liux***ya/dsv41-engram-1017|0=rocep1s0f0,roceP2p1s0f0;2=rocep1s0f1,roceP2p1s0f1"
+  "1|${NODE02_HOST}|${NODE02_IP}|/data/models/DeepSeek-V4.1-Flash-1017|/home/liux***ya/dsv41-engram-1017|0=rocep1s0f1,roceP2p1s0f1;2=rocep1s0f0,roceP2p1s0f0"
+  "2|${NODE04_HOST}|${NODE04_IP}|/data/models/dsv41-net|/home/liux***ya/dsv41-engram-1017|1=rocep1s0f0,roceP2p1s0f0;3=rocep1s0f1,roceP2p1s0f1"
+  "3|${NODE03_HOST}|${NODE03_IP}|/data/models/dsv41-net|/home/liux***ya/dsv41-engram-1017|0=rocep1s0f0,roceP2p1s0f0;2=rocep1s0f1,roceP2p1s0f1"
 )
 PEER_HCA_HEAD="1=rocep1s0f1,roceP2p1s0f1;3=rocep1s0f0,roceP2p1s0f0"  # net-rebuild-wc-20261015：本变量退役（不再注入；保留史档）
 HEAD_MODEL_SRC="/data/models/DeepSeek-V4.1-Flash-1017"
@@ -161,7 +183,7 @@ guard_node() {
   info "$name: 无容器、GPU 空闲"
 }
 info "== 前置守卫 =="
-guard_node "head dgxspark01" -
+guard_node "head ${NODE01_HOST}" -
 for w in "${WORKERS[@]}"; do IFS='|' read -r _rk _h _ip _ _ _ph <<<"$w"; guard_node "worker $_h" "$_h"; done
 
 
@@ -445,6 +467,37 @@ if [[ -n "${GATE_FORM:-}" ]]; then
   fi
 fi
 
+# ── [EQ-02·红线断言族] RoCE 通信聚合双键条件式 fail-closed 门（2026-10-30 0.3.4re EQ-02）──
+# 法源=035-W0-TASKBOOK-20261030 §EQ-02（外部手册升级篇 §14 A/B/A 实测：两键回滚即
+# c8 −96% 非单调塌陷；此前台账铁律「不许回滚这两键」无机器执行力）+RUNTIME-PARAMETERS
+# §1.9 两键绑定律（在役值均 1179648）。代际分形=条件式断言（勿做无条件断言）：
+#   ① env（ARM_ENV_FILE）声明两键（生效行）→ 在役值必须双双=1179648；任一回滚值
+#      （524288/262144 等历史档位）=die 拒起（fail-closed）；
+#   ② 单边声明（其一缺）→ 两键绑定律破裂=「清理多余参数」式砍键指纹，die 拒起；
+#   ③ 两键均未声明（新代际形：RoCE 聚合面整族退役的 env，如 VL41N 系）→ 不断言放行。
+# ARM_ENV_FILE 缺位=无注入面（两键不在 COMMON_ENV 固有面）→ 不断言。绿=横幅自报在役值
+# （boot 四查可直证）。读法与注入循环同口径（逐行 KEY=VAL；# 注释行跳过；尾行守护同款）。
+if [[ -n "${ARM_ENV_FILE:-}" && -f "$ARM_ENV_FILE" ]]; then
+  _eq02_max=""; _eq02_gather=""
+  while IFS= read -r _eq02_line || [ -n "$_eq02_line" ]; do
+    [[ -z "$_eq02_line" || "$_eq02_line" == \#* ]] && continue
+    [[ "$_eq02_line" == "SGLANG_ROCE_MAX_SIZE="* ]] && _eq02_max="${_eq02_line#SGLANG_ROCE_MAX_SIZE=}"
+    [[ "$_eq02_line" == "DSV41_ROCE_GATHER="* ]] && _eq02_gather="${_eq02_line#DSV41_ROCE_GATHER=}"
+  done < "$ARM_ENV_FILE"
+  _eq02_n=0
+  [[ -n "$_eq02_max" ]] && _eq02_n=$((_eq02_n+1))
+  [[ -n "$_eq02_gather" ]] && _eq02_n=$((_eq02_n+1))
+  if [[ $_eq02_n -eq 2 ]]; then
+    [[ "$_eq02_max" = 1179648 && "$_eq02_gather" = 1179648 ]] \
+      || die "[EQ-02] RoCE 聚合双键断言红（拒起；fail-closed）：SGLANG_ROCE_MAX_SIZE=$_eq02_max / DSV41_ROCE_GATHER=$_eq02_gather ≠ 在役值 1179648——回滚即 c8 −96% 非单调塌陷（RUNTIME-PARAMETERS §1.9 绑定律；035-W0 EQ-02）；恢复两键=1179648 后重靴"
+    info "[EQ-02] RoCE 聚合双键在役断言 PASS：SGLANG_ROCE_MAX_SIZE=DSV41_ROCE_GATHER=1179648（$ARM_ENV_FILE）"
+  elif [[ $_eq02_n -eq 1 ]]; then
+    die "[EQ-02] RoCE 聚合双键断言红（拒起；fail-closed）：单边声明 SGLANG_ROCE_MAX_SIZE=${_eq02_max:-缺} / DSV41_ROCE_GATHER=${_eq02_gather:-缺}——两键绑定律破裂（清理式砍键指纹；RUNTIME-PARAMETERS §1.9）；两键同补=1179648 或同退役（新代际形）后重靴"
+  else
+    info "[EQ-02] RoCE 聚合双键未声明（新代际形）——条件式门不断言，放行（$ARM_ENV_FILE）"
+  fi
+fi
+
 # ── ARM 注入面（doc102 W1 单变量开臂）：ARM_ENV_FILE 每行一个 KEY=VAL，注入 COMMON_ENV ──
 # 2026-10-30 修复（外部站点 bug 报告）：read 循环加尾行守护 || [ -n "$line" ]——
 # env 文件末尾缺换行时 while read 会静默丢掉最后一行（恰常为关键开关），且
@@ -553,7 +606,21 @@ SERVER_ARGS=(
   #    参面单键新增、不改源码、不动既有八参——SPEC6 谱 8→9 参（SPEC6-SERVE-REF 表同批补行，
   #    九参归一指纹重算预登记）。行为面：仅空闲态降 CPU，请求路径零变化。
   #    回退=去此单行重靴（或 .bak-pre-wg 还原；零 env 耦合、零 A8/A9 面耦合）。
-  --sleep-on-idle
+  # ── RETIRED-UP43050-20261030（上游缺陷 host 侧规避窗；法源=上游 sglang #43050
+  #    https://github.com/sgl-project/sglang/issues/43050）：与我栈完全同构的报告——
+  #    GB10/SM121/UMA×3 DGX Spark + DSv4.1-Flash + DSPARK speculative + NCCL 2.32.3
+  #    + --sleep-on-idle：空闲 10-20 分钟后被任意请求（含健康探测）唤醒即进入死 prefill，
+  #    py-spy 卡 _low_ratio_index_topk_dense（indexer_chunked_v3.py:181）的
+  #    prefill_empty_cache 唤醒重捕获路径，疑似唤醒后缺一处 host 同步点；无修复 PR。
+  #    报告者实测：同一硬件去掉 --sleep-on-idle 后空闲期完全正常 ⇒ 本窗退役该参
+  #    （W-G 窗省 CPU 收益让位可用性；SPEC6 谱 9→8 参，归一指纹回 6b12a445）。
+  #    替代面：如需回收空闲资源，走低峰期主动 /release_memory 或定时重启（勿用自动
+  #    idle-sleep）。禁参三面固化：env-lint EQ-03 禁参组合（值面注入位拒起）+
+  #    tools/serve_flags_gate.sh 缺席判据（argv 在场即 FAIL）+ selfcheck-prod 禁参表。
+  #    升级镜像时优先吸收 #45397/#46636 一类 idle 路径修复，并在补丁镜像里守卫 wake
+  #    路径的 host-sync 后，方可在复评窗重议此参。史注（W-G 窗原注记）上方原样保留。
+  # RETIRED-UP43050-20261030: --sleep-on-idle  ← 原参行在此，退役=注释化，勿回拷
+  #    .bak-pre-wg 单参回退面（该回退=重新引入 #43050 idle-wake hang）。
 )
 [[ "$SPEC" == "1" ]] && SERVER_ARGS+=(--speculative-algorithm DSPARK) || info "SPEC=0"
 

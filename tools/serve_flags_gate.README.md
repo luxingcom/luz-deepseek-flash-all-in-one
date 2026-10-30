@@ -8,13 +8,18 @@
 
 ## 判据
 
-| 旗标 | 期望 | 缺了会怎样 |
+| 旗标 | 期望 | 缺了/在场会怎样 |
 |---|---|---|
 | `--tool-call-parser deepseekv41` | 参数与值**成对精确匹配**（`deepseek-v41` 连字符形判红） | DeepSeek 原生 DSML 工具调用以纯文本吐出，静默降级 |
 | `--enable-cache-report` | flag 存在 | `usage.prompt_tokens_details.cached_tokens` 恒 `null`，面板缓存命中恒 0% |
+| `--sleep-on-idle`（UP43050-20261030） | **禁参=缺席**（判据方向与上两行相反：**在场**才 FAIL） | 在场=上游 sglang [#43050](https://github.com/sgl-project/sglang/issues/43050) idle-wake hang（GB10+DSv4.1-Flash+DSPARK 空闲 10-20 分钟后被任意请求〔含健康探测〕唤醒即死 prefill，py-spy 卡 `_low_ratio_index_topk_dense` 唤醒重捕获路径）——host 侧规避=该参必须缺席 |
 
 判据全程用 `case` 匹配，**不经 `cmd | grep -q` 取 rc**（防管道末端假绿）；任一份取证
 缺失即整体 `rc=1`；取证失败（容器不在/读不到 argv）`rc=2`（fail-closed）。
+
+> 禁参判据的取证面说明：`--container`/`--argv-file`（argv 两模式）为权威取证；
+> `--api` 模式为尽力取证——`/get_server_info` 若暴露 `sleep_on_idle`（顶层或
+> `server_args` 嵌套）为真即判红，字段不暴露的老代际形对该禁参为盲。
 
 ## 用法
 
@@ -28,13 +33,13 @@ tools/serve_flags_gate.sh --argv-file /tmp/r3boot-head.argv
 # 3) 运行时自省（更强：能抓 argv 写了但没绑定的值）
 tools/serve_flags_gate.sh --api http://127.0.0.1:30000
 
-# 4) 闸门自检（R1-R7 反向用例，不需要活栈）
+# 4) 闸门自检（R1-R8 反向用例，不需要活栈）
 tools/serve_flags_gate.sh --self-test
 ```
 
 退出码：`0`=全过 / `1`=有 FAIL / `2`=用法或取证失败。
 
-## R1-R7 覆盖（issue #4 §3）
+## R1-R8 覆盖（issue #4 §3 + UP43050）
 
 | # | 用例 | 自检期望 |
 |---|---|---|
@@ -45,6 +50,7 @@ tools/serve_flags_gate.sh --self-test
 | R5 | 值拼错（`deepseek-v41`） | `rc≠0` |
 | R6 | 判据不依赖管道末端 rc | 直接判据仍 `rc≠0` |
 | R7 | head 接了、worker 没接 | 整体 `rc≠0` |
+| R8 | 禁参 `--sleep-on-idle` 在场（UP43050） | `rc≠0` |
 
 `--self-test` 逐条跑并输出 PASS/FAIL；这是闸门自身的判别力证明，可随交付面复跑。
 

@@ -1,7 +1,7 @@
 # MANIFEST.md5 — cfgmgmt 包逐件清单（md5sum -c 自验；# 注释行 md5sum 容忍）
 # 律：内容变更→本件同日再生成（bash tools/packages/_lib/regen-manifest.sh cfgmgmt）
 #     +VERSION 指纹重钉 +TOOL-ANCHORS 同日更新（三联动缺一=同日更新律红）
-ea1620b3574f518334526f303d1a243d  ./README.md
+7874c9fe40a2243fb5365e9ca954d33e  ./README.md
 76de32a91fd0c0d50ca4e45ba674f23c  ./bin/cfgmgmt
 5bea614f62245926aef391fe09d63e4c  ./payload/adapter-manifest-regen.sh
 5964780d5d6713665d92b3c51e29cd9e  ./payload/boot/boot-chain.md5
@@ -12,7 +12,7 @@ fcaed824fe651e11af66edba8739dfc3  ./payload/boot/boot-with-slotlock.sh
 99e7ec9260db75922d8f302eff778d46  ./payload/env/PROD-R1STDLL128L2PF6O12C1-spec1.env
 15767aa67a0f0e2aaf7c55471dc4061f  ./payload/env/PROD-R51W5-spec1.env
 ffb58587039d44349bd9dd835a8d2d15  ./payload/gen-manifests.sh
-61a2c30f7f437860e028adb385ff4c7c  ./payload/golden/flashinfer-golden/MANIFEST.json
+5aaf0771f82aec57603a033955d5d65e  ./payload/golden/flashinfer-golden/MANIFEST.json
 22e4093994728618a95c60cb469c31c7  ./payload/golden/flashinfer-golden/UNREADABLE-NOTE.txt
 0104081d3a3265a4071d83ec48fb2828  ./payload/golden/flashinfer-golden/table.md5
 c9e1ff5b0c50b15aaeb461ec54b77e79  ./payload/golden/flashinfer-golden/table/0.6.18/sm121/472a7346d01ee0ea/rank_tp0_pp0_dp0.json

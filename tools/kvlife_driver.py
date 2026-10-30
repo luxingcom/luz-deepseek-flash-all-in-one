@@ -11,6 +11,8 @@
     填充相每行实测 chars_per_token 滚动记录；占池进度以服务端 /metrics 为准。
   ④metrics 快照律：每 N=10 发+相位边界拉 /metrics 存 jsonl（kv_available/
     evictable/used、swa 同族、cache_hit_rate、num_retracted…）。
+    （cache_hit_rate 裸快照=上游 #45119 缺陷面，只存原始值不作判据——口径判读走
+    tools/obs/cache_hit_caliber.py 计数器正典。）
   ⑤文档寻址律：doc 文本=plan 确定性纯函数拼装（盐头+章段+问题尾），落 md5；
     召回/逐出相凭 doc_id 重发逐字同文。
 
@@ -367,7 +369,7 @@ class Client:
 
 MET_KEYS = ("kv_available_tokens", "kv_evictable_tokens", "kv_used_tokens",
             "swa_available_tokens", "swa_evictable_tokens", "swa_used_tokens",
-            "full_token_usage", "swa_token_usage", "cache_hit_rate",
+            "full_token_usage", "swa_token_usage", "cache_hit_rate",  # cache-hit-caliber: raw-snapshot
             "cached_tokens_total", "num_retracted_reqs", "max_total_num_tokens")
 
 

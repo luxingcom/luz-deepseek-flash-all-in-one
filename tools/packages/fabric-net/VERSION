@@ -1,7 +1,7 @@
 PKG=fabric-net
 PKG_VERSION=0.3.1-t4.1
-FINGERPRINT=54735e24
-FINGERPRINT_NOTE=脱敏仓实算（战役仓同批=c23ed032）；补批同步 fabric-guard+topology 收官态
+FINGERPRINT=bacf2acd
+FINGERPRINT_NOTE=20261030 脱敏重钉（前值 54735e24=脱敏仓补批态；内网 IP/主机名改占位符或环境变量：README/runbook/guards×2/s4_bench/topology+selfcheck F7 锚随移）；战役仓同批=c23ed032 已过期须另窗对表
 GIT_ANCHOR=5db45cf（P1 整备提交）
 TOOL_ANCHORS_SYNC=2026-10-13（docs/TOOL-ANCHORS.md 五包锚段同日更新律）
 PAYLOAD_N=17

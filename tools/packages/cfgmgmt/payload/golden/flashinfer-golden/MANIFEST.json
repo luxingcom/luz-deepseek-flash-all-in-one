@@ -1,6 +1,6 @@
 {
   "created": "2026-10-10T07:07:49",
-  "image": "192.168.5.187:5000/lmsysorg/sglang:main-79cafec0",
+  "image": "<registry-host>:5000/lmsysorg/sglang:main-79cafec0",
   "fi_version": "0.6.18",
   "arch": "sm121",
   "cache_key": "472a7346d01ee0ea",

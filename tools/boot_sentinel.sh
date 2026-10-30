@@ -37,21 +37,27 @@
 #     bash tools/boot_sentinel.sh                    # 真跑（引擎须已在 :8898）
 #   DRY_RUN=1 ... 同上                               # DRY：打计划不发包不写台账
 #   bash tools/boot_sentinel.sh --selfcheck          # 自检（mock sd_bench 快/慢两态+负控，零集群）
-# 环境变量：ARM_TAG(必填) ARM_ENV_FILE(形钉面，缺=ANCHOR-N/A 不判快慢) SPEC_EXTRA_ARGS(参钉面)
-#   CAMPAIGN(默认 ~/luz030-opt-campaign) BASE_URL(默认 http://127.0.0.1:8898/v1；含 8899 即拒)
-#   SDBENCH(默认 ~/dsv41-flash-dgxsparks/bench/sd_bench.py；selfcheck 用 mock 覆盖)
+# 环境变量：ARM_TAG(必填) CAMPAIGN(必填；2026-10-30 DF-02 家目录默认 __REPO_ROOT__
+#   废除——缺参拒跑打印缺什么) SDBENCH(必填；2026-10-30 DF-02 家目录默认
+#   __FLEET_ENV_DIR__/bench/sd_bench.py 废除——缺参拒跑；DRY_RUN=1 亦须显式设，
+#   免的只是件在位性检查；selfcheck 用 mock 覆盖)
+#   ARM_ENV_FILE(形钉面，缺=ANCHOR-N/A 不判快慢) SPEC_EXTRA_ARGS(参钉面)
+#   BASE_URL(默认 http://127.0.0.1:8898/v1；含 8899 即拒)
 #   ANCHOR_TABLE(默认 tools/boot_sentinel_anchors.tsv) PR_FILLER(默认 real) SIZE(默认 32768)
 #   SHOTS(默认 3) STEP_TIMEOUT_S(默认 900) HEALTH_CHECK(默认 1；0=跳过 health 轮询，仅自检用)
 #   HEALTH_WAIT_S(默认 600) DRY_RUN(默认 0) RADIX_TTFT_RATIO(默认 0.3)
 # 【护栏】8899 硬拒（G5）；不起靴、不 ssh、不 docker、不 flush、不动引擎状态——只发 PR 读数。
 set -uo pipefail
 
-CAMPAIGN="${CAMPAIGN:-$HOME/luz030-opt-campaign}"
+# DF-02（2026-10-30）：两参原为家目录默认（__REPO_ROOT__、
+#   __FLEET_ENV_DIR__/bench/sd_bench.py）——外部站点 $HOME 下无作者路径必失锚，
+#   改必设显式参数；守卫段缺参即拒跑（fail-closed 打印缺什么），绝不带错默认静默跑。
+CAMPAIGN="${CAMPAIGN:-}"
 ARM_TAG="${ARM_TAG:-}"
 ARM_ENV_FILE="${ARM_ENV_FILE:-}"
 SPEC_EXTRA_ARGS="${SPEC_EXTRA_ARGS:-}"
 BASE_URL="${BASE_URL:-http://127.0.0.1:8898/v1}"
-SDBENCH="${SDBENCH:-$HOME/dsv41-flash-dgxsparks/bench/sd_bench.py}"
+SDBENCH="${SDBENCH:-}"
 ANCHOR_TABLE="${ANCHOR_TABLE:-$CAMPAIGN/tools/boot_sentinel_anchors.tsv}"
 PR_FILLER="${PR_FILLER:-real}"
 SIZE="${SIZE:-32768}"
@@ -69,7 +75,7 @@ import json, os, shutil, subprocess, sys, tempfile, textwrap
 
 SCRIPT = os.path.abspath(sys.argv[1])
 CAMP_ROOT = os.path.dirname(os.path.dirname(SCRIPT))            # 真仓（取真实锚表/env 面核）
-ENV43 = os.path.expanduser("~/migrate-assets/dsv41/env/PROD-R1STDLL128-spec1.env")
+ENV43 = os.path.expanduser("__ASSETS_ROOT__/dsv41/env/PROD-R1STDLL128-spec1.env")
 ENV_F2 = os.path.join(CAMP_ROOT, "arms/F2-EMPTYCACHE0-spec1.env")
 ARGS5 = ("--prefill-decode-interval 16 --max-queued-requests 32 --min-free-slots-delay 1 "
          "--enable-decoder-swa-bounded-replay --reasoning-parser deepseek-v41")
@@ -232,6 +238,12 @@ exit "$sc_rc"
 fi
 
 # ── 守卫（红=正确理由拒跑；负控自检 S7 面向此处）─────────────────────────
+# DF-02（2026-10-30）缺参拒跑置于一切守卫之首：CAMPAIGN/SDBENCH 家目录默认已废除，
+#   缺参=exit 5 并打印缺什么（fail-closed；非 8899 门/锚表门等更早截流）。
+if [ -z "$CAMPAIGN" ]; then
+  echo "ABORT: CAMPAIGN 未设（DF-02 家目录默认 __REPO_ROOT__ 已废除；例 CAMPAIGN=__REPO_ROOT__）" >&2; exit 5; fi
+if [ -z "$SDBENCH" ]; then
+  echo "ABORT: SDBENCH 未设（DF-02 家目录默认 __FLEET_ENV_DIR__/bench/sd_bench.py 已废除；例 SDBENCH=<sd_bench.py 绝对路径>；DRY_RUN=1 亦须显式设）" >&2; exit 5; fi
 case "$BASE_URL" in *8899*)
   echo "ABORT: BASE_URL 含 8899（生产口，G5 绝对隔离）: $BASE_URL" >&2; exit 5 ;; esac
 if [ -z "$ARM_TAG" ] || [ "$ARM_TAG" = "unknown" ]; then

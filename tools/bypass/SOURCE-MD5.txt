@@ -1,0 +1,4 @@
+# tools/bypass/ — BYPASS 采用固化正典件（D121 五步固化②，源=logs/S-034-BYPASS-B-20261028/ MV-14 实证件）
+prefill_bypass.py	c4875258（staging 原件逐字节；knapcio b9ea6dd 血统 173 行+我树 9 哈希重钉=181 行）
+stage-one-host-bypb.sh	staging 原件（sitecustomize 钩插入 dd69c59a+防重入三断言；BYPB 注记=MV-14 名义，复用即改口为 BEN 固化）
+bypass-armed-gate.sh	phase2-boot 原件（ARMED ×2/机+refusing-to-arm=0 断言；W-d 起为 deploy 后核面）

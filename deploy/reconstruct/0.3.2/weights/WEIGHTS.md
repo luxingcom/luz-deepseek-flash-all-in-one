@@ -27,16 +27,16 @@ sha256sum -c /path/to/DeepSeek-V4.1-Flash-1017.sha256
 
 | 机 | 角色 | 模型源 | engram 目录 | rank |
 |---|---|---|---|---|
-| dgxspark01（192.168.0.201） | head | `/data/models/DeepSeek-V4.1-Flash-1017` | `~/dsv41-engram-1017` | 0 |
-| dgxspark02（192.168.0.202） | worker | `/data/models/DeepSeek-V4.1-Flash-1017` | `~/dsv41-engram-1017` | 1 |
-| dgxspark04（192.168.0.204） | worker | `/data/models/dsv41-net`（NFS） | `~/dsv41-engram-1017` | 2 |
-| dgxspark03（192.168.0.203） | worker | `/data/models/dsv41-net`（NFS） | `~/dsv41-engram-1017` | 3 |
+| <node01>（<mgmt-node-ip>） | head | `/data/models/DeepSeek-V4.1-Flash-1017` | `~/dsv41-engram-1017` | 0 |
+| <node02>（<mgmt-node-ip>） | worker | `/data/models/DeepSeek-V4.1-Flash-1017` | `~/dsv41-engram-1017` | 1 |
+| <node04>（<mgmt-node-ip>） | worker | `/data/models/dsv41-net`（NFS） | `~/dsv41-engram-1017` | 2 |
+| <node03>（<mgmt-node-ip>） | worker | `/data/models/dsv41-net`（NFS） | `~/dsv41-engram-1017` | 3 |
 
-- 03/04 NFS 源：`10.10.1.11:/data/models/DeepSeek-V4.1-Flash-1017`（03）、
-  `10.10.1.21:/data/models/DeepSeek-V4.1-Flash-1017`（04）；同时建规范路径符号链接
+- 03/04 NFS 源：`<nfs-server-ip>:/data/models/DeepSeek-V4.1-Flash-1017`（03）、
+  `<nfs-server-ip>:/data/models/DeepSeek-V4.1-Flash-1017`（04）；同时建规范路径符号链接
   `/data/models/DeepSeek-V4.1-Flash-1017 -> dsv41-net`，供守卫的 `SHA256SUMS` 红线解析。
-- 01/02 的 NFS 导出：`/data/models/DeepSeek-V4.1-Flash-1017` → `10.10.1.0/24`、
-  `10.10.2.0/24`、`192.168.0.0/24`（ro,sync,no_subtree_check）；旧导出行保留。
+- 01/02 的 NFS 导出：`/data/models/DeepSeek-V4.1-Flash-1017` → `<fabric-ip>/24`、
+  `<fabric-ip>/24`、`<mgmt-node-ip>/24`（ro,sync,no_subtree_check）；旧导出行保留。
 - boot 的 `WORKERS` 表逐行对应上表；秩映射错位时，代码会找不存在的
   `engram-l{1,14}-r{rank}of4.bin`，起机即失败。
 

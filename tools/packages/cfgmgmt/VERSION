@@ -1,7 +1,7 @@
 PKG=cfgmgmt
 PKG_VERSION=0.3.1-t4.1
-FINGERPRINT=2dcc2ed0
-FINGERPRINT_NOTE=脱敏仓实算（战役仓同批=c4fb0c3e）；ADAPTER/env 双清单终态+regen HOME 化后维持
+FINGERPRINT=9ce5f393
+FINGERPRINT_NOTE=20261030 脱敏重钉（前值 2dcc2ed0；golden/flashinfer-golden/MANIFEST.json image 字段 registry 主机改占位符）；战役仓同批=c4fb0c3e 已过期须另窗对表
 GIT_ANCHOR=5a0ea04（P5 整备提交；TOOLS31-BAKE-20261013 S7b 三联动重钉——ADAPTER/env 双清单终态回填：sitecustomize 55b1e412+R51W5FL6 2ac74586 入清单）
 TOOL_ANCHORS_SYNC=2026-10-13（docs/TOOL-ANCHORS.md 五包锚段同日更新律）
 PAYLOAD_N=51

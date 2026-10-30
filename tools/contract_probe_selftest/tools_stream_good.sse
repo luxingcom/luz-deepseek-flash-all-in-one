@@ -1,0 +1,11 @@
+data: {"id":"fx-stream-good","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"","tool_calls":[{"index":0,"id":"call_eq04_stream_001","type":"function","function":{"name":"","arguments":""}}]},"finish_reason":null}]}
+
+data: {"id":"fx-stream-good","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"name":"get_server_","arguments":""}}]},"finish_reason":null}]}
+
+data: {"id":"fx-stream-good","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"name":"time","arguments":"{\"tz\""}}]},"finish_reason":null}]}
+
+data: {"id":"fx-stream-good","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":": \"Asia/Shanghai\"}"}}]},"finish_reason":null}]}
+
+data: {"id":"fx-stream-good","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":42,"completion_tokens":17,"total_tokens":59}}
+
+data: [DONE]

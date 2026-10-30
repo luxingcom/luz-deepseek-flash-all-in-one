@@ -1,12 +1,12 @@
 # MANIFEST.md5 — gateway 包逐件清单（md5sum -c 自验；# 注释行 md5sum 容忍）
 # 律：内容变更→本件同日再生成（bash tools/packages/_lib/regen-manifest.sh gateway）
 #     +VERSION 指纹重钉 +TOOL-ANCHORS 同日更新（三联动缺一=同日更新律红）
-342f00f861cede7981fbc66d3d80fe44  ./README.md
+394792d849791791ab00b178940a6062  ./README.md
 28f99b34b443e1d7889ea6fb98ca452b  ./bin/gateway
-5ea1d8d345de4cdcfd88cfab4b91a515  ./payload/concurrency_proxy_v2.py
+4f12f2d35872cefa18466ae9b22ad6e8  ./payload/concurrency_proxy_v2.py
 21884b8be51ae359e31cfd92df621c0b  ./payload/env/gateway-vl.env.template
-4888a667cb029bea8d06437cd76db8fa  ./payload/env/gateway.env.template
-ad558373072b641f6e8cafb3b53484a0  ./payload/gw-verify.sh
+7fa54c2f182d9cf38ef99174284d2e34  ./payload/env/gateway.env.template
+b9204d237a051f5980b448021506bef6  ./payload/gw-verify.sh
 66da1399c196a3321c47e9dbbdafae38  ./payload/tests/test_rc385.py
 f399b8438bac428629e98b53d7c4a2bb  ./payload/tests/test_rc386.py
 1acb0c4586f1f68ac94224912c18592b  ./payload/units/10-gateway-hardening.conf

@@ -24,6 +24,12 @@
 #   PORT 域 [1,65535]/GW_API_KEY 非空（键面非空律——空=裸奔面=红）+B4 域检查
 #   （QUEUE_TIMEOUT [1,300]/DEDUP_ENABLE {0,1}/INJECT_ENABLE_THINKING {0,1}，键在才查）
 #   +rc3.8.6 域检查（ADVERTISE_MODEL_CAPACITY {0,1}/MODELS_CONTEXT_LEN ≥0 整数，键在才查）
+#   +#45614 面（sglang issue #45614 host 侧规避执法，2026-10-30）：SGLANG_DEFAULT_THINKING
+#   属引擎侧 env、对网关为异键——env 文件内任何声明（无论真假值）=红（该键真值是
+#   上游「prompt 侧读/解析侧不读」不对称泄漏的触发面，异键混入=误植种子）；主车道
+#   （第一实参）INJECT_ENABLE_THINKING 必须=1——裸请求双键注入（rc3.8.8 thinking+
+#   enable_thinking）是缺陷的网关侧兜底，缺键/=0=兜底敞开=红；vl 车道（第二实参）
+#   维持域检查 {0,1}（VL 呈裁 C3 形=0 不适用注入律）
 #   +unit/drop-in 模板 lint（v2+vl 双 unit——要件在+密钥值零携带=SMOK_KEY 律执法；
 #   vl env 文件可作第二实参同面 lint）。
 # 【出口】0=绿/1=红/2=无法判（--live 网关不可达=2，ANCHOR-UNKNOWN 语义）。
@@ -36,9 +42,9 @@
 #   CAPACITY=1+MODELS_CONTEXT_LEN=0**=四键取引擎真值）；**8002 VL 车道已撤除**（G1 §E
 #   零消费者；compose .bak-auth1014 留回退）；**8003=responses-gateway-mac 鉴权
 #   公共入口**（02 v2.2.1 容器化迁 Mac，API_KEY 客户端钥同值平移；GW-PATCH 窗 v2.2.2
-#   起名录面并带容量四键）。用法面：--live 自 01 打 GW_URL=http://192.168.5.71:8001；
+#   起名录面并带容量四键）。用法面：--live 自 01 打 GW_URL=http://<mac-if-ip>:8001；
 #   GW_KEY=<GW_API_KEY 值> 在时增 P6 模型门+P7 容量广播带钥探针（值经 env 传递，
-#   绝不入档）；P3「直连对照」改义=UP_URL 指 -R 隧道面 http://192.168.0.1:24001（既有
+#   绝不入档）；P3「直连对照」改义=UP_URL 指 -R 隧道面 http://<mac-gw-ip>:24001（既有
 #   在役只读探针类，Mac 侧无本地 8899 可直；**8899 直打禁律不变**；⚠ 2026-10-15
 #   net-rebuild 后该隧道靶 192.168.5.18x 已失效=Mac 链疑断呈裁 P6 既有位，探针红
 #   非本件引入）；P1/P4 语义原样。本件默认值仍留 01 本地形态（127.0.0.1）＝历史基线，
@@ -51,7 +57,7 @@ GW_URL="${GW_URL:-http://127.0.0.1:8001}"
 UP_URL="${UP_URL:-http://127.0.0.1:8899}"
 GW_KEY="${GW_KEY:-}"          # rc3.8.5 带钥面（P6 模型门探针用；值零入档）
 
-lint_env() {  # lint_env <env 文件> → 0/1（四键面全绿才 0）
+lint_env() {  # lint_env <env 文件> [main|vl] → 0/1（四键面+#45614 面全绿才 0；车道缺省=main）
   local f="$1" v
   [ -r "$f" ] || return 1
   v=$(grep -E '^UPSTREAM=' "$f" | head -1)
@@ -62,13 +68,22 @@ lint_env() {  # lint_env <env 文件> → 0/1（四键面全绿才 0）
   [ "$v" -ge 1 ] 2>/dev/null && [ "$v" -le 65535 ] 2>/dev/null || return 1
   v=$(grep -E '^GW_API_KEY=' "$f" | head -1 | cut -d= -f2)
   [ -n "$v" ] && [ "$v" != '<值位空——部署窗填入，绝不入包>' ] || return 1
+  # #45614 异键律（2026-10-30）：SGLANG_DEFAULT_THINKING=引擎侧 env，网关 env 内
+  #   任何声明（含 =0 假形）=红——真值是上游泄漏触发面、假形是误植种子，一律不得入。
+  grep -qE '^(export +)?SGLANG_DEFAULT_THINKING=' "$f" && return 1
   # B4 域检查（键在才查——缺键=脚本默认继承非红面；A2/A3 补键后的 typo/越域执法面）
   v=$(grep -E '^QUEUE_TIMEOUT=' "$f" | head -1 | cut -d= -f2)
   if [ -n "$v" ]; then { [ "$v" -ge 1 ] && [ "$v" -le 300 ]; } 2>/dev/null || return 1; fi
   v=$(grep -E '^DEDUP_ENABLE=' "$f" | head -1 | cut -d= -f2)
   if [ -n "$v" ]; then [ "$v" = 0 ] || [ "$v" = 1 ] || return 1; fi
+  # INJECT_ENABLE_THINKING：主车道必须 =1（#45614 裸请求双键兜底缺省开=部署红线；
+  #   vl 车道维持 {0,1} 域检查——VL 呈裁 C3 形=0）
   v=$(grep -E '^INJECT_ENABLE_THINKING=' "$f" | head -1 | cut -d= -f2)
-  if [ -n "$v" ]; then [ "$v" = 0 ] || [ "$v" = 1 ] || return 1; fi
+  if [ "${2:-main}" = main ]; then
+    [ "$v" = 1 ] || return 1
+  else
+    if [ -n "$v" ]; then [ "$v" = 0 ] || [ "$v" = 1 ] || return 1; fi
+  fi
   # rc3.8.6 域检查（键在才查——容量广播两键；缺键=脚本默认关/引擎实值非红面）
   v=$(grep -E '^ADVERTISE_MODEL_CAPACITY=' "$f" | head -1 | cut -d= -f2)
   if [ -n "$v" ]; then [ "$v" = 0 ] || [ "$v" = 1 ] || return 1; fi
@@ -101,9 +116,9 @@ case "$cmd" in
     ENVF="${1:-}"; VLENVF="${2:-}"
     [ -z "$ENVF" ] && { echo "用法：$0 --offline <已填值 env 文件> [已填值 vl env 文件]（模板件=预期红，见 --selfcheck T2/T6）" >&2; exit 2; }
     vr_begin
-    lint_env "$ENVF" || vr_face "config-lint" "$ENVF 键面非空律/域违约（UPSTREAM 形/MAX_CONCURRENCY [1,64]/PORT/GW_API_KEY 非空/QUEUE_TIMEOUT [1,300]/DEDUP·INJECT {0,1}）"
-    if [ -n "$VLENVF" ]; then   # B4：VL 车道 env 双件 lint 面（缺省=只 lint 主车道）
-      lint_env "$VLENVF" || vr_face "vl-config-lint" "$VLENVF 键面非空律/域违约（同主车道四键+域检查）"
+    lint_env "$ENVF" main || vr_face "config-lint" "$ENVF 键面非空律/域违约/#45614 面（UPSTREAM 形/MAX_CONCURRENCY [1,64]/PORT/GW_API_KEY 非空/QUEUE_TIMEOUT [1,300]/DEDUP {0,1}/SGLANG_DEFAULT_THINKING 异键禁入/**主车道 INJECT_ENABLE_THINKING 必须=1**）"
+    if [ -n "$VLENVF" ]; then   # B4：VL 车道 env 双件 lint 面（缺省=只 lint 主车道）；#45614：vl 车道 INJECT 维持域检查 {0,1}（呈裁 C3 形=0）
+      lint_env "$VLENVF" vl || vr_face "vl-config-lint" "$VLENVF 键面非空律/域违约（同主车道键面+SGLANG_DEFAULT_THINKING 异键禁入；INJECT {0,1} 域检查）"
     fi
     lint_unit "$HERE/payload/units/concurrency-proxy-v2.service" || vr_face "unit-lint" "concurrency-proxy-v2.service 要件缺或密钥值入 unit"
     lint_unit "$HERE/payload/units/concurrency-proxy-vl.service" || vr_face "vl-unit-lint" "concurrency-proxy-vl.service 要件缺或密钥值入 unit"
@@ -227,7 +242,7 @@ print("BAD:"+",".join(bad) if bad else "OK")
     if lint_unit "$HERE/payload/units/concurrency-proxy-vl.service"; then
       echo "[gw-verify][OK] T6 vl unit lint 绿（要件在+密钥零携带）"
     else echo "[gw-verify][RED] T6 FAIL（vl unit 要件缺）"; rc=1; fi
-    if lint_env "$HERE/payload/env/gateway-vl.env.template"; then
+    if lint_env "$HERE/payload/env/gateway-vl.env.template" vl; then
       echo "[gw-verify][RED] T6 FAIL（vl 模板占位未判红）"; rc=1
     else echo "[gw-verify][OK] T6 vl env 占位模板判红（GW_API_KEY 空值=键面非空律）"; fi
     # T7 域检查判别力（B4）：QUEUE_TIMEOUT 越域必红
@@ -239,6 +254,24 @@ print("BAD:"+",".join(bad) if bad else "OK")
     { echo 'ADVERTISE_MODEL_CAPACITY=2'; cat "$T/good.env"; } > "$T/badadv.env"
     if lint_env "$T/badadv.env"; then echo "[gw-verify][RED] T8 FAIL（ADVERTISE_MODEL_CAPACITY=2 未判红）"; rc=1
     else echo "[gw-verify][OK] T8 ADVERTISE_MODEL_CAPACITY 越域判红（域 {0,1}）"; fi
+    # T9 异键律判别力（#45614）：SGLANG_DEFAULT_THINKING 入网关 env 必红——真值形与
+    #   假形同红（真值=上游泄漏触发面；假形=误植种子），engine 侧 env 不许混入网关面
+    { cat "$T/good.env"; echo 'SGLANG_DEFAULT_THINKING=1'; } > "$T/alien.env"
+    if lint_env "$T/alien.env"; then echo "[gw-verify][RED] T9 FAIL（SGLANG_DEFAULT_THINKING=1 未判红）"; rc=1
+    else echo "[gw-verify][OK] T9 SGLANG_DEFAULT_THINKING=1 异键判红（#45614 触发面禁入）"; fi
+    sed 's|^SGLANG_DEFAULT_THINKING=.*|SGLANG_DEFAULT_THINKING=0|' "$T/alien.env" > "$T/alien0.env"
+    if lint_env "$T/alien0.env"; then echo "[gw-verify][RED] T9 FAIL（=0 假形异键未判红）"; rc=1
+    else echo "[gw-verify][OK] T9 SGLANG_DEFAULT_THINKING=0 假形亦判红（异键=值无关一律禁入）"; fi
+    # T10 主车道注入律（#45614）：INJECT_ENABLE_THINKING 必须=1——=0/缺键必红
+    sed 's|^INJECT_ENABLE_THINKING=.*|INJECT_ENABLE_THINKING=0|' "$T/good.env" > "$T/noinj.env"
+    if lint_env "$T/noinj.env"; then echo "[gw-verify][RED] T10 FAIL（主车道 INJECT=0 未判红）"; rc=1
+    else echo "[gw-verify][OK] T10 主车道 INJECT_ENABLE_THINKING=0 判红（裸请求双键兜底缺省必须开）"; fi
+    grep -v '^INJECT_ENABLE_THINKING=' "$T/good.env" > "$T/missinj.env"
+    if lint_env "$T/missinj.env"; then echo "[gw-verify][RED] T10 FAIL（主车道 INJECT 缺键未判红）"; rc=1
+    else echo "[gw-verify][OK] T10 主车道 INJECT_ENABLE_THINKING 缺键判红"; fi
+    # T11 车道分形判别力：同一 =0 env——vl 车道（域检查 {0,1}）绿、主车道（必须=1）红
+    if lint_env "$T/noinj.env" vl; then echo "[gw-verify][OK] T11 vl 车道 INJECT=0 域内绿（呈裁 C3 形；lane 分形工作）"
+    else echo "[gw-verify][RED] T11 FAIL（vl 车道把 =0 误判红——lane 未分形）"; rc=1; fi
     rm -rf "$T"; exit "$rc" ;;
   *) echo "用法：$0 --offline <env 文件> [vl env 文件] | --live | --selfcheck" >&2; exit 2 ;;
 esac

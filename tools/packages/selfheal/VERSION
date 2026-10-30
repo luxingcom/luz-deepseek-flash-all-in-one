@@ -1,7 +1,7 @@
 PKG=selfheal
 PKG_VERSION=0.3.1-t4.1
-FINGERPRINT=90859fdb
-FINGERPRINT_NOTE=脱敏仓实算（战役仓同批=f632a0a8）；补批同步 01 在役守卫真值+双哨律注记回填
+FINGERPRINT=e178acc3
+FINGERPRINT_NOTE=20261030 脱敏重钉（前值 90859fdb；payload/r3-watchdog.sh 内网值参数化为环境变量缺参拒跑，判读零改）；战役仓同批=f632a0a8 已过期须另窗对表
 GIT_ANCHOR=9cc528a（P3 整备提交）
 TOOL_ANCHORS_SYNC=2026-10-13（docs/TOOL-ANCHORS.md 五包锚段同日更新律）
 PAYLOAD_N=13

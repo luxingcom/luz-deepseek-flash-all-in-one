@@ -24,7 +24,7 @@ CPU-only、无网络、无模型权重加载（tokenizer 仅解析 JSON 的 adde
 ```bash
 python3 -m venv /tmp/w0venv
 /tmp/w0venv/bin/pip install pytest
-cd /home/liuxiaoya/luz-deepseek-flash-all-in-one
+cd /home/<deploy-user>/luz-deepseek-flash-all-in-one
 PYTHONDONTWRITEBYTECODE=1 /tmp/w0venv/bin/python -m pytest -q tests/quality/ \
     -o cache_dir=/tmp/pytest-cache-quality
 ```

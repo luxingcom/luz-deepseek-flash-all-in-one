@@ -8,8 +8,8 @@ candidate images and all pre-0.3.2 images for future development.
 
 | Item | Value |
 |---|---|
-| Registry baseline tag | `192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-baseline-20261022` |
-| Source tag | `192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c` |
+| Registry baseline tag | `<registry-host>:5000/dsv41-sglang-optimized:0.3.2-baseline-20261022` |
+| Source tag | `<registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c` |
 | OCI index digest | `sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4` |
 | arm64 manifest digest | `sha256:ad7e362f4fe74cc0706bc13d77839909e0742669b4291b0ac58374967dc2b57e` |
 | Config digest | `sha256:ef64dec3d74b577bfcc8f54cc940b87d92701a9d9c3bb3c6c1214133c5e605b2` |
@@ -25,10 +25,10 @@ backend:
 
 | Host | Role | Local image ID | Storage backend |
 |---|---|---|---|
-| dgxspark01 | head | `sha256:47f6d91ada98…` (index digest) | `overlayfs` (containerd snapshotter) |
-| dgxspark02 | worker + registry | `sha256:ef64dec3d74b…` (config digest) | `overlay2` |
-| dgxspark03 | worker | `sha256:ef64dec3d74b…` (config digest) | `overlay2` |
-| dgxspark04 | worker | `sha256:ef64dec3d74b…` (config digest) | `overlay2` |
+| <node01> | head | `sha256:47f6d91ada98…` (index digest) | `overlayfs` (containerd snapshotter) |
+| <node02> | worker + registry | `sha256:ef64dec3d74b…` (config digest) | `overlay2` |
+| <node03> | worker | `sha256:ef64dec3d74b…` (config digest) | `overlay2` |
+| <node04> | worker | `sha256:ef64dec3d74b…` (config digest) | `overlay2` |
 
 These are the **same image content**, not two builds: 01 displays the index
 digest, 02–04 display the config digest.
@@ -46,7 +46,7 @@ digest, 02–04 display the config digest.
 | `runtime/` | Read-only container, systemd, NFS, network, GPU and health snapshots |
 | `README.md`, `IMAGE-IDENTITY.json`, `RESTORE.sh`, `MANIFEST.md`, `SHA256SUMS` | This checkpoint's documentation and verification |
 
-The image tar is stored only on `DGXspark02` in this checkpoint directory. The
+The image tar is stored only on `<node02>` in this checkpoint directory. The
 registry also holds the same OCI index under the baseline tag. The tar was
 verified with `sha256sum -c` and `tar -tf` before this document was written.
 
@@ -55,8 +55,8 @@ verified with `sha256sum -c` and `tar -tf` before this document was written.
 ### From the registry (fastest)
 
 ```bash
-docker pull 192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-baseline-20261022
-docker image inspect 192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-baseline-20261022 \
+docker pull <registry-host>:5000/dsv41-sglang-optimized:0.3.2-baseline-20261022
+docker image inspect <registry-host>:5000/dsv41-sglang-optimized:0.3.2-baseline-20261022 \
   --format '{{json .RepoDigests}}'
 # must contain sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4
 ```
@@ -91,7 +91,7 @@ repo at tag `v0.3.2-baseline-20261022`.
 
 - **Model weights**: `/data/models/DeepSeek-V4.1-Flash-1017` (01/02), `/data/models/dsv41-net` (03/04) and the NFS exports are 476 GB per copy and remain in place. Their 84-file SHA256 manifest and engram manifest are in the delivery repo under `deploy/reconstruct/0.3.2/weights/`.
 - **Engram shards**: `~/dsv41-engram-1017` (48 GB per host) remain in place; the 8-shard identity is in `deploy/reconstruct/0.3.2/weights/engram-bins-manifest.json`.
-- **0.2.4 checkpoint**: `DGXspark02:~/checkpoint/LuZ-0.2.4-head-image-v14-6d6353d16c2d.tar` remains untouched. It is a pre-0.3.2 rollback copy and is not part of this baseline.
+- **0.2.4 checkpoint**: `<node02>:~/checkpoint/LuZ-0.2.4-head-image-v14-6d6353d16c2d.tar` remains untouched. It is a pre-0.3.2 rollback copy and is not part of this baseline.
 - **Two root-owned 300-byte files** under `migrate-assets/flashinfer-golden/work/0.6.18/sm121/` were excluded from the assets tar because they are unreadable to the deploy user. They are regenerable JIT metadata; the exclusion list is in `deploy/migrate-assets.EXCLUDED.txt`.
 - **Old 0.3.1/0.3.2-r032/r032b images and their archives** are handled by the cluster archive/cleanup pass, not by this checkpoint.
 
@@ -100,7 +100,7 @@ repo at tag `v0.3.2-baseline-20261022`.
 The pre-0.3.2 archive consolidation and the old image/tag/cache cleanup completed
 on 2026-10-22. The 0.3.2 baseline image identity above is unchanged.
 
-- Historical sources are consolidated on `DGXspark02:~/cluster-archive-20261022/`
+- Historical sources are consolidated on `<node02>:~/cluster-archive-20261022/`
   (290,063,676,566 bytes, 92,931 files); per-directory checksums and the retained
   paths are in [`ARCHIVE-INDEX.md`](ARCHIVE-INDEX.md).
 - Removed images, registry tags, GC result, cache cleanup and host disk changes are

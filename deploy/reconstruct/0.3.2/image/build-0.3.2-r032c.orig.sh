@@ -11,8 +11,9 @@
 set -euo pipefail
 
 REPLAY=/tmp/bt-r032                       # 重演树（79cafec0→295c3097→b9cf2026→f9d89b02 补件）
-BASE="192.168.0.202:5000/lmsysorg/sglang:main-79cafec0"   # 现役形（80e1ea89；禁 pull）
-TAG="${TAG:-192.168.5.187:5000/dsv41-sglang-optimized:0.3.2-r032c}"   # 本地孪生（.187 命名连续性；正典=.202）
+# 20261030 脱敏：registry 主机改经环境变量注入，缺参拒跑。
+BASE="${BASE:?缺环境变量 BASE（<registry-host>:5000/lmsysorg/sglang:main-79cafec0），拒跑}"   # 现役形（80e1ea89；禁 pull）
+TAG="${TAG:?缺环境变量 TAG（<registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c），拒跑}"   # 本地孪生（原 .187 命名连续性；正典为新段）
 NOCACHE="${NOCACHE:-0}"
 WORK="$HOME/luz030-opt-campaign/logs/S-FIXC-BITPRESERVE-20261018/bake"
 CTX="$(mktemp -d "$WORK/ctx-XXXXXX")"     # 一次性 context（0.2.8 定谳）

@@ -1,0 +1,5 @@
+# tools/upstream/bench-arrival/ — PR #44162（bench_serving 到达漂移）host 侧规避两件套（2026-10-30 建件；双面同件互证锚）
+# 双面律：本目录 4 件在 luz030-opt-campaign/tools/upstream/bench-arrival/ 与 luz-034re/tools/upstream/bench-arrival/ 逐字节一致（md5 互证；任一面改动须同批落到另一面并重算本表）。
+e12f98c217549cd0d979cf8145b6bd36  bench_arrival_guard.py
+31059c453ec9dbb850518de64b4ffe74  bench_serving_44162.py
+2efc6acc08636bf5822b0f029cbc751f  README.md

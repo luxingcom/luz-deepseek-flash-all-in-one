@@ -1,0 +1,39 @@
+# gates-034.tsv — 0.3.4 固化生产态基线门期望正典（TSV 表体在文件尾部）
+#
+# 【法源】用户 2026-10-28 批文（0.3.4 封包/固化/交付）+ 决策台账 D118-③（固化终态四机亲核值=
+#   本表期望值唯一来源）+ D118-⑦（profile pin 行自洽化 :8/:9/:18 与基线门期望表入册两裁量项，
+#   本表=后者落档）。建表窗口=2026-10-28 零点火配置自洽化窗（docs/plan/034-W1/PINFIX-20261028.md）。
+#
+# 【对账结论（建窗亲跑）】既有 -wb 门（REBOOT-RECOVERY-baseline-verify-20261026-wb.sh，现行版=
+#   BASELINE-GATE-CURRENT.txt）四机实跑 FAIL 面恰=授权面：01={BL09,BL11,BL12,BL15,BL16,GOV-3}、
+#   02-04={BL09,BL11,BL12,BL15,GOV-3}（BL16 非 01 面 INFO 不判），无多余 FAIL——本表各该行期望值
+#   =对应 FAIL 行的 live 亲读值，逐行一致；未列面（BL01-BL08/BL10/BL13/BL14/GOV-1/2/4/5 等）
+#   锚值不变、现 PASS，不入本表（后续重锚窗照 -wb 脚本原列保留）。
+#
+# 【BL12 不变伴随锚注记】BL12 面三档中仅 backend 重锚（53cc9d61→73c80259）；sched=3db3275e 与
+#   serving 分形锚（01=9b60a463 head / 02-04=b77a736c worker）不变，四机 -wb 实跑均 PASS 在档。
+#
+# 【BL09 点火窗允差注记（D118-③「点火窗 :12 翻 x6bake」）】存储态=50700486（:12 IMAGE=
+#   0.3.2-r032c 占位形）。点火窗内 :12 翻为 0.3.4-x6bake-20261026 形的 md5=
+#   d41323ddac5743b54c00ad2ec3097d13（本窗 sed 复演亲证=单行差），窗内该值为合法态；
+#   窗毕必须回置 50700486。其余任何 md5=漂移。:465 挂载计数 -eq 29 两形同（不动项）。
+#
+# 【表外伴随面（快照在档，不入门）】tp4 面 .env.tp4=e225c391（:87 含 SGLANG_DSV4_KV_LAYOUT=v41
+#   +DSV41_SPARK_PREFILL_TP_SPLIT=1）四机 2026-10-28 复读一致（PINFIX-20261028.md §四）；
+#   guards :161 envpin 行以内容钉 .env.tp4::SGLANG_DSV4_KV_LAYOUT=v41（GOV-3 md5 已覆盖）。
+#
+# 【列义】gate_id=门号（-wb 同号面）；面=受钉面；期望值=固化态亲核值（全量 md5/计数/字符串）；
+#   核验命令=只读命令（doctor 类禁写禁启停；逐条可在四机任一机跑，01 面行除外）；
+#   失败提示=FAIL 时处置指向（偏差=停窗如实呈报不即兴）。
+#
+gate_id	面	期望值	核验命令	失败提示
+BL09	boot 脚本存储 md5（__ASSETS_ROOT__/bin/r3-boot-arm.sh）	50700486996405514a3f2f07b11feb48	md5sum __ASSETS_ROOT__/bin/r3-boot-arm.sh | awk '{print $1}'	非 50700486 且非 d41323ddac5743b54c00ad2ec3097d13（点火窗 :12 x6bake 翻转合法态，窗毕回置）=漂移，停窗呈报勿起栈
+BL11	ARM env storage md5+key count+v41 key+BYPASS key+I8 adopted key (__ASSETS_ROOT__/dsv41/env/CBX1A-CERTM-spec1.env)	4370aab9c501cd0cfd3d89bb0137c433；61 keys; SGLANG_DSV4_KV_LAYOUT=v41 standalone line=1; DSV41_PREFILL_BYPASS=2048 standalone line=1; DSV41_ENGRAM_CACHE_GIB=2 standalone line=1	md5sum __ASSETS_ROOT__/dsv41/env/CBX1A-CERTM-spec1.env | awk '{print $1}'; grep -c '^[A-Za-z_][A-Za-z0-9_]*=' __ASSETS_ROOT__/dsv41/env/CBX1A-CERTM-spec1.env; grep -c '^SGLANG_DSV4_KV_LAYOUT=v41$' __ASSETS_ROOT__/dsv41/env/CBX1A-CERTM-spec1.env; grep -c '^DSV41_PREFILL_BYPASS=2048$' __ASSETS_ROOT__/dsv41/env/CBX1A-CERTM-spec1.env; grep -c '^DSV41_ENGRAM_CACHE_GIB=2$' __ASSETS_ROOT__/dsv41/env/CBX1A-CERTM-spec1.env	md5/key count mismatch=env face drift (61=canonical after W-f I8 adoption [D124]; 60=W-f pre-canonical [D121]); v41 line missing=fork-v4-fp4 degraded face risk; BYPASS line missing=first-key TTFT optimization face lost; I8 line missing=engram cache 2GiB adopted face lost (live-proof banner 8/8 cache=2.0GiB), all stop window, report
+BL12	overlay backend md5（__ASSETS_ROOT__/v4vl/sglang-overlay.o12c1-prod/deepseek_v4_backend.py；伴随锚 sched 3db3275e/serving 分形不变）	73c802597f9494685227e7a5b6ee040f	md5sum __ASSETS_ROOT__/v4vl/sglang-overlay.o12c1-prod/deepseek_v4_backend.py | awk '{print $1}'	backend 漂移=overlay 面被改，停窗呈报；伴随锚失配另记（-wb BL12 全档口径）
+BL15	overlay-map.tsv 行数（__ASSETS_ROOT__/v4vl/sglang-overlay.o12c1-prod/overlay-map.tsv）	29	awk -F'\t' '!/^#/ && NF>=2 && $1!="" {n++} END{print n+0}' __ASSETS_ROOT__/v4vl/sglang-overlay.o12c1-prod/overlay-map.tsv	≠29=映射面漂移（boot-prod.sh:52 将 die），停窗呈报
+BL16	prod 校验面两档 md5（01 面：profile 整件+overlay 清单）	profile=77d7fa67384d41c91f8268581d3048f5 (W-f I8 adoption re-pin :8/:9, 2026-10-29); overlay-md5.txt=fd59c03bee7866aea29ecd35b7e14cf5	md5sum __ASSETS_ROOT__/prod/prod-profile.env __ASSETS_ROOT__/prod/overlay-md5.txt | awk '{print $1}'	profile mismatch=pin line re-drift (diff bak-pre-deopt-adopt-20261029 should be exactly :8/:9 two lines); manifest mismatch=overlay file change not filed, all stop window, report
+BL-BYP1	BYPASS 采用 adapter 面（__ASSETS_ROOT__/dsv41/adapter 整树+两单件）	整树=0beb4bee·99 件；sitecustomize.py=dd69c59a1098b735dd20e8aec1baaee9（钩插入后）；prefill_bypass.py=c487525873cc2c0e09436414efb22115	cd __ASSETS_ROOT__/dsv41/adapter && find . -type f ! -path '*__pycache__*' | LC_ALL=C sort | xargs -r md5sum 2>/dev/null | LC_ALL=C sort | md5sum | cut -c1-8; find __ASSETS_ROOT__/dsv41/adapter -type f ! -path '*__pycache__*' | wc -l; md5sum __ASSETS_ROOT__/dsv41/adapter/sitecustomize.py __ASSETS_ROOT__/dsv41/adapter/prefill_bypass.py | awk '{print $1}'	三值任一失配=BYPASS 采用面漂移（sitecustomize 回 45ca6e3e=钩丢失静默回 74s 慢带）；正典副本 tools/bypass/（SOURCE-MD5.txt）互证；停窗呈报
+BL-BYP2	BYPASS 点火后 ARMED 断言面（docker logs 活体；W-d 起为 deploy 后核面）	四机 armed 合计=8（2/机）；refusing-to-arm 合计=0	docker logs r3prod-head 2>&1 | grep -c 'DSV41_PREFILL_BYPASS armed:'; for h in __PROD_HOST_02__ __PROD_HOST_03__ __PROD_HOST_04__; do ssh -o BatchMode=yes -o ConnectTimeout=8 $h 'docker logs r3prod-worker 2>&1 | grep -c "DSV41_PREFILL_BYPASS armed:"'; done; docker logs r3prod-head 2>&1 | grep -ci 'refusing to arm'	armed<2/机=未武装（env 键未达容器/钩断）；refusing>0=守卫拒因（查 bypass-armed-gate 逐机断言档）；采集面=正典件 capture-boot-evidence.sh [12] 段（0b9117cb）；停窗呈报
+GOV-3	guards.conf 在役 md5（__GUARDS_KIT_DIR__/guard/guards.conf；:161 sglang-kv-layout envpin=v41）	418414c3b735265cb47e22eb73b688d5	md5sum __GUARDS_KIT_DIR__/guard/guards.conf | awk '{print $1}'; sed -n '161p' __GUARDS_KIT_DIR__/guard/guards.conf	md5 失配=守护面漂移；:161 非 v41=KV 布局钉松动，均停窗呈报（注意 __ASSETS_ROOT__/dsv41/kit 与 deploy/kit 下同名件为非在役副本，勿误钉）
+IMG-1	镜像 RepoDigest（tag 0.3.4-x6bake-20261026，四机各自 inspect）	sha256:80e4c95712f3369ae4c087e1a879a3b63343f0469e5eb5a02aa7513b4968f7d0	docker image inspect __REGISTRY_HOST__:__REGISTRY_PORT__/dsv41-sglang-optimized:0.3.4-x6bake-20261026 --format '{{index .RepoDigests 0}}'	digest 失配=镜像被覆写/重推，停窗呈报（profile :21 同锚）
+GW-1	网关 rc3.8.7 sampling-on（__GATEWAY_HOST__ concurrency-proxy-v2-mac）	日志含 concurrency-proxy-v2-rc3.8.7 且 sampling=on；GW_SAMPLING_POLICY=1	ssh -o BatchMode=yes -o ConnectTimeout=8 __GATEWAY_HOST__ '/opt/homebrew/bin/docker logs concurrency-proxy-v2-mac 2>&1 | grep "sampling=" | tail -1; /opt/homebrew/bin/docker exec concurrency-proxy-v2-mac printenv GW_SAMPLING_POLICY'	非 sampling-on=判读面漂移；处置须走专门窗（GW_SAMPLING_POLICY/K16 两键判读窗禁切律随身），本门只读不触

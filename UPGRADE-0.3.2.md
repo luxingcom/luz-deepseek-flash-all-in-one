@@ -1,5 +1,18 @@
 # 升级到 LuZ 0.3.2（0.3.1 基底 + 混合快照）
 
+> **0.3.4re 读者指引（2026-10-30 增）**：本仓现役版本已是 **0.3.4**（修复固化代+
+> 调优终态：v41 三联固化、`DSV41_PREFILL_BYPASS=2048`、61 键 env、engram cache
+> 2GiB）。要部署或升级到 0.3.4 的读者请走新主路径：发布说明=
+> [`docs/release/0.3.4-RELEASE-NOTE.md`](docs/release/0.3.4-RELEASE-NOTE.md)；
+> 升级操作=[`UPGRADE-0.3.4.md`](UPGRADE-0.3.4.md)；从零部署主路径=
+> [`docs/DEPLOY-STEP-BY-STEP.md`](docs/DEPLOY-STEP-BY-STEP.md)（其 §4.5 网关节、
+> §5 env 面、§6.6 工具族已并入 0.3.4 增量）；日常运维与验收=
+> [`docs/runbook/runbook-034.md`](docs/runbook/runbook-034.md)；参数词典=
+> [`docs/RUNTIME-PARAMETERS.md`](docs/RUNTIME-PARAMETERS.md)（0.3.4 面 61 键）。
+> **本档保留为 0.3.2 升级正典**：0.3.1→0.3.2 的 md5 锚/绑定律/回退表/验收门正文
+> 不动（史面不覆写）；0.3.2→0.3.4 的差异面一律以 0.3.4 侧正典件为准，本档除卷首
+> 与既有 2026-10-30 覆写注记（§0 serve 行）外不载 0.3.4 增量。
+
 > 目标读者：已经能跑 0.3.1、或从零搭 4×DGX Spark GB10 TP4 的采用人员。
 > 目标：把公开仓的 **0.3.1 整面基底** 与 **0.3.2 现役增量** 合成一套可 boot、
 > 可判读、可回退的 0.3.2 栈，并复现 release note 的性能与质量读数。
@@ -21,7 +34,7 @@
 | IMAGE | `dsv41-sglang-optimized:0.3.2-r032c` | digest `sha256:47f6d91ada98…e2ffc4`；71 层（基座 70+1） |
 | 权重 | `DeepSeek-V4.1-Flash-1017`（84 文件） | 510,311,045,870 B；`config.json` `8be45ce0…21879` |
 | engram | 8 分片 | 202,758,065,168 B；秩映射 01=r0、02=r1、04=r2、03=r3 |
-| serve | SPEC6 九参（A8/A9/`--sleep-on-idle`） | 池 9,600,000；ctx 600,000；MRR 16；chunked 4096 |
+| serve | SPEC6 九参（A8/A9/`--sleep-on-idle`） | 池 9,600,000；ctx 600,000；MRR 16；chunked 4096。〔2026-10-30 覆写注记：第 9 参已退役=禁参（上游 #43050），现役八参指纹 6b12a445，见 SPEC6-SERVE-REF〕 |
 | boot | `r3-boot-arm.sh` | 产线 **20f22bc6**；公开件 9ac6e113（快照头+掩码） |
 
 > 网络形态说明：0.3.1 及更早的环网形是 4 口 CX-7 hairpin；0.3.2 现役已切
@@ -58,7 +71,7 @@
 - 宿主 C 工具链：`cc`/`gcc` + `libibverbs` 头文件（b12x `_roce_proxy.c` 首次
   使用自动编译）。
 - 磁盘：基座镜像约 48.6GB；1017 权重 476G；engram 约 189G；另留镜像/备份空间。
-- 网络：双 rail 交换机；管理段 `192.168.0.201-204`；registry `192.168.0.202:5000`。
+- 网络：双 rail 交换机；管理段 `<mgmt-node-ip> 段（.201-204 掩形）`；registry `<registry-host>:5000`。
 - 纪律：前栈拆靴→点火至少 **600s** 沉降；一个判读窗内 env/serve/adapter 三元组
   不许中途切换。
 
@@ -67,12 +80,12 @@
 ### 3.1 直接拉现役镜像（推荐，身份完全一致）
 
 ```bash
-docker pull 192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c
+docker pull <registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c
 docker inspect --format '{{index .RepoDigests 0}}' \
-  192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c
+  <registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c
 # 期望：sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4
 docker image inspect -f '{{len .RootFS.Layers}}' \
-  192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c
+  <registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c
 # 期望：71（基座 70 + 单 COPY 层）
 ```
 
@@ -212,12 +225,12 @@ SPEC_EXTRA_ARGS="--prefill-decode-interval 16 --max-queued-requests 32 --min-fre
 ```
 
 `SPEC=1` 追加 `--speculative-algorithm DSPARK`；`r3-boot-arm.sh` 的 `SERVER_ARGS`
-固定面另含 A8/A9/第九参：
+固定面另含 A8/A9 两参（原第九参 `--sleep-on-idle` 已于 2026-10-30 退役为禁参=
+上游 #43050 idle-wake hang host 侧规避，勿以任何路径带回）：
 
 ```
 --tool-call-parser deepseekv41
 --enable-cache-report
---sleep-on-idle
 ```
 
 易错点：`tool-call-parser` 必须连写 `deepseekv41`；`reasoning-parser` 必须带
@@ -231,8 +244,9 @@ SPEC_EXTRA_ARGS="--prefill-decode-interval 16 --max-queued-requests 32 --min-fre
 ## 9. 验收门（boot 后先过这一组）
 
 1. `curl -s http://127.0.0.1:8898/health` = 200；网关侧 8899/8001 健康。
-2. 四机 `printenv` 与 CBX1A env 逐字；九参直证用
-   `docker exec <ctn> sh -c 'tr "\0" "\n" < /proc/1/cmdline'`（或 `tools/serve_flags_gate.sh`）。
+2. 四机 `printenv` 与 CBX1A env 逐字；八参直证用
+   `docker exec <ctn> sh -c 'tr "\0" "\n" < /proc/1/cmdline'`（或 `tools/serve_flags_gate.sh`，
+   其同时断言禁参 `--sleep-on-idle` 缺席〔UP43050-20261030〕）。
    **不要用 `docker inspect` 的 `Config.Cmd`**——它只反映镜像设计意图；经 wrapper/entrypoint
    起栈时不反映真实 argv，据此会把已配好的参数误判成缺失（外部站点实测踩坑）。
 3. 横幅 `banner complete: 29 gates`；池 `max_total_num_tokens=9600000`；
@@ -334,7 +348,7 @@ C1=3757.7、C2=2849.8、C4=1571.0（C4/C1=0.418）。这是定标读数，不是
 | env | `ARM_ENV_FILE` 回指 E16B2→E16B1→FB54→0.3.1 51 键；单文件整替，不手改 |
 | adapter | `rsync -a --delete <home>/migrate-assets/dsv41/adapter-bak-pre-032-<ts>/ <home>/migrate-assets/dsv41/adapter/`；复靴 |
 | overlay/b12x | 回拷 0.3.1 基底件（`deploy/overlay/o12c1-prod/` 原 backend；`deploy/b12x/` 原三件）；清 b12x 编译缓存 |
-| boot 参 | 去 `--sleep-on-idle` / A8/A9 的旧 boot 件回拷（若有 `.bak`） |
+| boot 参 | A8/A9 的旧 boot 件回拷（若有 `.bak`）。**勿回拷带 `--sleep-on-idle` 的旧件**——该参 2026-10-30 起为禁参（上游 #43050 idle-wake hang；三面硬门拦截） |
 
 回退后同样跑 boot 四查+接线闸门；旧形 A8/A9 未接线时闸门应红——这是预期判别，
 不是回归。回退完成前不要开流量。

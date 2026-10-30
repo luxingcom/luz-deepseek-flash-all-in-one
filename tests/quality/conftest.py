@@ -31,10 +31,10 @@ import pytest
 # ============================================================
 
 # SGLang 基座源码树（79cafec0 线，INV-05 证据基线；只读）
-SGLANG_SRC = "/home/liuxiaoya/sglang-main-src"
+SGLANG_SRC = "/home/<deploy-user>/sglang-main-src"
 # 本机同源 tokenizer（DeepSeek-V4-Flash-Vision-Exp，INV-05 EV-05-028；只读，不加载权重）
 TOKENIZER_V41_LOCAL = (
-    "/home/liuxiaoya/models/DeepSeek-V4-Flash-Vision-Exp/tokenizer.json"
+    "/home/<deploy-user>/models/DeepSeek-V4-Flash-Vision-Exp/tokenizer.json"
 )
 # 产线 1017 tokenizer（/data/models，只读；INV-05 §9.问题的 E1 直读对象）
 TOKENIZER_PROD_1017 = (
@@ -44,7 +44,7 @@ TOKENIZER_PROD_1017_SHA256SUMS = (
     "/data/models/DeepSeek-V4.1-Flash-1017/SHA256SUMS"
 )
 # 交付仓根（overlay/env 的只读来源）
-LUZ_DELIVERY_ROOT = "/home/liuxiaoya/luz-deepseek-flash-all-in-one"
+LUZ_DELIVERY_ROOT = "/home/<deploy-user>/luz-deepseek-flash-all-in-one"
 # 生产 env 文件（只按行提取 SGLANG_MAX_NEW_TOKENS_LIMIT）
 PROD_ENV_FILES = [
     LUZ_DELIVERY_ROOT + "/deploy/env/CBX1A-CERTM-spec1.env",

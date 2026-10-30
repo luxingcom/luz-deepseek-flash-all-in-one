@@ -6,7 +6,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TAR="${HERE}/image-r032c-arm64.tar"
 SHA="${TAR}.sha256"
-TARGET="192.168.0.202:5000/dsv41-sglang-optimized"
+# 20261030 脱敏：registry 主机改经环境变量注入，缺参拒跑。
+TARGET="${TARGET:?缺环境变量 TARGET（形如 <registry-host>:5000/dsv41-sglang-optimized），拒跑}"
 BASELINE_TAG="${TARGET}:0.3.2-baseline-20261022"
 SOURCE_TAG="${TARGET}:0.3.2-r032c"
 CONFIG_ID="sha256:ef64dec3d74b577bfcc8f54cc940b87d92701a9d9c3bb3c6c1214133c5e605b2"

@@ -1,21 +1,21 @@
 # 0.3.2 前代档案归档索引（2026-10-22）
 
-归档主机：`DGXspark02`（`192.168.0.202`）
-归档根：`/home/liuxiaoya/cluster-archive-20261022/`
+归档主机：`<node02>`（`<mgmt-node-ip>`）
+归档根：`/home/<deploy-user>/cluster-archive-20261022/`
 总量：**290,063,676,566 B（271G，92,931 个普通文件）**
 
 本索引记录 0.3.2 基线之前开发/测试档案的最终位置与校验状态。0.3.2 现役回滚点不在本归档内，它在
-`/home/liuxiaoya/checkpoints/0.3.2-baseline-20261022/`，身份与恢复方法见同目录
+`/home/<deploy-user>/checkpoints/0.3.2-baseline-20261022/`，身份与恢复方法见同目录
 [`README.md`](README.md) 和 [`IMAGE-IDENTITY.json`](IMAGE-IDENTITY.json)。
 
 ## 目录布局
 
 | 路径 | 内容 |
 |---|---|
-| `01/` | dgxspark01 上 0.3.2 之前的历史档案、旧仓库、旧发行包 |
-| `02/` | dgxspark02 本机旧测试环境/迁移暂存，同盘移动，不占额外空间 |
-| `03/` | dgxspark03 旧运维工作区与环境统一档案 |
-| `04/` | dgxspark04 旧运维工作区与环境统一档案 |
+| `01/` | <node01> 上 0.3.2 之前的历史档案、旧仓库、旧发行包 |
+| `02/` | <node02> 本机旧测试环境/迁移暂存，同盘移动，不占额外空间 |
+| `03/` | <node03> 旧运维工作区与环境统一档案 |
+| `04/` | <node04> 旧运维工作区与环境统一档案 |
 
 ## 01 — 历史档案与保留目录（02 有完整副本）
 
@@ -30,7 +30,7 @@
 | `archive-20261014` | 56,199,671,120 | 53G | 33,979 | checksum 零差异 |
 | `archive-env-unify-20261010` | 1,966,788 | 2.0M | 30 | checksum 零差异 |
 | `archive-tools-20261007` | 505,252 | 616K | 61 | checksum 零差异 |
-| `dsv41-flash-dgxsparks` | 527,686,223 | 526M | 8,952 | checksum 零差异（含 215 个 root-only 文件） |
+| `<source-repo>` | 527,686,223 | 526M | 8,952 | checksum 零差异（含 215 个 root-only 文件） |
 | `luz-0.3.1-dist` | 28,974,016,739 | 27G | 10 | checksum 零差异 |
 | `luz-0.3.1-locked` | 7,249,145 | 7.4M | 178 | checksum 零差异 |
 | `switch-1017-20261017-154237` | 52,705,438 | 51M | 118 | checksum 零差异 |
@@ -60,7 +60,7 @@
 ```bash
 # 16 个目录逐一执行；archive-20261012 额外加 -H
 rsync -rlp --checksum --dry-run --itemize-changes \
-  /home/liuxiaoya/<dir>/ DGXspark02:/home/liuxiaoya/cluster-archive-20261022/01/<dir>/
+  /home/<deploy-user>/<dir>/ <node02>:/home/<deploy-user>/cluster-archive-20261022/01/<dir>/
 ```
 
 - 16/16 目录返回 `rc=0`，差异行数为 0。
@@ -68,7 +68,7 @@ rsync -rlp --checksum --dry-run --itemize-changes \
   而 `du -sb` 为 74,533,864,463 B（硬链接只计一次）。初次 `rsync -a` 会展开硬链接，因此重新以
   `rsync -aH --sparse` 复制；最终 02 目标同样为 74,533,864,463 B、6,163 个普通文件、
   3,936 个硬链接，`-H --checksum` 零差异。展开的旧副本已删除。
-- `dsv41-flash-dgxsparks` 的 `state/b12x-compile/` 与 `state/b12x-next-compile/` 下有 root-only
+- `<source-repo>` 的 `state/b12x-compile/` 与 `state/b12x-next-compile/` 下有 root-only
   编译缓存（134 个文件，约 8.6 MB）。用户态 rsync 先排除了这两个目录；随后用 root tar 流补齐，
   并对两个目录全部 215 个文件做 SHA256 对表，源/档 215/215 全等。最终源/档均为
   527,686,223 B、8,952 个文件。
@@ -127,11 +127,11 @@ rsync -rlp --checksum --dry-run --itemize-changes \
 ## 复核
 
 ```bash
-ssh DGXspark02 'du -sb ~/cluster-archive-20261022; du -sh ~/cluster-archive-20261022; \
+ssh <node02> 'du -sb ~/cluster-archive-20261022; du -sh ~/cluster-archive-20261022; \
   find ~/cluster-archive-20261022 -type f | wc -l'
 # 期望：290063676566 / 271G / 92931
 ```
 
 0.3.2 回滚点与归档是两套独立备份：回滚点在
-`DGXspark02:~/checkpoints/0.3.2-baseline-20261022/`（镜像 tar、registry manifest、deploy kit、
-运行时快照、git bundle），归档在 `DGXspark02:~/cluster-archive-20261022/`（历史资料）。
+`<node02>:~/checkpoints/0.3.2-baseline-20261022/`（镜像 tar、registry manifest、deploy kit、
+运行时快照、git bundle），归档在 `<node02>:~/cluster-archive-20261022/`（历史资料）。

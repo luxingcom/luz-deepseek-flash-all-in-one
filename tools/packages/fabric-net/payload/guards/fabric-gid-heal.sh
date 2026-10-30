@@ -15,7 +15,7 @@
 #   P3 本机无引擎：无 r3boot-*/r3prod-*/dsv41-* 容器（环回=瞬断 QP 面）
 #   P4 频次未熔断：state heal.history 1h 内 <2 次（≥2=熔断，guard Q5 面）
 # 安全边界（§2.3）：只碰 DEVLIST 四 fabric 口；enP7s7 管理口与 01 机 macgw /30 副地址
-#   （192.168.0.2）永不在动作面（P2 的「恰一条 IPv4」断言天然排除宽接口形态）。
+#   （<mgmt-node-ip>）永不在动作面（P2 的「恰一条 IPv4」断言天然排除宽接口形态）。
 # 白名单硬界：HCA 名单四件固定；净覆盖=F06 语义（topology 期望表）。
 set -u
 

@@ -1,0 +1,24 @@
+{
+  "note": "EQ-04 contract_probe --selftest 离线 fixture 台账：逐条声明 file/kind/expect，由 tools/contract_probe.py selftest() D 段驱动判读并与期望比对；E 段校验盘上文件与本台账一一对应（新增 fixture 必须同步登记，否则 selftest 红）。",
+  "kinds": {
+    "tools_nostream": "非流式 chat 响应 JSON——validate_tools_case 判读",
+    "tools_stream": "SSE 流原文——parse_sse+assemble_stream 拼装后同判（含跨分片切开标记负例）",
+    "retrieval": "长上下文检索题响应 JSON——validate_retrieval_case 判读（magic 取本表 magic 字段）"
+  },
+  "fixtures": [
+    {"file": "tools_nostream_good.json", "kind": "tools_nostream", "expect": "PASS"},
+    {"file": "tools_nostream_leak.json", "kind": "tools_nostream", "expect": "FAIL",
+     "expect_keywords": ["明文"]},
+    {"file": "tools_nostream_badargs.json", "kind": "tools_nostream", "expect": "FAIL",
+     "expect_keywords": ["JSON"]},
+    {"file": "tools_stream_good.sse", "kind": "tools_stream", "expect": "PASS"},
+    {"file": "tools_stream_leak.sse", "kind": "tools_stream", "expect": "FAIL",
+     "expect_keywords": ["明文"]},
+    {"file": "retrieval_good.json", "kind": "retrieval", "magic": "3f2a9c1d",
+     "expect": "PASS"},
+    {"file": "retrieval_bad_finish.json", "kind": "retrieval", "magic": "3f2a9c1d",
+     "expect": "FAIL", "expect_keywords": ["finish"]},
+    {"file": "retrieval_empty.json", "kind": "retrieval", "magic": "3f2a9c1d",
+     "expect": "FAIL", "expect_keywords": ["正文"]}
+  ]
+}

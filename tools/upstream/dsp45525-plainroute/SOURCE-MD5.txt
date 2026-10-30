@@ -1,0 +1,6 @@
+# tools/upstream/dsp45525-plainroute/ — issue #45525 host 侧路由规避件（2026-10-30 建件；双面同件互证锚）
+# 双面律：本目录 5 件在 luz030-opt-campaign/tools/upstream/dsp45525-plainroute/ 与 luz-034re/tools/upstream/dsp45525-plainroute/ 逐字节一致（md5 互证；任一面改动须同批落到另一面并重算本表，plainroute_lint_45525.sh L2 面机器执法）。
+38bd0f406dfeec0a0ebe005f605ffe17  README.md
+cd8a1e36f515b62c97803b6da90e7e9c  plain-face-45525.env
+b5888766531fe36bfc47944fb0ac7086  plainroute_guard_45525.sh
+3b7684a1cf319ba8f79698b6f928f70b  plainroute_lint_45525.sh

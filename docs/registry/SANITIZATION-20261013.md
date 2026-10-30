@@ -34,5 +34,5 @@
 
 ## 三、范围外注记（未处置，另批呈裁）
 
-- **内网 IP**（192.168.5.187 registry 直链/10.100.136.x/192.168.0.x）：不在本指令五类清单内；registry 直链=镜像获取指令的必要组成（README §二），掩码会破坏部署指引——维持 SCAN-REPORT 政策保留位，如需脱敏另行呈裁。
+- **内网 IP**（<registry-host> registry 直链/<fabric-ip>.x/<mgmt-node-ip>.x）：不在本指令五类清单内；registry 直链=镜像获取指令的必要组成（README §二），掩码会破坏部署指引——维持 SCAN-REPORT 政策保留位，如需脱敏另行呈裁。
 - gw-verify/selfcheck 三处**假值 fixture**：判别力件（自检红例必须以"看起来像泄漏"的假值触发检测），掩码会使自检失去抓坏能力——保留。

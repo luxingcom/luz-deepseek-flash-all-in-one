@@ -73,10 +73,11 @@ out=$(FABRIC_MOCK_SYS="$M" FABRIC_CARRIER_SLEEP_MS=0 bash "$HERE/payload/diag/fa
 if [ "$rc" = 1 ] && printf '%s' "$out" | grep -q 'carrier-flap'; then sc_ok "F6 doctor mock 红例判红（carrier-flap 签名点名）"
 else sc_red "F6 doctor mock 红例失效（rc=$rc out=$out）"; fi
 
-# F7 runbook 蓝本 md5 对锚（cc84ba86=~/w6-kit 正典蓝本；漂移=收编源升级未同步）
+# F7 runbook 蓝本 md5 对锚（2d333a6f=20261030 脱敏后包内正典——原锚 cc84ba86=未脱敏蓝本；
+#     内网值改占位符属收编源升级，蓝本侧同步须另窗呈裁注记）
 rb_md5=$(md5sum "$HERE/payload/runbook/FABRIC-GID-REPAIR-RUNBOOK.md" | awk '{print substr($1,1,8)}')
-[ "$rb_md5" = "cc84ba86" ] && sc_ok "F7 GID runbook 蓝本 md5 对锚绿（cc84ba86）" \
-  || sc_red "F7 GID runbook md5 漂移（$rb_md5≠cc84ba86——蓝本升级须同日再吸收+注记）"
+[ "$rb_md5" = "2d333a6f" ] && sc_ok "F7 GID runbook 蓝本 md5 对锚绿（2d333a6f，脱敏后形）" \
+  || sc_red "F7 GID runbook md5 漂移（$rb_md5≠2d333a6f——蓝本升级须同日再吸收+注记）"
 
 rm -rf "$T"
 sc_summary

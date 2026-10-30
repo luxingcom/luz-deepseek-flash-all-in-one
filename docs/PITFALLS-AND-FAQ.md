@@ -386,12 +386,15 @@ docker exec <CTN> sh -c 'tr "\0" " " < /proc/1/cmdline'
 tools/serve_flags_gate.sh --api http://127.0.0.1:<PORT>
 ```
 
-**处置**：两处都看。接线类旗标（`--tool-call-parser` / `--enable-cache-report` /
-`--sleep-on-idle` 等）用 `tools/serve_flags_gate.sh` 从运行进程 argv 直证，判据表
+**处置**：两处都看。接线类旗标（`--tool-call-parser` / `--enable-cache-report` 等）
+用 `tools/serve_flags_gate.sh` 从运行进程 argv 直证，判据表
 见 `deploy/SPEC6-SERVE-REF.md`「旗标-能力-生效值对照表」，用法与退出码见
 `tools/serve_flags_gate.README.md`。注意命名陷阱：`--tool-call-parser` 的值**连写**
 （如 `deepseekv41`），`--reasoning-parser` 的值**带连字符**（如 `deepseek-v41`），
 写反**不报错、功能静默缺失**；`/health` 200 不能证明接线成功。
+另注意判据方向：`--sleep-on-idle` 自 2026-10-30 起为**禁参**（上游 sglang #43050
+idle-wake hang host 侧规避）——argv **在场**才是红灯（缺席=正态），该判据已入
+serve_flags_gate 缺席判据（R8）/env-lint EQ-03 禁参组合/selfcheck-prod 禁参表。
 
 ## P2-5 三层引号转发会把 `grep -A1` 打坏
 

@@ -4,7 +4,7 @@
 - 版本：V1.0（审核归档稿）
 - 编制日期：2026-10-23
 - 归档范围：2026-10-22 12:24 UTC 至 2026-10-23 06:07 UTC 的连续维护周期（覆盖 10-22 全天至 10-23 凌晨）
-- 适用对象：`dgxspark01`–`dgxspark04`，TP4 推理集群，模型 `deepseek-v4.1-flash`
+- 适用对象：`<node01>`–`<node04>`，TP4 推理集群，模型 `deepseek-v4.1-flash`
 - 文档状态：**完成，待审核签字**
 
 ---
@@ -38,7 +38,7 @@
 | A-13 | RoCE 自愈误报修复 | 修正 `heal-if-down`：栈运行时只读 check，零漂移 exit 0；四机恢复 `running`，`Result=success` | 回滚报告 4.4；`roce-ring-apply.sh` 副本 |
 | A-14 | 内核/驱动版本锁 | 22 个精确锁包 + 7 个 guard hold（共 29）；APT pin 1001；29 包 unattended 黑名单；4 个自动升级单元 masked；30 分钟周期校验 | 回滚报告 4.5；`version-lock/host-01..04.txt` |
 | A-15 | 启动门禁与自检增强 | 回滚后自检由 42/42 扩至 post-boot 46/46、fast 44/44；新增每机 `driver`、`version_lock`；启动预检失败即拒绝起栈 | 最终自检日志与 JSON |
-| A-16 | ZCode/网关 API 报错排查 | 确认集群 API、网关、后端健康；44 条 `model.request.failed` 中 42 条来自旧 provider `192.168.5.65:8003`；有效入口 `192.168.0.1:8003/v1` 正常 | 第 9 节；ZCode 日志统计 |
+| A-16 | ZCode/网关 API 报错排查 | 确认集群 API、网关、后端健康；44 条 `model.request.failed` 中 42 条来自旧 provider `<mac-if-ip>:8003`（旧管理段接口，20261030 脱敏为占位符）；有效入口 `<mac-gw-ip>:8003/v1` 正常 | 第 9 节；ZCode 日志统计 |
 | A-17 | 文档与证据归档 | 形成回滚报告、7.0 历史报告、运维交接清单、版本锁证据和两级 SHA256 校验 | 第 10 节；`SHA256SUMS` |
 
 ---
@@ -84,7 +84,7 @@
 | Lossless buffer | `19872,523296,0,0,0,0,0,0` | `mlnx_qos -i` |
 | PFC / trust | `0,0,0,1,0,1,0,0` / `dscp` | `mlnx_qos -i` |
 | GPU 频率/温控 | 默认无上限；EC auto；max SM 3003 MHz | `nvidia-smi`、`gb10-clock-cap` 状态 |
-| 镜像 | `192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c` | digest 校验 |
+| 镜像 | `<registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c`（registry 主机已脱敏为占位符） | digest 校验 |
 | 镜像 digest | `sha256:47f6d91a…e2ffc4` | `boot-prod.sh` |
 | env / overlay / adapter | 56 键 / 28 件 / 97 件，指纹 `c41b1a45` | 四机逐项比对 |
 | recipe | 0.2.0；`serving_chat.py 3151a2ed…`、`dsv41_recipe.py da98467d…` | 容器 md5 + 功能探针 |
@@ -349,18 +349,18 @@ curl -fsS http://127.0.0.1:8899/health
 
 ### 9.1 结论
 
-**集群 API、网关和后端服务正常，报错主因不在集群侧。** 调查窗口内网关侧正常推理请求均返回 200；有效 base URL 为 `http://192.168.0.1:8003/v1`，网关健康检查 200，认证冒烟请求约 585 ms 返回 200。失败集中在 ZCode 客户端遗留的旧 provider 绑定 `cffc3a51-b294-4cad-8f50-738aeedeb0c4` → `http://192.168.5.65:8003`。
+**集群 API、网关和后端服务正常，报错主因不在集群侧。** 调查窗口内网关侧正常推理请求均返回 200；有效 base URL 为 `http://<mac-gw-ip>:8003/v1`，网关健康检查 200，认证冒烟请求约 585 ms 返回 200。失败集中在 ZCode 客户端遗留的旧 provider 绑定 `cffc3a51-b294-4cad-8f50-738aeedeb0c4` → `http://<mac-if-ip>:8003`（旧管理段接口，IP 已脱敏）。
 
 ### 9.2 链路
 
 ```text
-ZCode → Mac 192.168.0.1:8003（responses-gateway-mac）
+ZCode → Mac <mac-gw-ip>:8003（responses-gateway-mac）
       → concurrency-proxy-v2-mac
       → concurrency-proxy:8001
       → 集群 127.0.0.1:8899
 ```
 
-Mac 接口：en0 `192.168.0.1`（当前有效）、en1 `192.168.5.71`、en11 `192.168.5.65`（旧 provider 指向）。从集群侧访问 `.65`/`.71` 可建立 TCP，但收不到 HTTP 响应；网关日志中没有对应请求。有效入口 `.1` 的请求均有正常响应。
+Mac 接口：en0 `<mac-gw-ip>`（当前有效专线口）、en1 `<mac-if-ip>`（管理口）、en11 `<mac-if-ip>`（旧 provider 指向的旧管理段口）。从集群侧访问旧管理段的这两个接口地址可建立 TCP，但收不到 HTTP 响应；网关日志中没有对应请求。有效入口（专线口）的请求均有正常响应。（内网 IP 已于 20261030 脱敏为占位符）
 
 ### 9.3 报错归类
 
@@ -368,8 +368,8 @@ Mac 接口：en0 `192.168.0.1`（当前有效）、en1 `192.168.5.71`、en11 `19
 
 | 来源 | 条数 | 说明 |
 |---|---:|---|
-| 旧 provider `cffc…` → `192.168.5.65:8003` | 42 | 40 条 `network_error` + 2 条 `cancelled`；多次自动重试，最高 15 次 |
-| `dgxspark-v41` → `192.168.0.1:8003/v1` | 1 | `reason=unknown`，持续约 743 s；同一时刻网关返回 200、240772 字节 |
+| 旧 provider `cffc…` → `<mac-if-ip>:8003` | 42 | 40 条 `network_error` + 2 条 `cancelled`；多次自动重试，最高 15 次 |
+| `<provider-name>` → `<mac-gw-ip>:8003/v1` | 1 | `reason=unknown`，持续约 743 s；同一时刻网关返回 200、240772 字节 |
 | 公有云 `deepseek` | 1 | `cancelled` |
 
 另有 8 条 `zcode_protocol.v4.gateway_error`，均为客户端本地协议/会话错误，不是网关 HTTP 5xx：
@@ -382,11 +382,11 @@ Mac 接口：en0 `192.168.0.1`（当前有效）、en1 `192.168.5.71`、en11 `19
 
 ### 9.4 处置建议
 
-1. 在 ZCode 客户端把任务/会话重新绑定到当前 provider `dgxspark-v41`（`http://192.168.0.1:8003/v1`），或新建任务，清除旧 `cffc…`/`.65` 绑定。
+1. 在 ZCode 客户端把任务/会话重新绑定到当前 provider `<provider-name>`（`http://<mac-gw-ip>:8003/v1`），或新建任务，清除旧 `cffc…`（旧管理段接口）绑定。
 2. 客户端侧 743 s 长请求与 75 s 客户端超时不匹配的请求需跟踪（2026-10-24 复核更正：该请求来自本机 ZCode CLI，版本 0.17.0 为当前发行版本而非陈旧客户端；应作为当前版本的客户端侧缺陷跟踪，而非升级/退役旧客户端）。
 3. 网关侧在客户端断开时取消上游请求；调查中观察到两条零字节、持续 656/677 s 的上游流。
 4. 网关容器环境中的静态 API key 应按安全流程轮换并移出明文环境变量；本文不记录任何密钥值。
-5. 旧接口 `.65`/`.71` 不应作为生产 provider 入口；如需保留，应明确标注为调试地址。
+5. 旧管理段的两个 Mac 接口地址不应作为生产 provider 入口；如需保留，应明确标注为调试地址。
 
 本次排查未修改生产、网关或集群配置。
 
@@ -474,7 +474,7 @@ Mac 接口：en0 `192.168.0.1`（当前有效）、en1 `192.168.5.71`、en11 `19
 | 项目 | 等级 | 现状 | 建议 |
 |---|---|---|---|
 | 完整 500 题 GSM8K 未重跑 | 中 | 仅 20 题冒烟 + qeval 75 题 | 低峰补跑，记录 `accuracy_content`，作为正式质量签字依据 |
-| ZCode 旧 provider 绑定 | 中 | 44 条失败中 42 条来自 `cffc…`/`.65` | 客户端重新绑定 `dgxspark-v41` 或新建任务；清理旧 provider |
+| ZCode 旧 provider 绑定 | 中 | 44 条失败中 42 条来自 `cffc…`（指向旧管理段接口） | 客户端重新绑定 `<provider-name>` 或新建任务；清理旧 provider |
 | 网关断开后未取消上游 | 中 | 观察到零字节长流 | 网关侧增加客户端断开取消逻辑 |
 | 客户端 743 s 长请求超时 | 低 | 本机 CLI 0.17.0（当前版本）的客户端侧超时/解析问题；743 s 与 75 s 超时不一致 | 作为当前版本缺陷跟踪；随客户端版本更新验证是否修复 |
 | 网关静态 API key | 中（安全） | 容器环境中为明文 | 按安全流程轮换并移出明文环境变量；本文不记录密钥 |
@@ -526,7 +526,7 @@ Mac 接口：en0 `192.168.0.1`（当前有效）、en1 `192.168.5.71`、en11 `19
 
 ```bash
 # 1) 四机基线与版本锁
-for h in dgxspark01 dgxspark02 dgxspark03 dgxspark04; do
+for h in <node01> <node02> <node03> <node04>; do
   ssh "$h" 'uname -r; nvidia-smi --query-gpu=driver_version --format=csv,noheader,nounits | head -1; /usr/local/sbin/version-lock.sh check; systemctl is-system-running'
 done
 
@@ -557,7 +557,7 @@ PY
 审核时点只读复核结果（2026-10-23 06:07 UTC）：
 
 ```text
-dgxspark01..04  kernel=6.17.0-1031-nvidia  driver=580.173.02
+<node01>..<node04>  kernel=6.17.0-1031-nvidia  driver=580.173.02
 version-lock OK  holds=29 lock=22 guard=7  grub=1>2
 systemctl is-system-running=running  failed_units=0
 r3prod-head + r3prod-worker x3  Up 7 hours

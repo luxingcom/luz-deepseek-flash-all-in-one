@@ -8,6 +8,34 @@
 > 逐件 CLASS 分类（active 29/inert 11/loader/UNCLASSIFIED）权威表=
 > `tools/packages/cfgmgmt/payload/out/ADAPTER-MANIFEST.regenerated`（CODE31 D.3）。
 
+## 清单格式律与只读校验（EQ-12，2026-10-30）
+
+清单件（本目录 `MANIFEST.md5`、`0.3.2-MANIFEST.md5` 及五包同形 `MANIFEST.md5`）统一
+**规范格式**——注释行与路径条目行彻底分离，只允许三类行：
+
+1. **条目行**：`^[0-9a-f]{32}`+两空格+相对路径（`md5sum -c` 同形；禁绝对路径与 `..` 段）；
+2. **注释行**：统一 `#` 前缀（不可混淆前缀；GNU `md5sum -c` 容忍）；
+3. **空行**。
+
+其余任何行=格式红（fail-loud 拒比对）。此律消除外部手册 P3-7（部署篇 §44 口径）
+的高频假警报：「拿清单行数 vs 文件数当缺口」的差额是头部注释行不是真缺件；注释行
+被逐词当路径解析会凭空多出假缺件。
+
+只读校验工具=`tools/adapter-manifest-verify.sh`（内建注释过滤+逐件 md5 对 manifest+
+「N 件差异」机器可判 RESULT 行，校验路径零写盘）：
+
+```bash
+bash tools/adapter-manifest-verify.sh --manifest deploy/adapter/MANIFEST.md5 --root deploy/adapter
+# 出口 0=「RESULT: 0 件差异=通过」；缺件/md5 不符逐件列名并计入差异总数（exit 1）
+# 格式红（非条目非 # 注释行/重复条目/单空格分隔）exit 2；清单不可读/树缺位 exit 3
+# --extra 另检树内多件；--extra-exclude './MANIFEST.md5,./README.md' 豁免自指件
+# --selfcheck 本地逻辑自检 13 项（含 strace %file 零写盘直证）
+```
+
+注：本仓树为工作面，与清单锚的 md5 漂移以工具实报为准（工具判「恰好哪几件」，
+不产生注释行假缺件）；条目 md5 重钉属交付包发布动作（清单格式变更随下次交付包
+发布生效，任务书 EQ-12 依赖注记）。
+
 ## 规模与构成（收录 83 件，约 3.0M）
 
 | 分区 | 件数 | 内容 |

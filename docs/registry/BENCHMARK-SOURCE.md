@@ -213,11 +213,12 @@
 
 ## 五、量具 md5 台账与 selfcheck 权威计数口径
 
-### 5.1 md5 台账（2026-10-23 本档落笔前 md5sum 亲验，与 TOOL-MAINT §4 一致）
+### 5.1 md5 台账（2026-10-23 本档落笔前 md5sum 亲验，与 TOOL-MAINT §4 一致；pr_ladder6 行为 2026-10-30 EQ-19 补登、当日亲验，见 §十）
 
 | 件 | md5 | 状态 |
 |---|---|---|
 | 交付仓 `tools/bench/sd_bench.py` | `410f543d4cc363defa66ffd54d190c9a` | W0 双口径 schema 版；de_c48/conc_pr 两量具探针 pin 门命中值 |
+| 交付仓 `tools/bench/pr_ladder6.sh` | `ed303431a648f1f3d09cca33d6dbb182` | **RETIRED（退役登记，EQ-19 补登 2026-10-30）**：现役 HEAD 锚首次入台账（此前全树无锚登记=登记缺口已收口）；调用面已退役（G5 8899 硬拒 + BENCH_REPO bench/ 实体灭失双因，`pr_ladder6.sh:66,77,79-80`），现行 sparkDash 阶梯载体=sd_bench.py（上行）CFG-31 锚实体直调——详见 §十 |
 | 战役仓 `tools/de_c48_bench.py` | `a337f64e835a20b75f905ed5d11d6e4e` | TOOL-MAINT 任务 A 修复+§5c 自检后钉值（钉史：`f0dd91c4`→`84ff45b1`→`410f543d`(sd_bench)；本件 `3ba79b1d`→`811c8de3`→现值） |
 | 战役仓 `tools/conc_pr_driver.py` | `333033ce2fae98b28187d106f7cbb14f` | TOOL-MAINT 任务 B 正典参数化新档（测量逻辑与归档原件逐字节同） |
 | 战役仓 `tools/lit_driver.py` | `0fb5a0c498fe265a81e915bc02df59dc` | 零改动（W1-A/TOOL-MAINT 同值） |
@@ -361,3 +362,131 @@ sparkDash 相关借鉴源（社区实测复测/real-text 修正数/filler 膨胀
 > SCHED_STATS_V1 落验后可作常采载体，属后续窗）。
 
 —— 追加者：0.3.3 整合批执行子代理（批令第 7 项）/ 2026-10-24
+
+
+## 十、pr_ladder6.sh 档锚补登记与退役标（EQ-19，2026-10-30 追加节）
+
+> 本节为 0.3.4re 缺陷修复单元 **EQ-19（prl6 档锚登记缺口收口）** 的正式登记，按任务书
+> `~/luz030-opt-campaign/docs/plan/035-W0-TASKBOOK-20261030.md` §EQ-19（:513-523）落档。
+> 收口动作面：§5.1 台账增 `pr_ladder6.sh` 一行（本节外唯一改动）；既有其余章节（§一~§九）
+> 与版本史零改。**本节性质：纯文档登记面**（0 靴、0 引擎面、量具本体零改——pr_ladder6.sh
+> 盘上字节零触碰，本节只登记不修件）。
+
+### 10.1 现行锚值（本档首次入册）
+
+| 件 | 现行锚值（md5） | 适用版本 | 状态 |
+|---|---|---|---|
+| 交付仓 `tools/bench/pr_ladder6.sh` | `ed303431a648f1f3d09cca33d6dbb182` | 源提交 **fa062c9**「F-6a.2 prl6 真文本锚接线缺口修复」（2026-10-09 15:08:08Z，sanctioned）；交付仓经 **fb5798c**（2026-10-14 13:55:40Z）入仓，此后无再改提交 | **RETIRED（退役）** |
+
+- 现行锚值 2026-10-30 双仓 md5sum 亲验一致（交付仓 `tools/bench/pr_ladder6.sh`＝战役仓
+  `luz030-opt-campaign/tools/pr_ladder6.sh`＝`ed303431a648f1f3d09cca33d6dbb182`）；交付仓该件
+  `git status --porcelain` 为空（盘上=HEAD）。
+- F-6a.2 改动面（fa062c9 提交语在档）：仅 pr_ladder6.sh 一个文件 +22/−13——旧 realtext 值名
+  改 random、新增 `REAL_PASS` real 档、口径注/summary 更新；sparkDash→repeated 分发路径行为保持。
+
+### 10.2 过期警示（旧锚作废声明 + 双退役因）
+
+- **旧锚 `f72b06f5366bb1c718437ed45ef62d83` 自本节起标历史**：该值=判例 SPARKDASH-ALIGN-20261006
+  §四所记，实为提交 **4943690**「tools: R40 six-tier PR ladder + prefix-hit probe (W0)」
+  （2026-10-02 入档版；2026-10-30 `git show 4943690:tools/pr_ladder6.sh | md5sum` 复核实值一致）。
+  判例 §四旧值未随 F-6a.2（fa062c9，2026-10-09）更新，属登记滞后；**不得再作现行对表值**，
+  仅历史对照可用（§3.5 历史锚纪律同款）。
+- **双退役因（现行文件行证，两仓同字节同行号；2026-10-30 逐行亲验）**：
+  1. **G5 生产口硬拒门**：`pr_ladder6.sh:77`——BASE_URL 含 8899 即 `ABORT … exit 5`
+     （F-6a.2 提交语明言「8899 硬拒门在位」）。与 0.3.4 起标准测试口 `127.0.0.1:8899` 直接冲突，
+     prl6 无论 md5 门如何均无法充当在役标准测试载体。
+  2. **BENCH_REPO 实体灭失**：`pr_ladder6.sh:66` 默认 `BENCH_REPO=$HOME/dsv41-flash-dgxsparks`，
+     其下 `bench/`（`sd_bench.py` 所在，`:79-80` 存在性门缺件即 abort）2026-10-30 亲验不在盘
+     （该根目录现仅存 `.env.tp4` 备件族与 `logs/`）。
+- **裁定链在档**：2026-10-29 escalate 裁定「档锚陈旧属实，不维持停窗」；prl6 载体退役注记
+  dwfq-62d8bdec-2 裁定在案。
+- **现行 sparkDash 阶梯载体**＝`sd_bench.py` CFG-31 锚实体直调（战役侧
+  `~/luz-deepseek-flash-all-in-one/tools/bench/sd_bench.py`；2026-10-30 亲验 md5
+  `410f543d4cc363defa66ffd54d190c9a`，与 §5.1 台账首行一致）——prl6 退役后 PR 阶梯调用纪律
+  （3 独立调用取中位/fresh uuid4 salt/512t×2 预热，§2.1）由该载体承袭。
+
+### 10.3 证据锚与复核记录（本窗 2026-10-30）
+
+- 任务书：`~/luz030-opt-campaign/docs/plan/035-W0-TASKBOOK-20261030.md` §EQ-19（:513-523）。
+- `docs/plan/034-W1/SPARKDASH-LADDER-20261029.md:19-26`（§一登记①陈旧事实+登记②双退役因原始记录）。
+- `~/luz030-opt-campaign/archives/034-lock-20261028/MANIFEST-034LOCK.tsv:77-80`（追记登记缺口注记：
+  ed303431 全树无锚/判例 f72b06f5 旧值）。
+- `docs/plan/034-W1/STANDARD-TESTS-CLOSURE-20261029.md:368-369`（§六-8：建议随追记补登记或标退役）。
+- 实物复核（本窗只读亲跑）：`md5sum` 双仓两件、`git show 4943690:tools/pr_ladder6.sh | md5sum`
+  （旧锚复核）、`git log -1` fa062c9/fb5798c（版本面）、`git status --porcelain`（干净面）、
+  `ls ~/dsv41-flash-dgxsparks/`（bench/ 灭失亲验）。
+- **对表零漂移声明**（任务书验收门第二分支）：本节登记后，§5.1 台账 pr_ladder6 行锚值与盘上
+  实物 md5 逐字一致（`ed303431a648f1f3d09cca33d6dbb182`），台账-实物零漂移；旧锚 f72b06f5 已标
+  历史、不再占对表位。
+
+—— 登记者：0.3.4re EQ-19 修复子代理 / 2026-10-30
+
+
+## 十一、prefix cache 命中率口径纪律（UPSTREAM-45119 入册，2026-10-30 追加节）
+
+> 本节为上游缺陷 **sgl-project/sglang issue #45119**（`sglang:cache_hit_rate` gauge 在
+> 空/无命中 prefill 报告时发布 0.0，健康缓存〔真实 ~0.96〕在 Grafana 面板/`avg_over_time`
+> /告警上来回跳 0；修复 PR #45122 open 未合，仅做 `total_tokens==0` 跳写守卫且作者自注
+> 非症状全修）的监控侧规避口径入册。既有 §一~§十与版本史零改；**本节性质：纯口径纪律，
+> 判读面规范——一切命中率读数自本节起按此判**。
+
+- **11-1 计数器正典律**：prefix cache 命中率一律以
+  `sglang:prefill_effective_tokens_total` 族计数器计算：
+  `hit_rate = rate(Σ mode=~"device_hit|host_hit|storage_hit") / rate(Σ 全 mode)`
+  （该族 HELP 文档自述原文即此式）。两快照取窗（Δhits/Δtotal，Prometheus rate 的离散
+  等价），单快照取累计比；计数器回绕/重启（Δ≤0）降级累计比并注记。gauge
+  `sglang:cache_hit_rate` 的读数**不得作为判据**（per-report 发布语义，分块 prefill 下
+  ~85% 报告无命中即发布 0.0）。
+- **11-2 gauge 缺陷注记**：与 §九 C2-3（accept gauge σ=0 塌陷）同族不同源——本缺陷为
+  gauge 级伪 0（上游 #45119，与 decode 路径旧修 #12459/PR #24427 不同源）。在役实测
+  铁证：2026-10-29 引擎 /metrics 快照同页计数器 input=1.068429e+07、device_hit=910336
+  （真实流量+命中）而 gauge=0.0——缺陷签名现势在档。兜底（仅计数器全缺位时）：
+  gauge 样本 `!= 0` 过滤、保留最后非零值；**真 0% 冷缓存会被该过滤误持旧值**，故兜底
+  读数必须带降级注记，判读以计数器口径为准。
+- **11-3 工具与守卫**：口径实现件=`tools/obs/cache_hit_caliber.py`（selfcheck 13/13 +
+  单测 19/19；env 旋钮 `CACHE_HIT_CALIBER_MIN_TRAFFIC` 缺省 1000=小流量防伪率）。
+  守卫=`--lint` 面：仓内 .py/.sh 裸读 `cache_hit_rate` 判据一律 REFUSE；豁免只限
+  同行标记 `# cache-hit-caliber: raw-snapshot`（裸快照记录，如 kvlife_driver MET_KEYS）。
+  双面律：公开面与战役仓 `tools/obs/` 逐字节同件（锚=战役仓 docs/TOOL-ANCHORS.md）。
+- **11-4 镜像面后续**：随镜像窗 cherry-pick PR #45122（`total_tokens==0` 跳 gauge 写、
+  保留最后有效值，附单测）；合入前本节口径纪律持续有效，合入后 gauge 仍为 per-report
+  语义（#45122 非全修），**计数器正典律不随镜像修撤废**。
+
+—— 登记者：0.3.4re UPSTREAM-45119 host 侧规避子代理 / 2026-10-30
+
+
+## 十二、开环到达率口径纪律（UPSTREAM-44162 入册，2026-10-30 追加节）
+
+> 本节为上游缺陷 **sgl-project/sglang PR #44162**（[Fix] benchmark: Compensate
+> cumulative request arrival drift，fixes issue #43930；2026-10 时点 open 未合）
+> 的压测口径侧规避入册。缺陷：`sglang.benchmark.serving` 的 `get_request` 泊松
+> 分支（finite-rate、非 trace）把 `await asyncio.sleep(interval)` 放在 yield
+> 之后、以 consumer 恢复 generator 的时刻为睡起点——consumer 工作与晚唤醒逐
+> 请求累进到达间隔，offered load 系统性偏低（上游报告 100 req/s 实测 ~68、
+> 400 req/s 实测 ~190）。既有 §一~§十一与版本史零改；**本节性质：纯口径纪律，
+> 一切开环有限速率基准读数自本节起按此判**。
+
+- **12-1 闭环正典律（现行口径不受影响）**：本档 §二 全部正典量具（sd_bench
+  PR/DE、de_c48 五档、conc_pr_driver liter、warm 门）均为**闭环并发驱动**，
+  无到达率调度面（2026-10-30 grep 亲核：零 `request_rate`/`exponential`/
+  `asyncio.sleep` 命中）——§三 全部现行锚读数**不受本缺陷偏置**，无须重采。
+- **12-2 开环经修补件律**：凡开环有限速率基准（`--request-rate` 有限值，
+  PR 复测/SLO 校验/与上游数字对齐等场景）一律经
+  `tools/upstream/bench-arrival/bench_serving_44162.py` 跑——启动器对缺陷版
+  sglang **运行时注入 #44162 修补版**（绝对到达时刻表）后透传，横幅须 PATCHED
+  或 ALREADY-FIXED 方为有效口径；未经修补件的裸跑读数**不得入档**（漂移量
+  依赖 consumer 每请求工作时长，不可事后折算修正）。trace replay 分支
+  （`--use-trace-timestamps`）本身即绝对时刻法，不经修补件亦不受影响。
+- **12-3 守卫与 lint**：`bench_arrival_guard.py --check` 判别 sglang 面
+  get_request 缺陷态（VULNERABLE/FIXED/UNKNOWN 三态 fail-closed）；`--lint`
+  扫仓面「裸跑 bench_serving 且有限 `--request-rate`」=REFUSE，豁免标记
+  `bench-arrival: patched/closed-loop/doc`。工具本体两 py 自豁免。双面律：
+  公开面与战役仓 `tools/upstream/bench-arrival/` 逐字节同件
+  （SOURCE-MD5.txt 互证；锚=战役仓 docs/TOOL-ANCHORS.md）。
+- **12-4 镜像面后续**：本缺陷在 bench 客户端，**与引擎镜像无关、零镜像动作**；
+  上游 #44162 合入发布后目标面 `--check` 转 FIXED ⇒ 启动器自动透传、本节
+  12-2 律自然满足，判别器 FIXED 语义长青保留。同窗关联 #46504（多轮输入
+  token 计 serving metrics）与 #47050（timed-trace replay）的口径影响随其
+  入栈版本另行评估。
+
+—— 登记者：0.3.4re UPSTREAM-44162 host 侧规避子代理 / 2026-10-30

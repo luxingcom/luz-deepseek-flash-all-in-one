@@ -35,7 +35,7 @@
 
 | 件 | 用途 |
 |---|---|
-| `tools/bench/qeval.py` + `qeval_tasks.py` | 75 题质量门；`--selftest` 15/15 |
+| `tools/bench/qeval.py` + `qeval_tasks.py` | 75 题质量门；`--selftest` 20/20（EQ-11 后） |
 | `tools/bench/gsm8k_dsv41.py` | GSM8K 8-shot CoT；`--nq 500` 复现发布读数 |
 | `tools/needle_probe.py` | 600k needle；输出新增 `water_m` 有效水位线 |
 | `tools/bench/README.md` | PR/DE/质量门的完整命令与口径 |
@@ -88,7 +88,7 @@
 这是当前公开面的**已知缺口**，必须说清楚：
 
 - `v0.3.1` 的 ring boot 把 `IMAGE` 写死为基座
-  `192.168.5.187:5000/lmsysorg/sglang:main-79cafec0`，并校验 golden 表的
+  `<registry-host>:5000/lmsysorg/sglang:main-79cafec0`，并校验 golden 表的
   `MANIFEST.image` 与之相等（`r3-boot-arm.sh:12`、`:178`）。
 - `main` 的 0.3.2 boot 把 `IMAGE` 写死为 `0.3.2-r032c`，网络面是双 rail 2 口
   （`:20`、`:305` 附近）。

@@ -22,7 +22,7 @@
 #   128 对齐墙崩——「零 DSV41_* 性能键」律只辖臂 env=51 键族零注入，启动器公共面
 #   =生产同形含 engram pread/FP4KV_PORT/SM121 候选对键+/engram 四秩挂载）。
 #   新增 post-UP **mm 三直证断言**（§5 G-V3 承载；生产同款锚=
-#   logs/FL6-PROMO-20261013/teardown/pre-stop/r3prod-worker-dgxspark02.docker.log:236-237/:277）：
+#   logs/FL6-PROMO-20261013/teardown/pre-stop/<prod-log>:236-237/:277）：
 #     mm 后端 triton_attn 两行+mm KV 0.10G 预留行+processors 扫描行，四机逐机在档。
 #   池 pin=9,600,000（生产同值 R3.4；±2% 指纹带）；水位地板缺省 6000（VL 靴槽=
 #   产线常规线沿袭，§5 G-V4.4）；UMA 靴窗中止门 4G 沿基线；不 drop_caches（窗令红线）。
@@ -38,8 +38,16 @@ D="$CAMP/logs/VL-NATIVE-20261013"
 ARM_ENV_FILE="${ARM_ENV_FILE:-$CAMP/arms/VL41N-SPEC0.env}"
 ARM_TAG="${ARM_TAG:-VL41N}"
 DRY_RUN="${DRY_RUN:-0}"    # 1=靴前 DRY-RUN 段后零集群退出；0=活靴
-IMAGE="192.168.5.187:5000/lmsysorg/sglang:main-79cafec0"
-HEAD_IP="192.168.5.186"
+# ── 20261030 脱敏：以下内网值（registry 主机/管理段地址/节点主机名）改经环境变量注入，缺参拒跑 ──
+IMAGE="${IMAGE:?缺环境变量 IMAGE（<registry-host>:5000/lmsysorg/sglang:main-79cafec0），拒跑}"
+HEAD_IP="${HEAD_IP:?缺环境变量 HEAD_IP（head 节点 <mgmt-node-ip>），拒跑}"
+NODE01_HOST="${NODE01_HOST:?缺环境变量 NODE01_HOST（<node01>），拒跑}"
+NODE02_HOST="${NODE02_HOST:?缺环境变量 NODE02_HOST（<node02>），拒跑}"
+NODE03_HOST="${NODE03_HOST:?缺环境变量 NODE03_HOST（<node03>），拒跑}"
+NODE04_HOST="${NODE04_HOST:?缺环境变量 NODE04_HOST（<node04>），拒跑}"
+NODE02_IP="${NODE02_IP:?缺环境变量 NODE02_IP（<mgmt-node-ip>），拒跑}"
+NODE03_IP="${NODE03_IP:?缺环境变量 NODE03_IP（<mgmt-node-ip>），拒跑}"
+NODE04_IP="${NODE04_IP:?缺环境变量 NODE04_IP（<mgmt-node-ip>），拒跑}"
 DIST_PORT="20000"
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=8)
 ADAPTER_DIR="$HOME/migrate-assets/dsv41/adapter"
@@ -91,15 +99,15 @@ n_a4=$(printf '%s\n' "${ARM_KEYVALS[@]}" | grep -cE "^($A4_PAT)=" || true)
 info "A4 绿：臂 env 键黑名单零命中+X1 键零出现+overlay 空断言过（V4.1 原生=零 overlay 形）"
 
 # ── 1. per-machine MODEL_DIR（V4.1-Flash 拓扑=r3-boot-arm.sh WORKERS 逐字：
-#        01/02=/data 本地树；03/04=NFS **dsv41-net**〔03←10.100.140.1=01 主源；
-#        04←10.20.0.9=02 备源；≠dsvl-net=Vision-Exp NFS——预核截获勘正 1〕）────────
-declare -A MD=( [dgxspark01]="/data/models/DeepSeek-V4.1-Flash"
-                [dgxspark02]="/data/models/DeepSeek-V4.1-Flash"
-                [dgxspark04]="/data/models/dsv41-net"
-                [dgxspark03]="/data/models/dsv41-net" )
-WORKERS=( "1|dgxspark02|192.168.5.187|0=rocep1s0f1,roceP2p1s0f1;2=rocep1s0f0,roceP2p1s0f0"
-          "2|dgxspark04|192.168.5.189|1=rocep1s0f0,roceP2p1s0f0;3=rocep1s0f1,roceP2p1s0f1"
-          "3|dgxspark03|192.168.5.188|0=rocep1s0f0,roceP2p1s0f0;2=rocep1s0f1,roceP2p1s0f1" )
+#        01/02=/data 本地树；03/04=NFS **dsv41-net**〔03←<fabric-ip>=01 主源；
+#        04←<fabric-ip>=02 备源；≠dsvl-net=Vision-Exp NFS——预核截获勘正 1〕）────────
+declare -A MD=( [${NODE01_HOST}]="/data/models/DeepSeek-V4.1-Flash"
+                [${NODE02_HOST}]="/data/models/DeepSeek-V4.1-Flash"
+                [${NODE04_HOST}]="/data/models/dsv41-net"
+                [${NODE03_HOST}]="/data/models/dsv41-net" )
+WORKERS=( "1|${NODE02_HOST}|${NODE02_IP}|0=rocep1s0f1,roceP2p1s0f1;2=rocep1s0f0,roceP2p1s0f0"
+          "2|${NODE04_HOST}|${NODE04_IP}|1=rocep1s0f0,roceP2p1s0f0;3=rocep1s0f1,roceP2p1s0f1"
+          "3|${NODE03_HOST}|${NODE03_IP}|0=rocep1s0f0,roceP2p1s0f0;2=rocep1s0f1,roceP2p1s0f1" )
 PEER_HCA_HEAD="1=rocep1s0f1,roceP2p1s0f1;3=rocep1s0f0,roceP2p1s0f0"
 HEAD_CTN="${CTN_PREFIX}-head"; WORKER_CTN="${CTN_PREFIX}-worker"
 
@@ -117,7 +125,7 @@ else
     [[ -n "$pids" ]] && die "$name GPU 被占 (pid: $(echo $pids | tr '\n' ' '))"
     info "  $name: 无 r3 容器、GPU 空"; }
   info "== 前置守卫（无 drop_caches=窗令红线）=="
-  guard_node "head dgxspark01" "-"
+  guard_node "head ${NODE01_HOST}" "-"
   for w in "${WORKERS[@]}"; do IFS='|' read -r _rk _h _ip _ph <<<"$w"; guard_node "worker $_h" "$_h"; done
   m=$(memavail); [ "$m" -ge 100000 ] || die "head MemAvailable=${m}M < 100G"
   info "head MemAvailable=${m}M（≥100G 过）"
@@ -134,7 +142,7 @@ else
     info "  $_h 资产面 OK（engram 分片 r${_rk}of4+adapter+NCCL+b12x）"; done
   FP_LOG="$D/boot-checks/a9-fingerprint.txt"; : > "$FP_LOG"; a9fail=0
   fp_one(){ local h="$1" p="$2" out cfg16 cfgmd5 bytes nshard mnt
-    if [ "$h" = dgxspark01 ]; then out=$(sha256sum "$p/config.json" | awk '{print $1}'; md5sum "$p/config.json" | awk '{print $1}'; du -sb "$p" | awk '{print $1}'; ls "$p"/model-*-of-00048.safetensors 2>/dev/null | wc -l; findmnt -no FSTYPE,SOURCE "$p" 2>/dev/null || echo "local")
+    if [ "$h" = "${NODE01_HOST}" ]; then out=$(sha256sum "$p/config.json" | awk '{print $1}'; md5sum "$p/config.json" | awk '{print $1}'; du -sb "$p" | awk '{print $1}'; ls "$p"/model-*-of-00048.safetensors 2>/dev/null | wc -l; findmnt -no FSTYPE,SOURCE "$p" 2>/dev/null || echo "local")
     else out=$(ssh -o ConnectTimeout=8 "${SSH_OPTS[@]}" "$h" "sha256sum '$p'/config.json | awk '{print \$1}'; md5sum '$p'/config.json | awk '{print \$1}'; du -sb '$p' | awk '{print \$1}'; ls '$p'/model-*-of-00048.safetensors 2>/dev/null | wc -l; findmnt -no FSTYPE,SOURCE '$p' 2>/dev/null || echo local" 2>/dev/null); fi
     cfg16=$(sed -n 1p <<<"$out" | cut -c1-16); cfgmd5=$(sed -n 2p <<<"$out" | cut -c1-16); bytes=$(sed -n 3p <<<"$out"); nshard=$(sed -n 4p <<<"$out" | tr -d '[:space:]'); mnt=$(sed -n 5p <<<"$out")
     local ok="OK"
@@ -142,7 +150,7 @@ else
     [ "$cfgmd5" = "$EXPECT_CFGMD5" ] || { ok="$ok RED(md5=$cfgmd5)"; a9fail=1; }
     [ "$nshard" = "$EXPECT_NSHARD" ] || { ok="$ok RED(nshard=$nshard)"; a9fail=1; }
     printf 'MODEL=deepseek-v4.1-flash CFG=%s(md5:%s) PATH=%s BYTES=%s host=%s mount=%s overlay=NONE %s\n' "$cfg16" "$cfgmd5" "$MOUNT_TGT" "$bytes" "$h" "$mnt" "$ok" | tee -a "$FP_LOG"; }
-  fp_one dgxspark01 "${MD[dgxspark01]}"
+  fp_one "${NODE01_HOST}" "${MD[${NODE01_HOST}]}"
   for w in "${WORKERS[@]}"; do IFS='|' read -r _rk _h _ip _ph <<<"$w"; fp_one "$_h" "${MD[$_h]}"; done
   [ "$a9fail" = 0 ] || { cat "$FP_LOG"; die "A9/权重面红（四机身份漂移）"; }
   info "A9 绿：四机 CFG=$EXPECT_CFG16 逐机相等=注册值；BYTES 记录不判红（元数据级）；overlay=零（原生臂）"
@@ -371,7 +379,7 @@ info "== 起 head (rank 0, API :$API_PORT) =="
 docker rm -f "$HEAD_CTN" >/dev/null 2>&1 || true
 docker run -d --name "$HEAD_CTN" "${DOCKER_HW[@]}" "${COMMON_ENV[@]}" \
   -e "NCCL_IB_PEER_HCA=$PEER_HCA_HEAD" \
-  -v "${MD[dgxspark01]}:$MOUNT_TGT:ro" \
+  -v "${MD[${NODE01_HOST}]}:$MOUNT_TGT:ro" \
   -v "$ENG_HOST:/engram:ro" \
   "$IMAGE" python3 -m sglang.launch_server "${SERVER_ARGS[@]}" \
   --node-rank 0 --host 0.0.0.0 --port "$API_PORT"

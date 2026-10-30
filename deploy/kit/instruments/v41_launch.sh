@@ -78,7 +78,7 @@
 #    between 02 and 04. Stock NCCL in the preview image picks a local GID that is
 #    not on a common subnet with the peer and dies in QP transition:
 #        ibv_modify_qp failed with 110 Connection timed out ... curr state INIT,
-#        next state RTR, local GID ::ffff:10.100.136.1, remote GID ::ffff:10.100.138.2
+#        next state RTR, local GID ::ffff:<fabric-ip>, remote GID ::ffff:<fabric-ip>
 #    Production solves this with the custom "ringonly-v5" NCCL (drop-in libnccl
 #    2.30.7) + the CPU-pinning shim, exactly as its image labels record
 #    (org.aicad.libnccl.md5=51e36db584e5373ccaa060d50d537ed1). We preload the very
@@ -99,19 +99,30 @@ export HOME=/home/liux***ya
 
 RANK="${1:?usage: bash v41_launch.sh <node_rank 0..3>}"
 
+# ── 20261030 脱敏：节点主机名/管理段地址/registry 改经环境变量注入，缺参拒跑 ──
+NODE01_HOST="${NODE01_HOST:?缺环境变量 NODE01_HOST（<node01>），拒跑}"
+NODE02_HOST="${NODE02_HOST:?缺环境变量 NODE02_HOST（<node02>），拒跑}"
+NODE03_HOST="${NODE03_HOST:?缺环境变量 NODE03_HOST（<node03>），拒跑}"
+NODE04_HOST="${NODE04_HOST:?缺环境变量 NODE04_HOST（<node04>），拒跑}"
+NODE01_IP="${NODE01_IP:?缺环境变量 NODE01_IP（<mgmt-node-ip>），拒跑}"
+NODE02_IP="${NODE02_IP:?缺环境变量 NODE02_IP（<mgmt-node-ip>），拒跑}"
+NODE03_IP="${NODE03_IP:?缺环境变量 NODE03_IP（<mgmt-node-ip>），拒跑}"
+NODE04_IP="${NODE04_IP:?缺环境变量 NODE04_IP（<mgmt-node-ip>），拒跑}"
+IMG="${IMG:?缺环境变量 IMG（<registry-host>:5000/vllm/vllm-openai:deepseekv41-flash-0909-engramdisk-fh），拒跑}"
+
 case "$(hostname)" in
-  dgxspark01) MYIP=192.168.5.186 ;;
-  dgxspark02) MYIP=192.168.5.187 ;;
-  dgxspark03) MYIP=192.168.5.188 ;;
-  dgxspark04) MYIP=192.168.5.189 ;;
+  "$NODE01_HOST") MYIP="$NODE01_IP" ;;
+  "$NODE02_HOST") MYIP="$NODE02_IP" ;;
+  "$NODE03_HOST") MYIP="$NODE03_IP" ;;
+  "$NODE04_HOST") MYIP="$NODE04_IP" ;;
   *) echo "unknown host $(hostname)" >&2; exit 2 ;;
 esac
-# production topology is 186=r0 187=r1 189=r2 188=r3; keep the same placement
+# production topology keeps rank placement r0=01/r1=02/r2=04/r3=03; same placement below (IP 已脱敏)
 case "$RANK" in
-  0) EXPECT=192.168.5.186 ;;
-  1) EXPECT=192.168.5.187 ;;
-  2) EXPECT=192.168.5.189 ;;
-  3) EXPECT=192.168.5.188 ;;
+  0) EXPECT="$NODE01_IP" ;;
+  1) EXPECT="$NODE02_IP" ;;
+  2) EXPECT="$NODE04_IP" ;;
+  3) EXPECT="$NODE03_IP" ;;
   *) echo "rank must be 0..3" >&2; exit 2 ;;
 esac
 if [ "$MYIP" != "$EXPECT" ]; then
@@ -120,7 +131,6 @@ if [ "$MYIP" != "$EXPECT" ]; then
 fi
 
 NAME="vllm-v41-test-rank${RANK}"
-IMG="192.168.5.187:5000/vllm/vllm-openai:deepseekv41-flash-0909-engramdisk-fh"
 MODEL_DIR="/data/models/DeepSeek-V4.1-Flash"
 PORT=8012
 GMU="${GMU:-0.83}"
@@ -187,13 +197,13 @@ ENV=(
   -e VLLM_DISABLE_PYNCCL=1
   -e VLLM_HOST_IP="$MYIP"
   -e NODE_RANK="$RANK"
-  -e MASTER_ADDR=192.168.5.186 -e MASTER_PORT=26001
+  -e MASTER_ADDR="$NODE01_IP" -e MASTER_PORT=26001
   -e PYTHONFAULTHANDLER=1
   # --- multi-node role/topology vars, copied from production's proven
   #     ~/w6-kit/w6_env.txt, for parity with the working stack. NOTE: these were
   #     NOT the first-window failure cause -- adding them changed nothing. The
   #     real cause was the missing follower hold in the image (see header note).
-  -e VLLM_DP_MASTER_IP=192.168.5.186
+  -e VLLM_DP_MASTER_IP="$NODE01_IP"
   -e VLLM_TOPO_SAME_NODE_MAP=0,1,2,3
   -e VLLM_USE_FLASHINFER_SAMPLER=1
   -e VLLM_USE_BREAKABLE_CUDAGRAPH=1
@@ -220,7 +230,7 @@ SERVE_CMD="export LD_PRELOAD='/opt/libncclpin.so /opt/nccl-ringonly/libnccl.so.2
     --speculative-config '{\"method\":\"dspark\",\"num_speculative_tokens\":${K},\"draft_sample_method\":\"probabilistic\"}' \
     --port ${PORT} \
     --tensor-parallel-size 4 --nnodes 4 --node-rank ${RANK} \
-    --master-addr 192.168.5.186 --master-port 26001"
+    --master-addr "$NODE01_IP" --master-port 26001"
 
 if [ "${DRYRUN:-0}" = "1" ]; then
   echo "--- env that would be injected ($(( ${#ENV[@]} / 2 )) vars) ---"

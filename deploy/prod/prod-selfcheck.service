@@ -5,11 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=liuxiaoya
-Group=liuxiaoya
-Environment=HOME=/home/liuxiaoya
-WorkingDirectory=/home/liuxiaoya
-ExecStart=/home/liuxiaoya/migrate-assets/prod/selfcheck-prod.sh --fast
+User=liux***ya
+Group=liux***ya
+Environment=HOME=/home/liux***ya
+WorkingDirectory=/home/liux***ya
+ExecStart=/home/liux***ya/migrate-assets/prod/selfcheck-prod.sh --fast
 Nice=10
 TimeoutStartSec=120
 # Read-only check: it never restarts or reconfigures the stack.

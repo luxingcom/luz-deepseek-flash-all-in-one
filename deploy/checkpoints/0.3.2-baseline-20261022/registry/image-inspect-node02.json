@@ -23,11 +23,11 @@
   "Id": "sha256:ef64dec3d74b577bfcc8f54cc940b87d92701a9d9c3bb3c6c1214133c5e605b2",
   "Os": "linux",
   "RepoDigests": [
-    "192.168.0.202:5000/dsv41-sglang-optimized@sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4"
+    "<registry-host>:5000/dsv41-sglang-optimized@sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4"
   ],
   "RepoTags": [
-    "192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-baseline-20261022",
-    "192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c"
+    "<registry-host>:5000/dsv41-sglang-optimized:0.3.2-baseline-20261022",
+    "<registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c"
   ],
   "Size": 33221760806
 }

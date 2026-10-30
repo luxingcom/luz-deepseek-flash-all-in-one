@@ -4,11 +4,11 @@
 
 | 项 | 值 |
 |---|---|
-| 目标 tag | `192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c` |
+| 目标 tag | `<registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c` |
 | manifest digest | `sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4` |
 | 内容身份 cid | `6e379f6fe0531c9c`（RootFS 层链 sha256 前 16） |
 | 层数 | 71 = 基座 70 + 1 COPY |
-| 基座 | `192.168.0.202:5000/lmsysorg/sglang:main-79cafec0`（image `80e1ea8979c5`） |
+| 基座 | `<registry-host>:5000/lmsysorg/sglang:main-79cafec0`（image `80e1ea8979c5`） |
 | 上游基线 | `sgl-project/sglang@79cafec0` |
 | 重演树 | `/tmp/bt-r032@f9d89b02`，tree `dab49d96d33839480e30a1d24ac9e6cdb0a9c29d` |
 
@@ -30,7 +30,7 @@
 ### A. 用全文直接构建（推荐，最接近产线烘法）
 
 ```bash
-docker image inspect 192.168.0.202:5000/lmsysorg/sglang:main-79cafec0 >/dev/null
+docker image inspect <registry-host>:5000/lmsysorg/sglang:main-79cafec0 >/dev/null
 bash build-0.3.2-r032c.sh            # 构建 + 读回 + py_compile + import + collection
 ```
 

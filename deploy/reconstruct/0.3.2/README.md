@@ -56,16 +56,16 @@ V4.1-Flash-1017 权重（476G）、engram 分片（约 189G）。本包给出它
 **A. 直接拉内网在役镜像（最省事，身份完全一致）**
 
 ```bash
-docker pull 192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c
+docker pull <registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c
 docker inspect --format '{{index .RepoDigests 0}}' \
-  192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c
+  <registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c
 # 必须等于 sha256:47f6d91a…e2ffc4
 ```
 
 **B. 从基座重建（可审计/离线）**
 
 ```bash
-# 基座：192.168.0.202:5000/lmsysorg/sglang:main-79cafec0（image 80e1ea8979c5，70 层）
+# 基座：<registry-host>:5000/lmsysorg/sglang:main-79cafec0（image 80e1ea8979c5，70 层）
 bash <repo>/deploy/reconstruct/0.3.2/image/build-0.3.2-r032c.sh
 ```
 
@@ -178,7 +178,8 @@ bash <repo>/deploy/reconstruct/0.3.2/verify.sh
   `sed '2,9d' deploy/bin/r3-boot-arm.sh | sed "s#/home/liux\*\*\*ya#<home>#g"`。
 - `adapter/build_repack_cuda.sh` 仅第 6 行注释里的家目录改成
   `/home/<deploy-user>`；产线 md5 cd6c7707，公开件不同，运行逻辑零差异。
-- 内网 IP/主机名（192.168.0.201-204、10.10.1.x、dgxspark01-04）按部署文档政策保留。
+- 内网 IP/主机名（管理段四址、NFS 段与节点主机名）已于 20261030 脱敏为占位符
+  （`<mgmt-node-ip>`/`<nfs-server-ip>`/`<node0N>` 等；boot 脚本侧改环境变量注入）。
 - 本包**零凭据**：无 sudo 口令、无私钥、无 API key、无 registry 登录串。
 
 ## 6. 变更谱系（单变量）

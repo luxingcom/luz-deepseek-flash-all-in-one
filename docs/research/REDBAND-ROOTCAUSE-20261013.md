@@ -240,7 +240,7 @@ GPU 0%（chunk 期无测量）不能承载任何结论、chunk 4s 恒定+boot �
 
 - 红带靴 docker 日志（含 Prefill batch 逐 chunk 行+Engram 60s 统计+idle-release 行+
   Capturing batches bars+startup timings）：`logs/W5-PROMO2-20261013/teardown/pre-stop/
-  r3prod-{head,worker-dgxspark0{2,3,4}}.docker.log`（:406-:1210 红窗段）。
+  r3prod-{head,worker-<node0{2,3,4}>}.docker.log`（:406-:1210 红窗段）。
 - 健康对照：`logs/W5-PROMO-20261012/teardown/W5PROMO/r3boot-head.docker.log`+
   `bench/W5PROMO/warm_request_0.json`+`bench/W5PROMO-PROD/*`+`state/sentinel-*`+
   `boot-checks/W5PROMO{,-PROD}-boot.log`+`state/boot_ledger.txt`。

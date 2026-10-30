@@ -116,15 +116,26 @@ if isinstance(raw, list):
 else:
     text = str(raw)
 required = [
-    '--tool-call-parser deepseekv41', '--enable-cache-report', '--sleep-on-idle',
+    '--tool-call-parser deepseekv41', '--enable-cache-report',
     '--speculative-algorithm DSPARK', '--prefill-decode-interval 16',
     '--max-queued-requests 32', '--min-free-slots-delay 1',
     '--enable-decoder-swa-bounded-replay', '--reasoning-parser deepseek-v41',
     '--swa-prefix-tails 256',
 ]
+# UP43050-20261030 禁参表（上游 sglang #43050：--sleep-on-idle 空闲 10-20 分钟后
+# 被任意请求唤醒即死 prefill 挂起；host 侧规避=在场即 FAIL，缺席=正态）。与
+# tools/serve_flags_gate.sh 缺席判据、deploy/bin/r3-gate-env-lint.sh EQ-03 禁参
+# 组合三面同律。
+forbidden = ['--sleep-on-idle']
 missing = [x for x in required if x not in text]
-print('all SPEC6/SPEC1 args present' if not missing else 'missing: ' + ', '.join(missing))
-sys.exit(1 if missing else 0)
+present = [x for x in forbidden if x in text]
+if not missing and not present:
+    print('all SPEC6/SPEC1 args present; banned args absent')
+elif present:
+    print('BANNED args present: ' + ', '.join(present) + ' (upstream #43050 idle-wake hang workaround)')
+else:
+    print('missing: ' + ', '.join(missing))
+sys.exit(1 if (missing or present) else 0)
 PY
 argv_raw=$(mktemp)
 docker inspect "${PROD_CTN_PREFIX}-head" --format '{{json .Config.Cmd}}' > "$argv_raw" 2>/dev/null

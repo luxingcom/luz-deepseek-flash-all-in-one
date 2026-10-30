@@ -1,10 +1,10 @@
 #!/bin/bash
 # s4_bench.sh — W7 S4 NCCL allreduce bench (B1 口径: nccl-tests all_reduce, 4-rank, in-place, avg)
 # 拓扑: 4 节点 x 每节点 1 进程(GB10 x1/节点) = 4 rank 跨节点, RoCE 数据面
-# 用法(在 .186 head 上):
+# 用法(在 head 机上):
 #   bash /home/liux***ya/w6-kit/s4_bench.sh timed    # 计时轮(无 NCCL_DEBUG)
 #   bash /home/liux***ya/w6-kit/s4_bench.sh verify   # 验证轮(64KB, NCCL_DEBUG=INFO, 出 NET/IB 行)
-# 前置: 四机 w6-kit 就位; 免密 ssh 192.168.5.186-189; 宿主机 mpirun(OpenMPI 4.1.6)
+# 前置: 四机 w6-kit 就位; 免密 ssh 四机（20261030 脱敏：主机名经 NODE0X_HOST 注入）; 宿主机 mpirun(OpenMPI 4.1.6)
 set -u
 KIT=/home/liux***ya/w6-kit
 PERF=$KIT/s4_build/all_reduce_perf
@@ -53,14 +53,19 @@ MODE=${1:-timed}
 # fabric 病不是本工具病。先报洞再跑，省一轮误诊。修复见 FABRIC-GID-REPAIR-RUNBOOK.md。
 gid_hole_audit() {
   local bad=0 h holes
-  for h in 186 187 188 189; do
-    holes=$(ssh -o ConnectTimeout=8 -o BatchMode=yes 192.168.5.$h '
+  # 20261030 脱敏：四机主机名改经环境变量注入，缺参拒跑
+  local hosts=("${NODE01_HOST:?缺环境变量 NODE01_HOST（<node01>），拒跑}"
+               "${NODE02_HOST:?缺环境变量 NODE02_HOST（<node02>），拒跑}"
+               "${NODE03_HOST:?缺环境变量 NODE03_HOST（<node03>），拒跑}"
+               "${NODE04_HOST:?缺环境变量 NODE04_HOST（<node04>），拒跑}")
+  for h in "${hosts[@]}"; do
+    holes=$(ssh -o ConnectTimeout=8 -o BatchMode=yes "$h" '
       for c in rocep1s0f0 rocep1s0f1 roceP2p1s0f0 roceP2p1s0f1; do
         [ -d /sys/class/infiniband/$c ] || continue
         [ "$(cat /sys/class/infiniband/$c/ports/1/gid_attrs/types/3 2>/dev/null)" = "RoCE v2" ] || echo $c
       done' 2>/dev/null | tr '\n' ' ')
     if [ -n "$holes" ]; then
-      echo "[!!] 192.168.5.$h GID 洞(idx3): $holes"
+      echo "[!!] $h GID 洞(idx3): $holes"
       bad=1
     fi
   done

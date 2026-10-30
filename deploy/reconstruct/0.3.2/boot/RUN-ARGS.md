@@ -42,10 +42,10 @@ SPEC_EXTRA_ARGS="--prefill-decode-interval 16 --max-queued-requests 32 --min-fre
 
 | rank | 机 | 管理 IP | 模型源 | engram | HCA 对 |
 |---|---|---|---|---|---|
-| 0 | dgxspark01 | 192.168.0.201（head） | `/data/models/DeepSeek-V4.1-Flash-1017` | `~/dsv41-engram-1017` | — |
-| 1 | dgxspark02 | 192.168.0.202 | `/data/models/DeepSeek-V4.1-Flash-1017` | 同上 | `0=rocep1s0f1,roceP2p1s0f1;2=rocep1s0f0,roceP2p1s0f0` |
-| 2 | dgxspark04 | 192.168.0.204 | `/data/models/dsv41-net` | 同上 | `1=rocep1s0f0,roceP2p1s0f0;3=rocep1s0f1,roceP2p1s0f1` |
-| 3 | dgxspark03 | 192.168.0.203 | `/data/models/dsv41-net` | 同上 | `0=rocep1s0f0,roceP2p1s0f0;2=rocep1s0f1,roceP2p1s0f1` |
+| 0 | <node01> | <mgmt-node-ip>（head） | `/data/models/DeepSeek-V4.1-Flash-1017` | `~/dsv41-engram-1017` | — |
+| 1 | <node02> | <mgmt-node-ip> | `/data/models/DeepSeek-V4.1-Flash-1017` | 同上 | `0=rocep1s0f1,roceP2p1s0f1;2=rocep1s0f0,roceP2p1s0f0` |
+| 2 | <node04> | <mgmt-node-ip> | `/data/models/dsv41-net` | 同上 | `1=rocep1s0f0,roceP2p1s0f0;3=rocep1s0f1,roceP2p1s0f1` |
+| 3 | <node03> | <mgmt-node-ip> | `/data/models/dsv41-net` | 同上 | `0=rocep1s0f0,roceP2p1s0f0;2=rocep1s0f1,roceP2p1s0f1` |
 
 `PEER_HCA_HEAD` 仍有定义但已退役（不再注入）；NCCL 用双 rail 部署对
 `rocep1s0f0,roceP2p1s0f1` + `NCCL_IB_TC=106`。

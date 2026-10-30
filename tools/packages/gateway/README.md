@@ -27,8 +27,8 @@ GATEWAY-MIGRATION-PLAN §1.4 点名 **P0 死件：单元文件缺失，进程裸
 | units/concurrency-proxy-v2.service（**P0 死件闭合**；EnvironmentFile 承载键面+A7 部署序注记） | 本包新件（部署面分发件） |
 | units/concurrency-proxy-vl.service + env/gateway-vl.env.template（VL 车道 8002——**2026-10-14 AUTH-DEPLOY 起 Mac:8002 已撤除**〔零消费者实证〕；unit/模板留档=01 RETIRED 回退面） | VL-NATIVE-WINCARD-20261013 §4.3 承载 |
 | units/10-gateway-hardening.conf（drop-in：journal/MemoryMax 2G/非特权/ProtectSystem；B6 双实例通用件） | 本包新件 |
-| env/gateway.env.template（UPSTREAM/PORT/MAX_CONCURRENCY=16/QUEUE_TIMEOUT=5/CHUNK_IDLE_TIMEOUT=600/INJECT_ENABLE_THINKING=1/**ADVERTISE_MODEL_CAPACITY=0〔rc3.8.6 容量广播单键，缺省关〕/MODELS_CONTEXT_LEN=0〔引擎实值位〕**/GW_API_KEY 值位空） | 本包新件（宿主 0600 落位） |
-| gw-verify.sh（探针族+离线 lint；P1 401 双面〔/gw/* 管理+**P1b 业务面**——rc3.8.5 全局门后无钥业务 POST 本地应答 401 零上游载〕+**P6 模型门**〔GW_KEY 在时带钥假模型 404〕+**P7 容量广播面**〔rc3.8.6；带钥 GET /v1/models 条目带 context_window 时四键==max_model_len 才绿，不带=缺省关/未部署 INFO 跳过不红〕+P2 POST 打点序+vl 双件 lint 与域检查+rc3.8.6 两键域检查+--selfcheck T8 红例面） | TOOLS31 §二 P4-3 新件 |
+| env/gateway.env.template（UPSTREAM/PORT/MAX_CONCURRENCY=16/QUEUE_TIMEOUT=5/CHUNK_IDLE_TIMEOUT=600/INJECT_ENABLE_THINKING=1〔**#45614 主车道部署红线=1，gw-verify --offline 硬断言**〕/**ADVERTISE_MODEL_CAPACITY=0〔rc3.8.6 容量广播单键，缺省关〕/MODELS_CONTEXT_LEN=0〔引擎实值位〕**/GW_API_KEY 值位空） | 本包新件（宿主 0600 落位） |
+| gw-verify.sh（探针族+离线 lint；P1 401 双面〔/gw/* 管理+**P1b 业务面**——rc3.8.5 全局门后无钥业务 POST 本地应答 401 零上游载〕+**P6 模型门**〔GW_KEY 在时带钥假模型 404〕+**P7 容量广播面**〔rc3.8.6；带钥 GET /v1/models 条目带 context_window 时四键==max_model_len 才绿，不带=缺省关/未部署 INFO 跳过不红〕+P2 POST 打点序+vl 双件 lint 与域检查+rc3.8.6 两键域检查+**#45614 面**〔SGLANG_DEFAULT_THINKING 异键禁入（值无关一律红）+主车道 INJECT_ENABLE_THINKING 必须=1+vl 车道维持 {0,1} 域检查分形；--selfcheck T9/T10/T11 红例面〕） | TOOLS31 §二 P4-3 新件 |
 
 ## 部署面分发注记（01 systemd 形历史面；Mac 容器形见下节）
 
@@ -41,7 +41,7 @@ GATEWAY-MIGRATION-PLAN §1.4 点名 **P0 死件：单元文件缺失，进程裸
 
 ## Mac M6 部署节（在役本尊；GW-PATCH-20261015 容量广播升形态）
 
-**网关本尊=Mac mini M6（192.168.5.71 管理 /192.168.0.1 专线）OrbStack 容器**；
+**网关本尊=<mac-admin-host>（Mac mini M6；<mac-if-ip> 管理 /<mac-gw-ip> 专线）OrbStack 容器**；
 01 systemd 双实例 RETIRED。详档=战役仓 luz030-opt-campaign
 docs/ops/GW-MAC-MIGRATION-PLAN/RESULT-20261014.md、docs/ops/AUTH-DEPLOY-RESULT-20261014.md
 与 docs/ops/GW-PATCH-RESULT-20261015.md。
@@ -58,8 +58,8 @@ docs/ops/GW-MAC-MIGRATION-PLAN/RESULT-20261014.md、docs/ops/AUTH-DEPLOY-RESULT-
    MODELS_CONTEXT_LEN=0〔rc3.8.6 容量广播两键〕**；rg.env（8003）=API_KEY 客户端钥同值平移（28ch，客户端只换
    URL 不换钥）/UPSTREAM_API_KEY=8001 GW 钥（47ch）/VLLM_URL=compose 网内名
    http://concurrency-proxy:8001/SERVED_MODEL=引擎真名+别名面；均宿主 **0600**。
-3. **UPSTREAM 隧道形**：`http://192.168.0.1:24001`＝01 侧反向隧道（mac-forwarders.service
-   =systemd 托管；Restart=always/RestartSec=10）`ssh -N -R 192.168.0.1:24001:127.0.0.1:8899`
+3. **UPSTREAM 隧道形**：`http://<mac-gw-ip>:24001`＝01 侧反向隧道（mac-forwarders.service
+   =systemd 托管；Restart=always/RestartSec=10）`ssh -N -R <mac-gw-ip>:24001:127.0.0.1:8899`
    ——**2026-10-16 01:30 旁路重定向新址形**（原 5.18x 旧址靶已退役）；**隧道断=网关 502**
    （ServerAlive 20s×3 自愈；端到端核销=NET-WH-GWCHAIN-20261016 窗档 §P6）。
 4. **升级序**：scp 新载荷→`md5 -q` 对锚（**rc3.8.6=5ea1d8d3…**〔回退锚 rc3.8.5=
@@ -67,7 +67,7 @@ docs/ops/GW-MAC-MIGRATION-PLAN/RESULT-20261014.md、docs/ops/AUTH-DEPLOY-RESULT-
    `docker compose build concurrency-proxy && docker compose up -d --force-recreate
    concurrency-proxy`→探针族（gw-verify 头注 Mac 变体口径；rc3.8.6 后 P1b/P6/P7 可用；
    升级前 .bak-gw386 备份载荷+env，回退=cp 回+force-recreate）。
-5. **鉴权键面表**：8003 公共入口=API_KEY（sk-dgxspark-*，Bearer+hmac）；8001 内部车道
+5. **鉴权键面表**：8003 公共入口=API_KEY（sk-<prefix>-*，Bearer+hmac）；8001 内部车道
    =GW_API_KEY（/v1/* 与 /metrics 一切方法收 Bearer，/health 豁免=探针面）；
    8001 /gw/* 管理面=同钥原门；模型门=8001 POST 白名单外 404（别名归一=8003 层职责）；
    容量广播面=8001 GET /v1/models(/id) 条目四键=max_model_len（rc3.8.6，鉴权门后）；

@@ -30,7 +30,7 @@ import pytest
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 MODULE_PATH = os.path.join(REPO, "tools", "proto", "k16_protocol.py")
 PATCH_PATH = os.path.join(REPO, "tools", "patches", "t33-01a.overlay-serving-chat.patch")
-SGLANG_ENCODER = "/home/liuxiaoya/sglang-main-src/python/sglang/srt/entrypoints/openai/encoding_dsv41.py"
+SGLANG_ENCODER = "/home/<deploy-user>/sglang-main-src/python/sglang/srt/entrypoints/openai/encoding_dsv41.py"
 QUALITY_DIR = os.path.join(REPO, "tests", "quality")
 
 _spec = importlib.util.spec_from_file_location("k16_protocol", MODULE_PATH)
@@ -603,7 +603,7 @@ PATCH_PATH_RECIPE = os.path.join(
     REPO, "tools", "patches", "t33-01a.overlay-serving-chat.recipe-rebase.patch"
 )
 RECIPE_BASE = (
-    "/home/liuxiaoya/migrate-assets/v4vl/sglang-overlay.o12c1-prod/serving_chat.py"
+    "/home/<deploy-user>/migrate-assets/v4vl/sglang-overlay.o12c1-prod/serving_chat.py"
 )
 RECIPE_BASE_MD5 = "3151a2edf2c21e4d3492dff5bbc6ec10"
 # 基 3151a2ed + recipe 重基件应用后产物（W5 前置批构建器逐字节复算 pin）

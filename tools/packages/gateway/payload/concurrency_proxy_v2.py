@@ -3,6 +3,58 @@
 """
 concurrency_proxy_v2.py — vLLM 流式感知并发网关（v2.0-rc3，2026-09-06）
 
+rc3.8.8 相对 rc3.8.7 的增强（0.3.4re DF-05 修复单元，2026-10-30；设计输入=
+  035-W0-TASKBOOK §DF-05〔USR-1 hmm 长会话思考流退化缓解产品化〕）：
+  1. thinking 双键注入修复合入（0.3.2-p1 外部站点 bug 报告修复同步——战役仓
+     副本此前只注入 enable_thinking 单键，而本栈 V4.1 族 overlay
+     〔serving_chat.py〕读取键是 chat_template_kwargs["thinking"]，单键注入
+     对 V4.1 族是 no-op〔假键〕；现双键同注：thinking=V4.1 族生效键，
+     enable_thinking=其他模型族兼容键；body 已含任一键=用户显式管理不覆盖；
+     生产仓 luz-034re 同修复已于 2026-10-30 先落，本条=两仓逐字节合流）。
+  2. 保守采样缺省档（DF-05 新增）：INJECT_CONSERVATIVE_SAMPLING=1 时对 POST
+     chat/completions 请求体缺省注入 temperature/top_p/frequency_penalty 三键
+     （缺省值 0.6/0.95/0.4=任务书建议带〔temp 0.5-0.7 / freq 0.3-0.5〕中值；
+     CONSERVATIVE_TEMPERATURE / CONSERVATIVE_TOP_P /
+     CONSERVATIVE_FREQUENCY_PENALTY 三 env 键可调）；客户端已显式传任一键=
+     完全不动 body（全或无，绝不混注——PITFALLS P10-1 禁网关静默改写采样
+     参数，故必须是显式 env 开关+客户端显式传参永远优先）。
+     优先级链：客户端显式 > 保守缺省注入 > GW_SAMPLING_POLICY 策略改写
+     （dispatch 序=maybe_inject → apply_conservative_sampling →
+     apply_sampling_policy；策略开态按官方 V4.1 解析律可覆写本档注入值——
+     两键正交，组合态策略档赢）。
+  三硬门（沿 rc3.8.5-3.8.7 先例）：**纯增量门控**（INJECT_CONSERVATIVE_SAMPLING
+  缺省 0=与 rc3.8.7 行为等价——本段新逻辑全在键门内；thinking 双键修复除外=
+  本版目的①，且仅 INJECT_ENABLE_THINKING=1 开态有行为面）/ **幂等**（注入后
+  body 三键在位=字节豁免直返，零字节改动）/ **fail-open**（非法 JSON / 非
+  dict 顶层 / 非 chat 路径=原样透传，绝不因本变换新增失败）。
+  开关状态入代理横幅（conservative=on(<t>/<p>/<f>) / off）与 METRICS 双计数
+  （conservative_requests / conservative_injected）可审计。
+  ⚠ 判读窗纪律：开启态质量带需重定标（任务书 DF-05：开/关态各 GSM8K 500 题
+  双门，关闭态零漂移门）；上线=需窗（compose 重建）+批文；读数期内禁切本键。
+
+rc3.8.7 相对 rc3.8.6 的增强（0-5 网关备制批 A-1/U10 案头草案，2026-10-26；
+  设计输入=RECIPE-GATEWAY-AUDIT-20261026 §5 A-1——差异表 #9「采样解析」：
+  官方 deepseek-recipe 0.2.0 在 V4.1 按 thinking 态强制采样，我方全链透传）：
+  GW_SAMPLING_POLICY=1 时，POST chat/responses 路径的请求体按官方 V4.1 采样
+  解析改写（apply_sampling_policy）：
+    thinking 态（实效 enable_thinking=true 或缺省〔V4.1 官方缺省=开〕）：
+      temperature 恒 1.0；top_p：带 tools=1.0，否则 max(请求值, 0.95)，未给=1.0；
+    非 thinking 态（实效 enable_thinking=false）：temperature 透传（缺省引擎
+      1.0）；top_p 恒 1.0。
+  官方口径源=deepseek-recipe 0.2.0 CHANGELOG "Sampling values by model
+  version" + w6 桌面矩阵（evidence-desktop-recipe-semantics.txt）。
+  三硬门（沿 rc3.8.5/3.8.6 单键先例）：**纯增量门控**（缺省 0=与 rc3.8.6 逐
+  字节等价——本版全部新逻辑都在键门内）/ **幂等**（已合规 body 零字节改动原样
+  返回）/ **fail-open**（非法 JSON / 非法顶层结构 / enable_thinking 非布尔
+  〔不确定态不猜〕/ 非目标路径=原样透传，绝不因本变换新增失败）。
+  插入点=POST 分支 maybe_inject 之后（thinking 判定取**实效**值——注入后的
+  body 已带显式 enable_thinking）、validate_model 之前；确定性变换，先于
+  body_key（去重键对变换后 body 计算，与 rc3.6/rc3.7 同律）。
+  ⚠ 判读窗纪律（U10）：读数期内禁切本键——thinking 态 temp 强制 1.0 会改变
+  现行 temp=0.6 质量协议的采样语义；上线=需窗（Mac compose 重建）+需用户裁。
+  案头备制件：logs/S-CLOSURE-0BOOT-20261026/sub03/rc387-draft/（本草案+
+  test_rc387.py 桌面测试台+输出）；未入 gateway 包（包三联动律归上线窗）。
+
 rc3.8.6 相对 rc3.8.5 的增强（GW-PATCH-20261015 窗；设计输入=032-ADDENDUM §十一
   A10〔GitHub issue #3，contributor waterliu1981 已落地形〕）：
   /v1/models 响应侧容量广播（②-a）——ADVERTISE_MODEL_CAPACITY=1 时，GET
@@ -194,6 +246,9 @@ dispatch 单点；authorization 头透传恢复；GET/HEAD 原样转发。
   INJECT_ENABLE_THINKING=0   SANITIZE_IMAGE_PLACEHOLDER=1
   GW_REQUIRE_AUTH=0   GW_ALLOWED_MODELS=deepseek-v4.1-flash
   ADVERTISE_MODEL_CAPACITY=0   MODELS_CONTEXT_LEN=0（rc3.8.6 容量广播两键）
+  GW_SAMPLING_POLICY=0（rc3.8.7 采样策略键：0=与 rc3.8.6 逐字节等价；
+    1=官方 V4.1 采样解析——thinking temp=1.0/top_p≥0.95（带 tools 1.0），
+    非 thinking top_p=1.0。判读窗纪律：读数期内禁切）
 """
 import asyncio
 import hashlib
@@ -240,7 +295,30 @@ try:
     MODELS_CONTEXT_LEN = int(os.environ.get("MODELS_CONTEXT_LEN", "0") or "0")
 except ValueError:
     MODELS_CONTEXT_LEN = 0
-VERSION = "concurrency-proxy-v2-rc3.8.6"
+# rc3.8.7 采样策略键（A-1/U10）：默认 0=与 rc3.8.6 逐字节等价（休眠门）；=1 时
+# POST chat/responses 请求体按官方 deepseek-recipe 0.2.0 V4.1 采样解析改写
+# （apply_sampling_policy——thinking temp=1.0/top_p≥0.95〔带 tools 1.0〕，
+# 非 thinking top_p=1.0）。读数窗纪律：判读期内禁切（详见头注 rc3.8.7 段）。
+GW_SAMPLING_POLICY = os.environ.get("GW_SAMPLING_POLICY", "0") == "1"
+# rc3.8.8 保守采样缺省档（DF-05/USR-1）：默认 0=关（新逻辑全在键门内=行为与
+# rc3.8.7 等价）；=1 时 POST chat/completions 请求体缺省注入采样三键（值经下
+# 三键可调，见 apply_conservative_sampling）。优先级：客户端显式传任一键 >
+# 本缺省注入 > GW_SAMPLING_POLICY 策略改写。读数窗纪律：判读期内禁切；
+# 开启态质量带需重定标（详见头注 rc3.8.8 段）。
+INJECT_CONSERVATIVE_SAMPLING = os.environ.get("INJECT_CONSERVATIVE_SAMPLING", "0") == "1"
+
+
+def _conservative_float(name: str, default: str) -> float:
+    try:
+        return float(os.environ.get(name, default))
+    except ValueError:
+        return float(default)          # 非法 env 值回缺省（fail-open 同源）
+
+
+CONSERVATIVE_TEMPERATURE = _conservative_float("CONSERVATIVE_TEMPERATURE", "0.6")
+CONSERVATIVE_TOP_P = _conservative_float("CONSERVATIVE_TOP_P", "0.95")
+CONSERVATIVE_FREQUENCY_PENALTY = _conservative_float("CONSERVATIVE_FREQUENCY_PENALTY", "0.4")
+VERSION = "concurrency-proxy-v2-rc3.8.8"
 
 HEARTBEAT = b": keepalive\n\n"          # SSE 注释帧：OpenAI SDK/EventSource 忽略
 DONE_MARK = b"data: [DONE]\n\n"         # 错误帧后的终止符（SDK 正常收尾）
@@ -266,6 +344,8 @@ METRICS = {
     "internal_retries": 0, "active_streams": 0, "queue_now": 0,
     "queue_wait_peak": 0.0,
     "auth_rejected": 0, "models_rejected": 0,   # rc3.8.5：全局门/模型门计数（G1 §F-3）
+    "sampling_policy_requests": 0, "sampling_policy_changed": 0,  # rc3.8.7（键开态才计）
+    "conservative_requests": 0, "conservative_injected": 0,  # rc3.8.8（键开态才计）
     "ttft_buckets": {
         "lt1": 0, "1to5": 0, "5to30": 0, "30to60": 0,
         "60to120": 0, "120to300": 0, "gt300": 0},
@@ -374,6 +454,131 @@ def maybe_inject(body: bytes, path: str) -> bytes:
         return json.dumps(obj).encode()
     except Exception:
         return body                          # 非法 body：跳注入，走原转发逻辑
+
+
+def apply_conservative_sampling(body: bytes, path: str) -> bytes:
+    """rc3.8.8（DF-05/USR-1）：保守采样缺省注入档。**默认关**
+    （INJECT_CONSERVATIVE_SAMPLING=0）→ 首行原样返回，全链与 rc3.8.7 行为
+    等价（本档新逻辑全在键门内）。
+
+    开启时对 POST chat/completions 请求体**缺省注入**采样三键（仅补缺省，
+    绝不覆写）：
+      temperature=CONSERVATIVE_TEMPERATURE（缺省 0.6）
+      top_p=CONSERVATIVE_TOP_P（缺省 0.95）
+      frequency_penalty=CONSERVATIVE_FREQUENCY_PENALTY（缺省 0.4）
+    （三值 env 可调；任务书 DF-05 建议带=temp 0.5-0.7 / freq 0.3-0.5 中值。）
+
+    优先级链（客户端显式永远最高）：body 已显式携带任一键
+    （"temperature" / "top_p" / "frequency_penalty"——字节层预检，保
+    prefilter 收益）→ **完全不动 body**（全或无，绝不混注部分键）；三键全缺
+    才整组注入。相对 GW_SAMPLING_POLICY（官方 V4.1 解析律）：本档先执行
+    （dispatch 序=maybe_inject → 本函数 → apply_sampling_policy），策略开态
+    可按官方律覆写本档注入值——两键正交，组合态策略档赢（官方对齐面优先于
+    保守缺省）。
+
+    动因（hmm 长会话思考流退化判词=模型采样面 ~90%）：给采用方一个显式 env
+    开关的保守采样档（PITFALLS P10-1 禁网关静默改写采样参数——本档=显式
+    开关+客户端显式传参永远优先）；开启态质量带需重定标（任务书 DF-05：
+    开/关态各 GSM8K 500 题双门）。
+
+    确定性变换（同 body 恒同输出；幂等：注入后 body 三键在位=字节豁免直返，
+    零字节改动）；先于 body_key（去重键对注入后 body 计算，rc3.6/3.7/3.8.7
+    同律）。非法 JSON / 非法顶层结构 / 非 chat 路径 → 原样返回走原转发逻辑
+    （fail-open：绝不因本变换新增失败）。"""
+    if not INJECT_CONSERVATIVE_SAMPLING:
+        return body
+    if "/chat/completions" not in path:
+        return body
+    if ((b'"temperature"' in body) or (b'"top_p"' in body)
+            or (b'"frequency_penalty"' in body)):
+        return body                  # 客户端显式管理：完全不动（全或无）
+    try:
+        obj = json.loads(body)
+        if not isinstance(obj, dict):
+            return body
+        METRICS["conservative_requests"] += 1
+        obj["temperature"] = CONSERVATIVE_TEMPERATURE
+        obj["top_p"] = CONSERVATIVE_TOP_P
+        obj["frequency_penalty"] = CONSERVATIVE_FREQUENCY_PENALTY
+        METRICS["conservative_injected"] += 1
+        return json.dumps(obj, ensure_ascii=False).encode()
+    except Exception:
+        return body                  # fail-open：非法 body 走原转发逻辑
+
+
+def apply_sampling_policy(body: bytes, path: str) -> bytes:
+    """rc3.8.7（A-1/U10 案头备制）：官方 deepseek-recipe 0.2.0 V4.1 采样解析的
+    网关侧对齐变换。缺省关（GW_SAMPLING_POLICY=0）→ 首行原样返回，全链与
+    rc3.8.6 逐字节等价。
+
+    官方语义（CHANGELOG "Sampling values by model version" + w6 桌面矩阵）：
+      thinking 态：temperature 恒 1.0；top_p：带 tools=1.0，否则
+                   max(请求值, 0.95)，未给=1.0；
+      非 thinking 态：temperature=请求值或引擎缺省 1.0（透传零触碰）；top_p 恒 1.0。
+
+    thinking 态判定=maybe_inject 之后的**实效**值（本函数在 dispatch 中排在
+    maybe_inject 之后）：chat_template_kwargs.enable_thinking 显式布尔优先；
+    缺键=True（V4.1 官方 Conversation thinking_mode 缺省=开；我方部署面
+    INJECT_ENABLE_THINKING=1 注入后 body 已带显式键，两口径在本链等价）。
+    非布尔（字符串/数字等）=不确定态 → 整体跳过透传（不猜——上游给真实语义，
+    与 validate_model fail-open 约定同源）。
+
+    确定性变换（同 body 恒同输出，幂等：已合规 body 零字节改动原样返回）；
+    先于 body_key（去重键对变换后 body 计算，rc3.6/rc3.7 同律）。
+    非法 JSON / 非法顶层结构 → 原样返回走原转发逻辑（绝不因本变换新增失败）。
+    数值口径：temperature/top_p 仅对 int/float 生效（bool 剔除——JSON true 不是
+    1.0 的采样语义）；**缺键=按官方未给口径补**（thinking：temp=1.0/top_p=1.0；
+    非 thinking：top_p=1.0）；**已给数值=按官方解析律改写**（钳制/强制）；**已给
+    畸形值（bool/字符串等）=不确定态零触碰**——不越权代上游校验（NaN/超界留给
+    上游 4xx 真值，fail-open 同源）。"""
+    if not GW_SAMPLING_POLICY:
+        return body
+    if ("/chat/completions" not in path) and ("/responses" not in path):
+        return body
+    try:
+        obj = json.loads(body)
+        if not isinstance(obj, dict):
+            return body
+        kwargs = obj.get("chat_template_kwargs")
+        enable = kwargs.get("enable_thinking") if isinstance(kwargs, dict) else None
+        if enable is not None and not isinstance(enable, bool):
+            return body                  # 不确定态：不猜，整体透传
+        thinking = True if enable is None else enable
+        tools = obj.get("tools")
+        tools_present = isinstance(tools, list) and len(tools) > 0
+
+        def is_num(v) -> bool:
+            return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+        changed = False
+        temp = obj.get("temperature")
+        top_p = obj.get("top_p")
+        if thinking:
+            if temp is None or (is_num(temp) and temp != 1.0):
+                obj["temperature"] = 1.0            # 恒 1.0（未给=补；数值≠1=改写）
+                changed = True
+            if tools_present:
+                if top_p is None or (is_num(top_p) and top_p != 1.0):
+                    obj["top_p"] = 1.0              # 带 tools：恒 1.0（官方矩阵）
+                    changed = True
+            elif top_p is None:
+                obj["top_p"] = 1.0                  # 未给=官方未给口径 1.0
+                changed = True
+            elif is_num(top_p) and top_p < 0.95:
+                obj["top_p"] = 0.95                 # 钳制上抬 max(请求值, 0.95)
+                changed = True
+            # thinking 无 tools 且 top_p≥0.95 已给：保留请求值（max 语义）零触碰
+        else:
+            if top_p is None or (is_num(top_p) and top_p != 1.0):
+                obj["top_p"] = 1.0                  # 非 thinking：恒 1.0；temp 透传
+                changed = True
+        METRICS["sampling_policy_requests"] += 1
+        if not changed:
+            return body                  # 已合规：逐字节原样（幂等门）
+        METRICS["sampling_policy_changed"] += 1
+        return json.dumps(obj, ensure_ascii=False).encode()
+    except Exception:
+        return body                      # fail-open：非法 body 走原转发逻辑
 
 
 def validate_model(body: bytes) -> str | None:
@@ -973,6 +1178,8 @@ async def dispatch(request: web.Request):
         if request.method == "POST":
             body = sanitize_image_placeholders(body, request.path)  # rc3.7：先于注入与去重键
             body = maybe_inject(body, request.path)   # rc3.6：注入先于流式判定与去重键
+            body = apply_conservative_sampling(body, request.path)  # rc3.8.8：保守采样缺省档（maybe_inject 后、策略档前；键缺省 0=零字节改动）
+            body = apply_sampling_policy(body, request.path)  # rc3.8.7：采样策略（maybe_inject 后=取实效 thinking 态；键缺省 0=零字节改动）
             bad_model = validate_model(body)          # rc3.8.5：模型门（G1 §F-2，maybe_inject 后）
             if bad_model is not None:
                 METRICS["models_rejected"] += 1
@@ -1018,14 +1225,23 @@ def main() -> None:
     capacity_face = ("off" if not ADVERTISE_MODEL_CAPACITY else
                      (f"on({MODELS_CONTEXT_LEN})" if MODELS_CONTEXT_LEN > 0
                       else "on(engine)"))
+    # rc3.8.7：采样策略面（off=rc3.8.6 等价 / on=v4.1 官方解析）
+    sampling_face = "on" if GW_SAMPLING_POLICY else "off"
+    # rc3.8.8：保守采样缺省档面（off=rc3.8.7 等价 / on(<t>/<p>/<f>)=缺省注入
+    # 三键现值——横幅可审计注入值）
+    conservative_face = (
+        f"on({CONSERVATIVE_TEMPERATURE}/{CONSERVATIVE_TOP_P}/"
+        f"{CONSERVATIVE_FREQUENCY_PENALTY})" if INJECT_CONSERVATIVE_SAMPLING
+        else "off")
     log.info("%s %s->%s conc=%d ttft=%.0fs idle=%.0fs hb=%.0fs q=%.0fs "
-             "write_to=%.0fs total_to=%.0fs dedup=%s auth=%s models=%s cap=%s",
+             "write_to=%.0fs total_to=%.0fs dedup=%s auth=%s models=%s cap=%s "
+             "sampling=%s conservative=%s",
              VERSION, f"0.0.0.0:{PORT}", UPSTREAM, MAX_CONCURRENCY,
              FIRST_TOKEN_TIMEOUT, CHUNK_IDLE_TIMEOUT, HEARTBEAT_INTERVAL,
              QUEUE_TIMEOUT, WRITE_TIMEOUT, TOTAL_STREAM_TIMEOUT,
              DEDUP_ENABLE, auth_face,
              "|".join(sorted(GW_ALLOWED_MODELS)) if GW_ALLOWED_MODELS else "any",
-             capacity_face)
+             capacity_face, sampling_face, conservative_face)
     web.run_app(make_app(), host="0.0.0.0", port=PORT, print=None,
                 shutdown_timeout=60)
 

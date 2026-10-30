@@ -1,0 +1,6 @@
+# tools/upstream/nvfp4-kv/ — issue #42369 host 侧规避三件套（2026-10-30 建件；双面同件互证锚）
+# 双面律：本目录 5 件在 luz030-opt-campaign/tools/upstream/nvfp4-kv/ 与 luz-034re/tools/upstream/nvfp4-kv/ 逐字节一致（md5 互证；任一面改动须同批落到另一面并重算本表）。
+05a35ded694376c24c661e386908bb43  nvfp4_kv_scale_guard.py
+85b257ffed5f5b75e024e24fdcbba02c  nvfp4_strip_kv_scales.py
+d3813edaa9771dd8ab377b2c690f59df  nvfp4_needle_gate.py
+d80e1c090f4e658e8112cfa0d9f8d8d7  README.md

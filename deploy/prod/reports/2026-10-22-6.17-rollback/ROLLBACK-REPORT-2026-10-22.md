@@ -1,8 +1,8 @@
 # 6.17 内核回滚与生产恢复报告
 
 - 报告日期：2026-10-22（UTC；10-23 00:57 追加版本锁、guard hold 并完成最终复检）
-- 适用范围：`dgxspark01`–`dgxspark04`，TP4，`r3prod`，`deepseek-v4.1-flash`
-- 生产镜像：`192.168.0.202:5000/dsv41-sglang-optimized:0.3.2-r032c`（digest `sha256:47f6d91a…e2ffc4`）
+- 适用范围：`<node01>`–`<node04>`，TP4，`r3prod`，`deepseek-v4.1-flash`
+- 生产镜像：`<registry-host>:5000/dsv41-sglang-optimized:0.3.2-r032c`（digest `sha256:47f6d91a…e2ffc4`；registry 主机已脱敏为占位符）
 - 报告状态：**完成；生产在线，回滚后验收通过**
 - 审核归档总表：`../2026-10-23-audit-archive/TASK-ACHIEVEMENTS-2026-10-22_23.md`
 - 结论一句话：**四机按 02 → 03 → 04 → 01 顺序回滚到 6.17.0-1031 + NVIDIA 580.173.02；NIC 固件 28.50.1002 保留并验证兼容。回滚后 PR 七档全部回到并超过 A6 锚点（+0.6%～+2.9%），warm gate 6463 tok/s，DE c1/c8 91.64/249.10，GSM8K 20/20。**

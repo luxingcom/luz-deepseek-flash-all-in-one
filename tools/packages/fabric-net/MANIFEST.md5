@@ -1,19 +1,19 @@
 # MANIFEST.md5 — fabric-net 包逐件清单（md5sum -c 自验；# 注释行 md5sum 容忍）
 # 律：内容变更→本件同日再生成（bash tools/packages/_lib/regen-manifest.sh fabric-net）
 #     +VERSION 指纹重钉 +TOOL-ANCHORS 同日更新（三联动缺一=同日更新律红）
-841357dc9c3ca148aa312db75204106d  ./README.md
+6bafe9a2278972463d6b2fbbf156ac36  ./README.md
 48971daeb71e1090d295d90a3697db24  ./bin/fabric-net
-9b0c6eb6bc545bff4caf5983f26dc56e  ./payload/diag/fabric-doctor.sh
-b4424aec4034c23fc92ef611f5e134cd  ./payload/diag/s4_bench.sh
-d1c5b63ca0106a7d0e6018b4f863ad92  ./payload/guards/fabric-gid-heal.sh
-189964b44a8311b0d4f96f2e830feca9  ./payload/guards/fabric-guard.sh
+922db0d8810193cf5ea8be54069547d5  ./payload/diag/fabric-doctor.sh
+8c21a4b65b6c0fe03b582c36be2ade02  ./payload/diag/s4_bench.sh
+9804d9a6327698555b6476d743fe4695  ./payload/guards/fabric-gid-heal.sh
+ba573ff9a9eec41f430b750c03596bd7  ./payload/guards/fabric-guard.sh
 f41564cea8c4d6bd3d1a2f1446980f45  ./payload/guards/fabric-restore-gate.sh
-c307e1ab83697b3e4dd8757073958f7a  ./payload/guards/fabric-sentinel.sh
+04e535e406c2bf62d29fbe65da0af928  ./payload/guards/fabric-sentinel.sh
 01ff2763719e4e8f61dc5897012f9ea2  ./payload/runbook/COMMUNITY-FIELDNOTES.md
-cc84ba8652f43db9dbbf785be2619b60  ./payload/runbook/FABRIC-GID-REPAIR-RUNBOOK.md
+2d333a6fb333a5b792aa5f03c1bd1eda  ./payload/runbook/FABRIC-GID-REPAIR-RUNBOOK.md
 d003736de4521266f6862040276701aa  ./payload/weave/lutune.sh
 4e21f96e8a02043b11022ea054a981b6  ./payload/weave/netplan-templates/97-roce-mtu.yaml.template
 f592c0aa88ef96ad781257497577339c  ./payload/weave/netplan-templates/99-nvidia-sync-cluster.yaml.template
-2b5a09848cd18fd501988a4a89f21e1f  ./payload/weave/topology.json
-5104f0b43d61c1407fa7f04450c809f3  ./selfcheck/run.sh
+e7d0e3f21ae2e236661b85848475cc71  ./payload/weave/topology.json
+406c59fb95e9f1424a2c09455c6e721f  ./selfcheck/run.sh
 a3c6c5aa0f7ca367fb942e91282229a0  ./selfcheck/sources.tsv

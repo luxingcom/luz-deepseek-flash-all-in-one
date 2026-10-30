@@ -12,7 +12,7 @@
 #   UMA 双装载超卖）按事故论处。锁对象=四机整簇（一台 r3boot 容器在=槽被占）。
 #
 # 【语义】
-#   1. exec 9>~/luz030-opt-campaign/.slot-lock; flock -w 10 9  —— fd9 独占锁（10s 等待窗，
+#   1. exec 9>__REPO_ROOT__/.slot-lock; flock -w 10 9  —— fd9 独占锁（10s 等待窗，
 #      拿不到=打印现任持有者并拒起）。锁随本 wrapper 进程存续：被 kill -9 也会因 fd
 #      关闭而自动释放（内核语义），无死锁面；残留 lockfile 文本仅作取证。
 #   2. 持锁后写 pid+ARM_TAG+时间戳（覆盖式，格式对齐既存 .slot-lock 现场形态）。
@@ -25,18 +25,18 @@
 #   5. trap EXIT/INT/TERM：清锁（写释放标记+截断 pid 行）。
 #
 # 【用法】
-#   ARM_TAG=A23GATE SPEC=1 ARM_ENV_FILE=~/luz030-opt-campaign/arms/A23-ALPHA-gate.env \
-#     bash tools/boot-with-slotlock.sh bash ~/migrate-assets/bin/r3-boot-arm.sh
+#   ARM_TAG=A23GATE SPEC=1 ARM_ENV_FILE=__REPO_ROOT__/arms/A23-ALPHA-gate.env \
+#     bash tools/boot-with-slotlock.sh bash __ASSETS_ROOT__/bin/r3-boot-arm.sh
 #   （env 前缀赋值经 wrapper 原样透传给 boot 命令；SPEC_EXTRA_ARGS 同理。）
-#   排障：cat ~/luz030-opt-campaign/.slot-lock 看现任 pid/ARM_TAG/时间戳。
+#   排障：cat __REPO_ROOT__/.slot-lock 看现任 pid/ARM_TAG/时间戳。
 #
 # 【红出口】2=锁被占（另一会话持槽）；3=四机容器非净；4=adapter 四机对表红（仅
 #   ADAPTER_SYNC_CHECK=1 时存在）；其余=透传 boot 命令退出码。
 set -uo pipefail
 
-CAMPAIGN="${CAMPAIGN:-$HOME/luz030-opt-campaign}"
-LOCKFILE="$CAMPAIGN/.slot-lock"
-HOSTS="dgxspark01 dgxspark02 dgxspark03 dgxspark04"
+CAMPAIGN="${CAMPAIGN:-__REPO_ROOT__}"
+LOCKFILE="${SL_LOCKFILE:-$CAMPAIGN/.slot-lock}"   # SL_LOCKFILE/SL_HOSTS=mock 注入面（SG2_HOSTS 同款形；缺省=在役值零变化）
+HOSTS="${SL_HOSTS:-__PROD_HOST_01__ __PROD_HOST_02__ __PROD_HOST_03__ __PROD_HOST_04__}"
 ARM_TAG="${ARM_TAG:-unknown}"
 
 if [ "$#" -lt 1 ]; then
@@ -83,7 +83,7 @@ echo "[slotlock] 四机容器净（docker ps 无 r3boot）"
 # ── 3.5 可选前置核：adapter 权威源四机对表（ADAPTER_SYNC_CHECK=1 才跑；缺省关=零行为变化）──
 #     ENV-GOVERNANCE-20261010 落实件：DEPLOY-SPLIT-OPEN 根因=adapter 各机自挂而部署只落
 #     单机。镜像无烘件 ⇒ bind mount 是唯一供给面。本核=点火前红门（fail-closed，exit 4）：
-#     四机 ~/migrate-assets/dsv41/adapter 对 01 权威源 md5 对表（排除 __pycache__）。
+#     四机 __ASSETS_ROOT__/dsv41/adapter 对 01 权威源 md5 对表（排除 __pycache__）。
 #     对表红=先跑 tools/adapter-sync.sh --apply（部署窗纪律）再点火。缺省不跑=既有
 #     ARM_TAG 流程逐字不变（含 8899 产线复原靴与一切测试臂）。
 if [ "${ADAPTER_SYNC_CHECK:-0}" = "1" ]; then
@@ -118,4 +118,41 @@ if [ "${BOOT_SENTINEL:-0}" = "1" ] && [ "$rc" = 0 ]; then
   bash "$CAMPAIGN/tools/boot_sentinel.sh"
   echo "[slotlock] 哨兵退出 rc=$?（不透传；boot rc=$rc 不变）"
 fi
+
+# ── 6. 后置步：misfire-class 相位标签（S-HYG-MICRO-20261018 授权包 3；fail-visible 只落痕零行为改）──
+#     S-SETTLE-IMPL §四 P2 实施位：boot 退出时按「停靴相位+容器形态」三类判别落台账，
+#     为 settle_gate_v2 P1（--epoch 上次真拆靴起算）提供自动判别面。三类（判据三要素同落痕备查）：
+#       clean-teardown = rc=0 → 完整服役正常拆靴（沉降钟自此靴重置=正当）；
+#       misfire-config = rc≠0 + load-phase（boot 日志无「R3 栈 UP」=health 未过即停）+ 形态缺参
+#                        （CTN_PREFIX 未设→r3boot-* 默认形，S-FIX-W0 R4 形）→ 本靴不算真拆靴：
+#                        沉降钟基准不重置——输出面提示 --epoch 上次真拆靴即测即放（授权包 3 明令）；
+#       peer-wait-race = rc≠0 其余（带参装载期停/serve 后停=竞态·红带族）→ 照旧走门（1800s 律）。
+#     相位证据字串=「R3 栈 UP」（r3-boot-arm.sh health 200 后首打印，boot stdout 必现）；
+#     日志定位=BOOT_LOG 显式路径优先，否则按 ARM_TAG 于 $CAMPAIGN/logs/*/boot/ glob 最新；
+#     缺日志=phase unknown 如实记，不强行归类。MISFIRE_CLASS=0 关；台账=MISFIRE_CLASS_LEDGER
+#     覆盖（缺省 $CAMPAIGN/logs/misfire-class.tsv 追加式）。退出码恒=boot 命令 rc（零行为扰动）。
+misfire_class() {
+  local rc="$1" phase form cls blog
+  if [ "${MISFIRE_CLASS:-1}" != "1" ]; then return 0; fi
+  if [ -n "${CTN_PREFIX:-}" ]; then form="param:$CTN_PREFIX"; else form="missing-param(r3boot-default)"; fi
+  phase="unknown(无日志)"
+  blog="${BOOT_LOG:-}"
+  if [ -z "$blog" ] && [ "$ARM_TAG" != "unknown" ]; then
+    blog=$(ls -t "$CAMPAIGN"/logs/*/boot/*"$ARM_TAG"*.log 2>/dev/null | head -1)
+  fi
+  if [ -n "$blog" ] && [ -f "$blog" ]; then
+    if grep -q 'R3 栈 UP' "$blog" 2>/dev/null; then phase="post-health"; else phase="load-phase"; fi
+  fi
+  if [ "$rc" = 0 ]; then cls="clean-teardown"
+  elif [ "$phase" = "load-phase" ] && [ -z "${CTN_PREFIX:-}" ]; then cls="misfire-config"
+  elif [ "$phase" = "unknown(无日志)" ]; then cls="unknown"
+  else cls="peer-wait-race"; fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$ARM_TAG" "$rc" "$phase" "$form" "$cls" \
+    >>"${MISFIRE_CLASS_LEDGER:-$CAMPAIGN/logs/misfire-class.tsv}"
+  echo "[slotlock] misfire-class=$cls（rc=$rc phase=$phase form=$form；台账=${MISFIRE_CLASS_LEDGER:-$CAMPAIGN/logs/misfire-class.tsv}）"
+  if [ "$cls" = "misfire-config" ]; then
+    echo "[slotlock] HINT：misfire-config 型不重置沉降钟基准——settle_gate_v2 --epoch <上次真拆靴epoch> 即测即放（S-SETTLE P1 法），勿再盲等 1800s（032 授权包 3）"
+  fi
+}
+misfire_class "$rc"
 exit "$rc"

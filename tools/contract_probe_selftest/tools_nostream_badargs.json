@@ -1,0 +1,27 @@
+{
+  "id": "chatcmpl-fixture-tools-nostream-badargs",
+  "object": "chat.completion",
+  "created": 1760000002,
+  "model": "deepseek-v4.1-flash",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "",
+        "tool_calls": [
+          {
+            "id": "call_eq04_nostream_002",
+            "type": "function",
+            "function": {
+              "name": "get_server_time",
+              "arguments": "{'tz': 'Asia/Shanghai'}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {"prompt_tokens": 42, "completion_tokens": 15, "total_tokens": 57}
+}

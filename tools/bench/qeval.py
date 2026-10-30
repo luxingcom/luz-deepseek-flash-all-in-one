@@ -20,11 +20,16 @@
 对读。移植只改三处，都是我方环境的硬约束：
 
   ① 端口 8888 → **8899**（本仓网关/引擎端口；测试窗可用 `--url` 覆盖）。
-  ② **鉴权**：本仓引擎可带 API key，且 `--key-file`/`--key-var` 读入后**绝不回显**
-     （项目纪律）。他方 8888 无鉴权 ⇒ 直接照抄会把 75 题全部 401，而 401 会被读成
-     "质量灾难"（全 FAIL）—— 这是本项目最忌讳的"量具沉默却打印数字"族陷阱。
-     故本文件把鉴权做成**前置门**（`preflight()`）：401/403 一律判 `AUTH` 并拒绝出分。
-  ③ 结果落 `--out-dir`（默认 `~/qeval-results`，可用 `QEVAL_OUT` 覆盖），文件名不变。
+    ② **鉴权**：本仓引擎可带 API key，且 `--key-file`/`--key-var` 读入后**绝不回显**
+       （项目纪律）。他方 8888 无鉴权 ⇒ 直接照抄会把 75 题全部 401，而 401 会被读成
+       "质量灾难"（全 FAIL）—— 这是本项目最忌讳的"量具沉默却打印数字"族陷阱。
+       故本文件把鉴权做成**前置门**（`preflight()`）：401/403 一律判 `AUTH` 并拒绝出分。
+    ③ 结果落 `--out-dir`（默认 `~/qeval-results`，可用 `QEVAL_OUT` 覆盖），文件名不变。
+
+EQ-11 参数面统一（0.3.4re，2026-10-30）：`run --url` 三形通吃（origin/v1基/全路径
+    统一归一，bench_url 唯一构造处；旧正确形=全路径，归一后逐字节不变；根路径/带
+    /v1 的旧 405/404 形现可用）；URL 错形与 argparse 拒起（含子命令面与缺子命令）
+    一律首行 `ERROR[qeval.py]: …` 到 stderr + exit 2（管道 `2>&1|grep ERROR` 必命中）。
 """
 import argparse
 import concurrent.futures as cf
@@ -41,6 +46,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import qeval_tasks as qt  # noqa: E402
+import bench_url  # noqa: E402  # EQ-11 共享构造处（URL 三形归一 + 拒起首行 ERROR 摘要）
 
 MODEL = "deepseek-v4.1-flash"
 DEFAULT_URL = "http://127.0.0.1:8899/v1/chat/completions"
@@ -368,6 +374,38 @@ def selftest():
     case("S10 mcnemar(0,0)=1.0", 1.0, mcnemar_p(0, 0))
     case("S10b mcnemar(5,0) < 0.1", True, mcnemar_p(5, 0) < 0.1)
 
+    # S11-S13 EQ-11 参数面统一（bench_url 共享构造处；零请求离线驱动）
+    b = bench_url.v1_base
+    case("S11 --url 三形归一到 v1 基", ("http://h:1/v1", "http://h:1/v1", "http://h:1/v1"),
+         (b("http://h:1", flag="--url", prog="qeval.py"),
+          b("http://h:1/v1", flag="--url", prog="qeval.py"),
+          b("http://h:1/v1/chat/completions", flag="--url", prog="qeval.py")))
+    case("S11b 全路径旧正确形请求 URL 逐字节不变", DEFAULT_URL,
+         bench_url.chat_completions(DEFAULT_URL, flag="--url", prog="qeval.py"))
+    case("S11c 根路径旧 405/404 形修复为可用", "http://h:1/v1/chat/completions",
+         bench_url.chat_completions("http://h:1", flag="--url", prog="qeval.py"))
+    import contextlib as _ctx
+    import io as _io
+    buf = _io.StringIO()
+    try:
+        with _ctx.redirect_stderr(buf):
+            b("not-a-url", flag="--url", prog="qeval.py")
+        case("S12 错 URL 形必拒起", True, False)  # 不该活着走到这
+    except SystemExit as e:
+        first = buf.getvalue().splitlines()[0] if buf.getvalue() else ""
+        case("S12 错 URL 形首行 ERROR 摘要+exit 2", (2, True),
+             (e.code, first.startswith("ERROR[qeval.py]:")))
+    p = bench_url.BenchArgumentParser(prog="qeval.py")
+    buf = _io.StringIO()
+    try:
+        with _ctx.redirect_stderr(buf):
+            p.error("the following arguments are required: label")
+        case("S13 拒起必 exit", True, False)
+    except SystemExit as e:
+        first = buf.getvalue().splitlines()[0] if buf.getvalue() else ""
+        case("S13 argparse 拒起首行 ERROR 摘要+exit 2", (2, True),
+             (e.code, first.startswith("ERROR[qeval.py]:")))
+
     npass = sum(1 for _, ok_, _ in cases if ok_)
     for name, ok_, why in cases:
         print(f"  {'PASS' if ok_ else 'FAIL'}  {name}" + ("" if ok_ else f"   [{why}]"))
@@ -376,14 +414,16 @@ def selftest():
 
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser()
+    ap = bench_url.BenchArgumentParser(prog="qeval.py")  # EQ-11：拒起首行 ERROR 摘要 + exit 2
     ap.add_argument("--selftest", action="store_true", help="判别力自检（不连引擎）")
     ap.add_argument("--key-file", default=os.path.expanduser("~/luz-gateway.env"))
     ap.add_argument("--key-var", default="API_KEY")
     ap.add_argument("--out-dir", default=DEFAULT_OUT)
     s = ap.add_subparsers(dest="cmd")
     r = s.add_parser("run"); r.add_argument("label")
-    r.add_argument("--url", default=DEFAULT_URL)
+    r.add_argument("--url", default=DEFAULT_URL,
+                   help="引擎/网关口。EQ-11 三形通吃：origin（http://127.0.0.1:8899）/"
+                        " v1 基（…/v1）/ 全路径（…/v1/chat/completions），统一归一")
     r.add_argument("--timeout", type=float, default=900)
     r.add_argument("--concurrency", type=int, default=1)
     r.add_argument("--only", default="", help="comma-separated categories")
@@ -393,13 +433,17 @@ if __name__ == "__main__":
     if n.selftest:
         sys.exit(selftest())
     if n.cmd == "run":
+        # EQ-11：--url 三形归一（bench_url 唯一构造处）；错形在此即拒起（首行 ERROR
+        # 摘要 + exit 2），不再进前置门打一次必败请求。旧正确形（全路径）逐字节不变。
+        url = bench_url.chat_completions(n.url, flag="--url", prog="qeval.py")
         key, hit = read_key(n.key_file, n.key_var)
         if not hit:
             print(f"note: {n.key_var} 未在 {n.key_file} 命中（不回显任何值）", file=sys.stderr)
-        sys.exit(run(n.label, n.url, n.timeout, n.concurrency,
+        sys.exit(run(n.label, url, n.timeout, n.concurrency,
                      [x for x in n.only.split(",") if x], n.limit, key, n.out_dir))
     elif n.cmd == "compare":
         sys.exit(compare(n.a, n.b))
     else:
-        ap.print_help()
-        sys.exit(64)
+        # EQ-11：缺子命令从「print_help 到 stdout + exit 64」改为契约化拒起
+        # （首行 ERROR 摘要到 stderr + exit 2；usage 移到摘要之后）
+        ap.error("缺子命令：期望 `run <label>` 或 `compare <a> <b>`（--selftest 可单用）")
