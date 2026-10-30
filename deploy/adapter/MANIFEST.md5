@@ -11,6 +11,21 @@
 # 校验工具=tools/adapter-manifest-verify.sh（只读、内建注释过滤、逐件 md5 对 manifest、
 #   输出「N 件差异」机器可判结果）。勿拿清单行数 vs 文件数判缺件——本头部注释行不是条目
 #   （外部手册 P3-7 假缺件教训：注释逐词被当路径=凭空多出假缺件）。
+# 漂移注记（EQ-12 遗留处置步，2026-10-30 0.3.4re 批登记面收口）：下两件预存漂移经备份链/git 史/
+#   时间戳考古确证=B1 清单（2026-10-13 收录）后工作面正典演进而非篡改，条目随本注同日重钉——
+#   ① roce_ar.py 932fe12b→67031536：I14-C repo 面补丁产物（本仓 commit d05dfc1 2026-10-25；补丁对
+#     repo 基 932fe12b 应用；档=战役仓 docs/plan/033-W1/G-BL-REANCHOR-OVERLAY-20261024.md+
+#     W6-WINDOW-REPORT-20261025.md）。真树（~/migrate-assets/dsv41/adapter）在役对应=de401d20（同补丁
+#     对产线形 f61e0183 应用；10-24 四机全等+git apply CLEAN+18/18 行对位在档；.bak-pre-we=932fe12b
+#     留底亲核）。本树=repo 面（公开正典形），与真树在役值有意不同源。
+#   ② sitecustomize.py 55b1e412→b4822e37：同 I14-C 窗 repo 面产物（同 commit d05dfc1；45/45 行对位
+#     在档）。真树在役链=55b1e412→beb131ab（A6 10-19）→45ca6e3e（G-BL 10-24）→dd69c59a（D121
+#     BYPASS 采用，10-28 23:37 落盘；档=STANDARD-TESTS-CLOSURE-20261029.md BL-BYP1+runbook-034 DG2+
+#     GUARD-HARDENING-20261029.md；正典副本战役仓 tools/bypass/ 互证、.bak-pre-bypb-20261028=
+#     45ca6e3e 留底亲核）。
+#   其余预存漂移 3 件（build_repack_cuda.sh 4746845c→fe3036ec、lm_cert.py 995be63c→c597393c、
+#   tl_segment.py 6977551f→3fe062db）=面谱系/脱敏差候选，无逐件新值登记可确证，本步未动呈批留裁
+#   （adapter-manifest-verify 实测该 3 件差异在案）。
 ffdd73ec12640fd888a5dbf342aacad5  ./a23_parity_core.py
 237a96f33924622114e28f4a6265e712  ./a23_prefill_ar.py
 ecabf17bf87448a0c17a4b3c3cbfa4e3  ./admission_gate.py
@@ -69,7 +84,7 @@ a45d82265366da9ad8c48fe5c088160f  ./prefill_empty_cache.py
 10b88b24c3d5fd8813bbee5d4866b290  ./repack_cuda.cu
 70f3bf8d7262e7f9b182309a48ccd291  ./replay_guard.py
 49b9bd2aaafb7ee731db0433a8c7af6e  ./replicated_split.py
-932fe12b5736959afa0a257e15c16acd  ./roce_ar.py
+67031536b97bf56be42438195a98bc2c  ./roce_ar.py
 93a2c82369478ca3f232f5e1f3099a43  ./roce_gather.py
 7bc9870fe7e9aec2397979d98f49f801  ./router_live.py
 f012b36343939c277144c75a1eb10324  ./row_store.cpp
@@ -78,7 +93,7 @@ f012b36343939c277144c75a1eb10324  ./row_store.cpp
 35905ebecb164cca84fc1f200110097f  ./selection_dump.py
 ff392acfe559fe823a9d6e0180f5da88  ./shared_pad_k.py
 6e4a4d5107171b56b8b8922a2674de05  ./sitecustomize-wire-v2.diff
-55b1e412e867d4b20891ec6ba8ee0194  ./sitecustomize.py
+b4822e37d8945d4dfef08fa52ab3de38  ./sitecustomize.py
 e7dc1c44f30569876ef5f73db7499539  ./skip_nonfinal_decoder.py
 eb53ea124e09da51224d7c066a69fa46  ./spark_prefill_split.py
 d57656d29906b3c2d5b9b8e06da4183d  ./sparse_wire.py
