@@ -3,6 +3,22 @@
 > TOOLS31-PACKAGE-PLAN-20261012 §二 P1 承载。整备位=战役仓 `tools/packages/fabric-net/`；
 > 烘焙位=`/opt/dsv41/packages/fabric-net/`（**guards/ 族=宿主侧守护件不入镜像**，部署面
 > 分发——00-BAKED-BY-0.2.8「它是载荷不是运行时守卫」律：判据全来自宿主 /proc//sys 接口）。
+>
+> **外部采用者必读（2026-10-30 加）**：
+> 1. **兄弟仓取件**：织网全套运行件（拓扑生成器 plan.py/inventory.sh、mesh-up/mesh-down、
+>    hairpin.sh、qos.sh、systemd 引导单元对、fabricctl、topology.json 正典生成位）在
+>    基础设施仓 **`luxingcom/aicad-nccl-optimization`**（见仓库 README「基础设施仓」段）；
+>    本包收编的是织网**判据/守护/诊断**面。`grep` 本仓找不到织网安装件≠缺件。
+>    环网从零部署全程见 `docs/RING-DEPLOY.md`。
+> 2. **站点适配**：本包 guards/diag 内的期望值（topology.json 的 hosts 键/路由/PFC 期型）
+>    与哨兵的运行参数均为**作者站点采样**——hosts 键必须改成你本站真主机名
+>    （守卫用 `socket.gethostname()` 取键）；路由字段按 `ip route` 打印形写（主机路由不带
+>    `/32`）；fabric-sentinel 需显式设 `SENTINEL_IMAGE/SENTINEL_MASTER_ADDR/SENTINEL_W1-W3`
+>    （缺参拒跑；2026-10-30 参数化，此前为作者站硬编码）。适配三步详见
+>    `docs/RING-DEPLOY.md` §7。
+> 3. 2026-10-30 修复：fabric-sentinel idle 门兼容 `{"loads":[…]}` 包裹形、带外判据改
+>    浮点比较（此前 verdict 恒 0 永不告警）；fabric-doctor `--json` 在 _lib 失锚时
+>    显式 exit 2（此前静默失能）。
 
 ## 为什么存在
 

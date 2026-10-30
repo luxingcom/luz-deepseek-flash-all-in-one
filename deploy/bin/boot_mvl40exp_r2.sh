@@ -87,7 +87,9 @@ memavail(){ awk '/MemAvailable/{printf "%d", $2/1024}' /proc/meminfo; }
 # ── 0. 臂 env 解析+驱动约定键+A4 黑名单 ──────────────────────────────────────
 [ -f "$ARM_ENV_FILE" ] || die "ARM_ENV_FILE 缺：$ARM_ENV_FILE"
 ARM_KEYVALS=()
-while IFS= read -r line; do
+# 2026-10-30 修复（外部站点 bug 报告）：尾行守护——env 文件末尾缺换行时 while read
+# 会静默丢最后一行（常为关键开关）；lint 件自带同款守护会照常 PASS（split-brain）。
+while IFS= read -r line || [ -n "$line" ]; do
   [[ -z "$line" || "$line" == \#* ]] && continue
   ARM_KEYVALS+=("$line")
 done < "$ARM_ENV_FILE"

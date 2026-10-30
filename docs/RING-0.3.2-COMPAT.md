@@ -22,6 +22,11 @@
 或把 `B12X_ROCE_PEER_HCA_MAPS` 带进交换机形，都会在 C 层/NCCL 面 fail-closed 或
 静默走错口对。两形只能整套切换。
 
+> **PEER_HCA_MAPS 是属主映射表**：参考 env 里的该键值编码的是**作者站点的物理接线**
+> （哪个节点的哪个口连哪两个对端）。外部采用者**必须按本站 rank×口实测重生成**，
+> 照抄必挂（报错会点名具体 rank 的 `ibv_modify_qp(RTR): Connection timed out`）。
+> 实测方法与四条硬约束见 `docs/RING-DEPLOY.md` §4。
+
 ## 2. 环网可以直接用的 0.3.2 件
 
 ### 2.1 质量与量具（无拓扑依赖，立即用）

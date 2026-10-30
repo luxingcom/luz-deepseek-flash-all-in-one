@@ -1,5 +1,10 @@
 # cfgmgmt（P5 配置管理包）
 
+> **代际声明（2026-10-30 加）**：本包内 env 树/boot 链指纹表（boot-chain.md5：
+> r3-boot-arm `c051bb41` 等）为 **0.3.1 时点快照**，早于 0.3.2 终态（r3-boot-arm 生产形
+> `20f22bc6`）。0.3.2 在役锚以 `deploy/reconstruct/0.3.2/` 与 `UPGRADE-0.3.2.md` 为准；
+> 本包的 keydiff/keycheck/admregen/genmf 工具本身代际无关可照用，指纹表勿当 0.3.2 锚。
+>
 > TOOLS31-PACKAGE-PLAN-20261012 §二 P5 承载。整备位=`tools/packages/cfgmgmt/`；烘焙位=
 > `/opt/dsv41/packages/cfgmgmt/`（env 树与 golden 树=配置参照载荷可入镜像；部署真源=
 > 宿主 bind mount 面，镜像内只读参照——RECIPE 排除清单注记边界）。

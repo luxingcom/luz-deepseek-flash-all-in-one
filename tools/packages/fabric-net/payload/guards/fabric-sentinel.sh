@@ -10,18 +10,30 @@
 # 基线带：fabric-guard.json sentinel.band_us（--baseline 模式 5 发建带）
 # 用法：fabric-sentinel.sh [--baseline]
 set -u
-STATE=/opt/dsv41-mesh/state/fabric-guard.json
-ALERTS=/opt/dsv41-mesh/fabric-alerts.log
+STATE="${SENTINEL_STATE:-/opt/dsv41-mesh/state/fabric-guard.json}"
+ALERTS="${SENTINEL_ALERTS:-/opt/dsv41-mesh/fabric-alerts.log}"
 NE_CTN="${NODE_EXPORTER_CTN:-aicad-node-exporter}"
 API="${SENTINEL_API:-http://127.0.0.1:8899}"
 MODE="${1:-check}"
-PROBE_PY=~/migrate-assets/dsv41/sentinel/ar_probe.py
-IMAGE="192.168.5.187:5000/lmsysorg/sglang:main-79cafec0"
+# ── 站点参数（2026-10-30 参数化；外部站点 bug 报告：此前为作者站硬编码——旧网段
+#    registry IP/主机名/家目录路径在站外必然失效。带 :? 的三项必设，缺一即拒跑）──
+# 探针资产根（四机同路径可达：共享家目录或逐机同位）：其下应有
+#   dsv41/sentinel/ar_probe.py、nccl-ringonly/（含 libnccl.so.2.30.7）、ncclpin.so
+ASSETS="${SENTINEL_ASSETS:-$HOME/migrate-assets}"
+# 探针镜像：任意可达 registry 的 sglang 同族镜像（torch AR 探测用，非引擎镜像）
+IMAGE="${SENTINEL_IMAGE:?须设置，例 SENTINEL_IMAGE=<registry:port>/lmsysorg/sglang:<tag>}"
+# head 机 fabric 子网地址（rank0 rendezvous 用）
+MASTER_ADDR="${SENTINEL_MASTER_ADDR:?须设置：head 机 fabric 子网 IP}"
+# 三台 worker 的 ssh 可达主机名（对应 rank1/2/3）
+W1="${SENTINEL_W1:?须设置：rank1 worker 主机名}"
+W2="${SENTINEL_W2:?须设置：rank2 worker 主机名}"
+W3="${SENTINEL_W3:?须设置：rank3 worker 主机名}"
 PIP_NCCL=/opt/sglang/lib/python3.12/site-packages/nvidia/nccl/lib/libnccl.so.2
 MPORT="${SENTINEL_MPORT:-29617}"
-# root 跑法（systemd/sudo）下 ssh 免密钥在用户侧——root 时降身用户跑 ssh；docker root 直用
-if [ "$(id -u)" = 0 ]; then SSH="sudo -u liux***ya ssh -o BatchMode=yes -o ConnectTimeout=8"
+# root 跑法（systemd/sudo）下 ssh 免密钥在用户侧——root 时降身该用户跑 ssh；docker root 直用
+if [ "$(id -u)" = 0 ] && [ -n "${SENTINEL_SUDO_USER:-}" ]; then SSH="sudo -u $SENTINEL_SUDO_USER ssh -o BatchMode=yes -o ConnectTimeout=8"
 else SSH="ssh -o BatchMode=yes -o ConnectTimeout=8"; fi
+PROBE_PY="$ASSETS/dsv41/sentinel/ar_probe.py"
 
 ts(){ date -u +%FT%TZ; }
 alert(){ echo "[SENTINEL $(ts)] $*" | tee -a "$ALERTS"; logger -t fabric-sentinel -p daemon.err "$*"; }
@@ -33,14 +45,16 @@ running=$(python3 -c "
 import json
 try:
   j=json.loads('''$loads''')
-  ws=j if isinstance(j,list) else [j]
+  # 2026-10-30 修复（外部站点 bug 报告）：兼容 {\"loads\":[…]} 包裹形（引擎实返形）——
+  # 此前只认顶层 list，包裹形下恒读 0 → 真实在飞请求时 idle 门盲判放行 GPU 探测
+  ws=j['loads'] if isinstance(j,dict) and isinstance(j.get('loads'),list) else (j if isinstance(j,list) else [j])
   print(sum(int(w.get('num_running_reqs',w.get('running_reqs',0)) or 0) for w in ws))
 except Exception: print(-1)")
 waiting=$(python3 -c "
 import json
 try:
   j=json.loads('''$loads''')
-  ws=j if isinstance(j,list) else [j]
+  ws=j['loads'] if isinstance(j,dict) and isinstance(j.get('loads'),list) else (j if isinstance(j,list) else [j])
   print(sum(int(w.get('num_queue_reqs',w.get('waiting_reqs',0)) or 0) for w in ws))
 except Exception: print(-1)")
 if [ "$health" != 200 ] || [ "$running" != 0 ] || [ "$waiting" != 0 ]; then
@@ -63,24 +77,25 @@ NCCL_ENV="-e NCCL_NET=IB \
  -e \"LD_PRELOAD=/opt/ncclpin.so:$PIP_NCCL\""
 RUN_HC() {  # RUN_HC <rank> <host|-> <extra-timeout-s>
   local r=$1 h=$2 ito=$3
-  local uhome=/home/liux***ya   # 固定用户路径（root 跑法下 $HOME=/root 会失锚——docker -v 静默建空目录）
+  # 2026-10-30 参数化：挂载根随 SENTINEL_ASSETS（原为作者家目录硬编码；root 跑法下
+  # $HOME=/root 会失锚——docker -v 静默建空目录，务必显式设 SENTINEL_ASSETS）
   local cmd="docker run --rm --name $NCTN-r$r --network host --ipc host --gpus all \
     --device /dev/infiniband --memory 8g --ulimit memlock=-1 --ulimit stack=67108864 \
-    -v $uhome/migrate-assets/nccl-ringonly:/opt/nccl-ringonly:ro \
-    -v $uhome/migrate-assets/ncclpin.so:/opt/ncclpin.so:ro \
-    -v $uhome/migrate-assets/nccl-ringonly/libnccl.so.2.30.7:$PIP_NCCL:ro \
-    -v $uhome/migrate-assets/dsv41/sentinel:/sentinel:ro \
+    -v $ASSETS/nccl-ringonly:/opt/nccl-ringonly:ro \
+    -v $ASSETS/ncclpin.so:/opt/ncclpin.so:ro \
+    -v $ASSETS/nccl-ringonly/libnccl.so.2.30.7:$PIP_NCCL:ro \
+    -v $ASSETS/dsv41/sentinel:/sentinel:ro \
     $NCCL_ENV \
-    -e MASTER_ADDR=192.168.5.186 -e MASTER_PORT=$MPORT -e WORLD_SIZE=4 -e RANK=$r \
+    -e MASTER_ADDR=$MASTER_ADDR -e MASTER_PORT=$MPORT -e WORLD_SIZE=4 -e RANK=$r \
     $IMAGE python3 /sentinel/ar_probe.py"
   if [ "$h" = "-" ]; then timeout $ito $cmd; else timeout $ito $SSH "$h" "$cmd"; fi
 }
 
 probe(){  # 发射一轮 → stdout=median_us（空=失败）
   local log=/tmp/fabric-sentinel-probe.$$
-  RUN_HC 1 dgxspark02 240 >"$log.w1" 2>&1 &
-  RUN_HC 2 dgxspark04 240 >"$log.w2" 2>&1 &
-  RUN_HC 3 dgxspark03 240 >"$log.w3" 2>&1 &
+  RUN_HC 1 "$W1" 240 >"$log.w1" 2>&1 &
+  RUN_HC 2 "$W2" 240 >"$log.w2" 2>&1 &
+  RUN_HC 3 "$W3" 240 >"$log.w3" 2>&1 &
   RUN_HC 0 - 240 >"$log.h" 2>&1
   wait
   grep -h -m1 "^AR32M_US_MEDIAN" "$log.h" 2>/dev/null | awk '{print $2}'
@@ -121,8 +136,10 @@ fi
 v=$(probe)
 if [ -z "$v" ]; then echo "[sentinel] 本轮无读数（工具面失败，留痕不告警——避免工具故障误报性能带外）"; exit 0; fi
 verdict=0
-if [ "$v" -gt "$hi" ]; then verdict=1; alert "CRIT 哨兵带外：32MB AR ${v}us > 带${lo}-${hi}us（中值×1.25）——环境劣化形（OPEN-28 家族）分钟级告警"; fi
-[ "$v" -lt "$lo" ] && { echo "[sentinel] 带下越（${v}us < ${lo}us，更快=环境变好或量具面异动，留痕不告警）"; verdict=0; }
+# 2026-10-30 修复（外部站点 bug 报告）：ar_probe.py 输出为 %.1f 浮点（如 2496.5），
+# bash [ -gt ] 对浮点报"需要整数表达式"且判恒假 → 此前 verdict 恒 0 永不告警。改 awk 浮点比较。
+if awk -v v="$v" -v hi="$hi" 'BEGIN{exit !(v>hi)}'; then verdict=1; alert "CRIT 哨兵带外：32MB AR ${v}us > 带${lo}-${hi}us（中值×1.25）——环境劣化形（OPEN-28 家族）分钟级告警"; fi
+awk -v v="$v" -v lo="$lo" 'BEGIN{exit !(v<lo)}' && { echo "[sentinel] 带下越（${v}us < ${lo}us，更快=环境变好或量具面异动，留痕不告警）"; verdict=0; }
 python3 - "$STATE" "$v" "$verdict" <<'PYEOF'
 import json,sys,os,datetime
 state,v,verdict=sys.argv[1],sys.argv[2],sys.argv[3]

@@ -13,7 +13,15 @@
 set -u
 PKG_LIB="$(cd "$(dirname "$0")/../../.." && pwd)/_lib"
 # shellcheck source=../../_lib/verdict.sh
-[ -f "$PKG_LIB/verdict.sh" ] && . "$PKG_LIB/verdict.sh"
+# 2026-10-30 修复（外部站点 bug 报告）：PKG_LIB 固定上溯三级，五包未同根部署时
+# verdict.sh 缺位曾被静默跳过 → --json 三字段出口失能且无报错。现 --json 时
+# 显式 fail-closed（exit 2），不再静默。
+if [ -f "$PKG_LIB/verdict.sh" ]; then
+  . "$PKG_LIB/verdict.sh"
+elif [[ " $* " == *" --json "* ]]; then
+  echo "fabric-doctor: _lib 层级失锚（$PKG_LIB/verdict.sh 缺位）——五包须同根部署；--json 出口需要 verdict.sh，拒绝静默降级" >&2
+  exit 2
+fi
 
 DEVLIST="enp1s0f0np0 enp1s0f1np1 enP2p1s0f0np0 enP2p1s0f1np1"
 HCAS="rocep1s0f0 rocep1s0f1 roceP2p1s0f0 roceP2p1s0f1"

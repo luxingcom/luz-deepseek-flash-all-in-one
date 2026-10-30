@@ -231,7 +231,10 @@ SPEC_EXTRA_ARGS="--prefill-decode-interval 16 --max-queued-requests 32 --min-fre
 ## 9. 验收门（boot 后先过这一组）
 
 1. `curl -s http://127.0.0.1:8898/health` = 200；网关侧 8899/8001 健康。
-2. 四机 `printenv` 与 CBX1A env 逐字；`docker inspect` 的 `Config.Cmd` 含九参。
+2. 四机 `printenv` 与 CBX1A env 逐字；九参直证用
+   `docker exec <ctn> sh -c 'tr "\0" "\n" < /proc/1/cmdline'`（或 `tools/serve_flags_gate.sh`）。
+   **不要用 `docker inspect` 的 `Config.Cmd`**——它只反映镜像设计意图；经 wrapper/entrypoint
+   起栈时不反映真实 argv，据此会把已配好的参数误判成缺失（外部站点实测踩坑）。
 3. 横幅 `banner complete: 29 gates`；池 `max_total_num_tokens=9600000`；
    O12/R1/FL6/page/CERT 横幅齐。
 4. 面指纹四机全等：adapter 树、overlay 29 件、IMAGE digest。
@@ -375,3 +378,78 @@ bash <repo>/deploy/reconstruct/0.3.2/verify.sh   # 期望 RECON-KIT PASS
 - [性能与质量量具](tools/bench/README.md)（PR/DE/GSM8K/qeval/needle）
 - [部署指南](docs/DEPLOY-GUIDE.md) · [switch-fabric 分支](https://github.com/luxingcom/luz-deepseek-flash-all-in-one/tree/switch-fabric)
 - [CHANGELOG](CHANGELOG.md) · [FORM-REGISTRY](docs/registry/FORM-REGISTRY-031.md)
+
+**文档治理批（2026-10-30 新增，外部采用者优先读）**：
+[入门导览](docs/GETTING-STARTED.md) · [公开术语表](docs/GLOSSARY-PUBLIC.md) ·
+[从零部署主路径](docs/DEPLOY-STEP-BY-STEP.md) · [环网形部署](docs/RING-DEPLOY.md) ·
+[排障词典](docs/PITFALLS-AND-FAQ.md) · [量具口径全集](docs/CALIBER-AND-MEASUREMENT.md) ·
+[运行参数词典](docs/RUNTIME-PARAMETERS.md) · [已知现象](docs/KNOWN-ISSUES.md)
+
+## 15. 停机窗五步（每次重靴都用，2026-10-30 增）
+
+外部站点实测教训的固化。**任何跳步都可能对着还在跑的机器再点一次火。**
+
+1. **备份四件**：env 文件、boot 脚本、overlay 整目录、adapter 清单——各 `cp -p` 带
+   时戳备份（四机都要）。重靴之后旧形就不存在了，"改后再补 before"是空话。
+2. **存旧栈日志**：`docker logs <ctn> > <带时戳文件>`——**删容器前必存**，容器一删
+   日志即失，排障就没了第一现场。
+3. **停栈**：`CTN_PREFIX=<你的产线前缀> R3_STOP_VERIFY=1 bash deploy/bin/r3-stop.sh`。
+   两个硬要点：**前缀必须显式给**（脚本默认前缀是测试线名——不显式给时它会打印
+   "head removed ×4"全绿，而你的产线容器纹丝不动，此事故已在案）；**`R3_STOP_VERIFY=1`
+   才启用拆后三查**（缺省 0=不查）。
+4. **硬断言，不信自报**：
+   ```bash
+   test "$(docker ps --format '{{.Names}}' | grep -c '<你的前缀>')" = "0" || exit 1
+   curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:<PORT>/health   # 期望 000
+   ```
+   任一不满足就中止，**绝不进入沉降/点火**。
+5. **沉降 ≥600 秒**：拆靴到点火之间静候，**禁以"容器已净"替代计时**——快速重启
+   会造成首请求 940 级慢窗（warm 前后差一个数量级）；多靴切换建议 ≥30 分钟。
+
+配套两查：点火前 `crontab -l | grep reboot` 确认 `@reboot` 自启不会撞你的窗口
+（四机是单一靴槽，撞锁顺序不确定）；`BOOT_EXIT=2` 且日志只有两三行=锁被别人占了
+（你这靴根本没跑），三步定性：看容器是否已被点起→对 `StartedAt` 与锁内 `start=`→
+取运行 argv 核对是不是你的配置。详见[排障词典](docs/PITFALLS-AND-FAQ.md)二面。
+
+## 16. 通信面铁律（2026-10-30 增）
+
+**通信档位是"绑定项"，不是"可选调优"——任何"清理多余参数"的操作都不许动它。**
+
+- **两键在役的形态**（0.3.1 环网形与早期 switched 形：`SGLANG_ROCE_MAX_SIZE` /
+  `DSV41_ROCE_GATHER` 在 env 中生效，演进史见
+  [ENV-CHAIN](deploy/reconstruct/0.3.2/env/ENV-CHAIN.md) 262144→524288→1179648）：
+  新代引擎的高并发路径**硬依赖**更大的通信聚合窗口。回滚实测（同镜像/同 adapter/
+  同量具，A/B/A 三轮）：c1 **−55%**、c4 **−68%**、c8 **−96%**、c16 **−94%**，改回即复原。
+  识别指纹：**并发越高掉得越狠的非单调塌陷**（c8 比 c4 还慢）+ 单请求 tok/s 同步掉
+  = 退回慢路径，不是负载波动、也不是没热透（加重预热不会好转）。
+- **0.3.2 交换机形（CBX1A）**：上述两键已 **RETIRED**（env :27-28 注记），通信面改走
+  **ring-only NCCL 挂载 + `NCCL_IB_HCA` 部署对 + `NCCL_IB_TC=106`**（env :23 语义行）——
+  对本形而言"不许清理"的绑定项就是这三件，道理同上：去掉即脱离新代路径。
+- **A/B 必须在当前代引擎上做**：同一对键在旧代引擎上做 A/B 差值常落噪声带内，会得出
+  "无收益"的反向结论——因为旧代没有依赖该窗口的快速路径。**改代之后，上一代的全部
+  A/B 结论失效，必须重做**；报告读数要写明"这是哪一代引擎上的"。
+
+## 17. 取源顺序与权威层级（2026-10-30 增）
+
+判"缺件/不同源/账目错"之前，按这个顺序取证——三层说清再报，不要只比目录和层数。
+
+1. **判件权威顺序**：镜像烘焙件 > 基础设施仓（dev tip）> 脱敏交付仓副本 > 已装件。
+   拿脱敏仓副本去比镜像内烘焙件，会把"脱敏改写"误判成"包的账错了"（脱敏史见
+   `docs/registry/SANITIZATION-20261013.md`）。
+2. **缺件取源第一顺位=镜像本体**，不是仓库副本：
+   ```bash
+   docker run --rm --entrypoint /bin/sh <IM> -c 'tar -C / -cf - opt/<kit>' > baked.tar
+   ```
+   `grep` 交付仓找不到某件≠没发——织网/拓扑件在基础设施仓（README「基础设施仓」段），
+   交付包小≠缺件。**负结论要写清已穷尽哪几处**（git 全历史/镜像烘焙位/兄弟仓/已装件）。
+3. **镜像身份判据**：digest 只在同一基座层链上相等。比逐层哈希，不比总层数与 digest：
+   ```bash
+   docker inspect --format '{{range .RootFS.Layers}}{{println .}}{{end}}' <IM_A> > /tmp/LA
+   docker inspect --format '{{range .RootFS.Layers}}{{println .}}{{end}}' <IM_B> > /tmp/LB
+   diff /tmp/LA /tmp/LB        # 前 N 层全同=基座同源已证；多出的层看内容
+   ```
+   口径注记：`docker inspect` 报的层数常比构建口径多 1，对表前先统一；内容判据=
+   进容器 `git diff --stat` 为空 + 关键源文件 md5 逐件相等（本仓正典=16 件读回 md5+71 层+单 COPY）。
+4. **清单比对过滤注释行**：adapter 清单一类 md5 表必须
+   `grep -E '^[0-9a-f]{32}  '` 过滤后再比对——否则清单头部的注释行会被当路径解析，
+   凭空多出假"缺件"。

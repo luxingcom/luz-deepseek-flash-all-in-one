@@ -346,15 +346,20 @@ def is_stream(body: bytes) -> bool:
 
 def maybe_inject(body: bytes, path: str) -> bytes:
     """rc3.6（S2 下沉，原 8003 _inject_enable_thinking）：POST chat 路径缺省注入
-    chat_template_kwargs.enable_thinking=true。确定性变换（同 body 恒同输出），
-    在 body_key 之前执行 → 去重键对注入后 body 计算且跨开关各自稳定。
-    字节豁免优先：body 已含 "enable_thinking"（用户显式管理）→ 跳注入跳 parse
-    （保 rc3.4 prefilter 收益）；非法 JSON / 非法顶层结构 → 原样返回走原逻辑。"""
+    chat_template_kwargs.thinking=true + enable_thinking=true（双键）。
+    确定性变换（同 body 恒同输出），在 body_key 之前执行 → 去重键对注入后 body
+    计算且跨开关各自稳定。
+    字节豁免优先：body 已含任一键（用户显式管理）→ 跳注入跳 parse
+    （保 rc3.4 prefilter 收益）；非法 JSON / 非法顶层结构 → 原样返回走原逻辑。
+    2026-10-30 修复（外部站点 bug 报告）：此前只注入 enable_thinking，而本栈
+    V4.1 族 overlay（serving_chat.py）读取的键是 chat_template_kwargs["thinking"]
+    ——单注入 enable_thinking 对 V4.1 族是 no-op（假键）。现双键同注：
+    thinking=V4.1 族生效键；enable_thinking=其他模型族兼容键。"""
     if not INJECT_ENABLE_THINKING:
         return body
     if ("/chat/completions" not in path) and ("/responses" not in path):
         return body
-    if b'"enable_thinking"' in body:
+    if (b'"enable_thinking"' in body) or (b'"thinking"' in body):
         return body                          # 显式管理：不覆盖（T22 断言 2）
     try:
         obj = json.loads(body)
@@ -363,7 +368,8 @@ def maybe_inject(body: bytes, path: str) -> bytes:
         kwargs = obj.get("chat_template_kwargs")
         if not isinstance(kwargs, dict):
             kwargs = {}
-        kwargs.setdefault("enable_thinking", True)
+        kwargs.setdefault("thinking", True)          # V4.1 族 overlay 读取键
+        kwargs.setdefault("enable_thinking", True)   # 其他模型族兼容键
         obj["chat_template_kwargs"] = kwargs
         return json.dumps(obj).encode()
     except Exception:

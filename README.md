@@ -4,9 +4,44 @@
 双 rail RoCE（0.3.2 现役=交换机 flat 形；环网为 0.3.1 历史形）**全栈优化一体化交付（基于 SGLang 上游 `main-79cafec0` 的自有
 优化层，许可注记见 [NOTICE](NOTICE) / [LICENSE](LICENSE)）。
 
+**这个仓是什么**：把一套在四台 DGX Spark 上调到定版的 DeepSeek 推理栈完整交出来——
+镜像构建配方、启动脚本链、环境变量/命令行参数/自研优化件三面配置、网络面（环网与
+交换机两形）、量具与验收门、回退与排障手册，全部入档、可逐字节重建。适合「拿到同类
+硬件、想复现或借鉴整套部署」的工程师。
+
+> **第一次来**：先读 [GETTING-STARTED](docs/GETTING-STARTED.md)（三十分钟入门导览：
+> 五个核心名词、两代网络形态怎么分、请求从客户端到引擎怎么走、第一周常见十问）；
+> 术语随查=[GLOSSARY-PUBLIC](docs/GLOSSARY-PUBLIC.md)（44 条，每条一句话定义+指路）。
+
+## 读者分流表（按你要做的事选入口）
+
+| 你要做什么 | 主读 | 配套 |
+|---|---|---|
+| 第一次接触本仓 | [GETTING-STARTED](docs/GETTING-STARTED.md) | [GLOSSARY-PUBLIC](docs/GLOSSARY-PUBLIC.md) |
+| 从零部署（**交换机 flat 形**=0.3.2 现役） | [DEPLOY-STEP-BY-STEP](docs/DEPLOY-STEP-BY-STEP.md)（主路径） | [RUNTIME-PARAMETERS](docs/RUNTIME-PARAMETERS.md)（逐键词典） |
+| 从零部署（**环网 hairpin 形**=0.3.1 形/回退面） | [RING-DEPLOY](docs/RING-DEPLOY.md) | [RING-0.3.2-COMPAT](docs/RING-0.3.2-COMPAT.md)（两形边界） |
+| 从 0.3.1 升级到 0.3.2 | [UPGRADE-0.3.2](UPGRADE-0.3.2.md) | [DEPLOY-STEP-BY-STEP](docs/DEPLOY-STEP-BY-STEP.md) |
+| 量测/对表/判读 | [CALIBER-AND-MEASUREMENT](docs/CALIBER-AND-MEASUREMENT.md) | [tools/bench/README](tools/bench/README.md)（量具口径） |
+| 排障/查坑（按现象查） | [PITFALLS-AND-FAQ](docs/PITFALLS-AND-FAQ.md)（86 条，现象→根因→判据→处置） | [KNOWN-ISSUES](docs/KNOWN-ISSUES.md)（已知问题+采用方常见误判澄清） |
+| 查某个 env 键 / serve 参数 | [RUNTIME-PARAMETERS](docs/RUNTIME-PARAMETERS.md)（56 键+九参全解） | [deploy/env/](deploy/env/) |
+
+## 先认代际，再抄配置
+
+本仓同时保留 **0.3.1（环网形）** 与 **0.3.2（交换机 flat 形）** 两代档案：同一键两代
+取值可能不同，同一篇里新旧读数并存。**对表、抄 env、看旧报告之前，先确认它在哪一代、
+哪种网络形态上成立**（判别法见 [PITFALLS-AND-FAQ](docs/PITFALLS-AND-FAQ.md) 卷首一）。
+两形整套互斥、不可混拼（[RING-0.3.2-COMPAT](docs/RING-0.3.2-COMPAT.md) §1）。
+
+> **织网件不在本仓，不是缺件**：环网形态所需的 mesh 硬件转发层全套件（拓扑生成器/
+> tc hairpin 规则/systemd 引导单元/守卫自愈）唯一取处=基础设施仓
+> [luxingcom/aicad-nccl-optimization](https://github.com/luxingcom/aicad-nccl-optimization)
+> （详见 §四与 [RING-DEPLOY](docs/RING-DEPLOY.md) §2）。在本仓 grep 不到属正常，
+> 不要据此判「交付缺件」。
+
 > **0.3.2 定版档**：[release note 正典](docs/release/0.3.2-RELEASE-NOTE.md) ·
 > [系列 CHANGELOG](CHANGELOG.md) · [发布索引](docs/release/README.md) ·
-> [重建包](deploy/reconstruct/0.3.2/README.md) · **[升级指南](UPGRADE-0.3.2.md)**。
+> [重建包](deploy/reconstruct/0.3.2/README.md) · **[升级指南](UPGRADE-0.3.2.md)** ·
+> [已知问题与误判澄清](docs/KNOWN-ISSUES.md)。
 > 现役形=CBX1A 56 键 env + SPEC6 九参 + IMAGE `0.3.2-r032c`
 > （digest `sha256:47f6d91a…ffc4`）。0.3.1 为前代定版（tag `v0.3.1`），
 > 其读数在下方保留为历史基线。
@@ -118,6 +153,9 @@ issue #1/#2）+**A10②-a 网关容量四键**（issue #3）；**SPEC6 九参谱
 > **0.3.2 分发面注记**：`0.3.2-r032c` 为内网 registry 在役镜像（公开仓不携带
 > 镜像 tar；大文件不走 GitHub Release）。0.3.1-r3 网盘包（下节）保留为前代
 > 离线分发面；0.3.2 的离线包如需另行制作，以 release note 的镜像 digest 为准。
+> **外部站点取镜像**：上表 registry 直链仅产线内网可达；外部部署请走下节网盘
+> 离线包（0.3.1 面），或按 [重建包](deploy/reconstruct/0.3.2/README.md) 在本站
+> 自行构建 0.3.2 面——不要对着内网直链反复重试。
 
 > **历史注记（vLLM 两形，VL 线已切 SGLang 单基座——单基座交付律，不随网盘分发）**：
 > `vllm/vllm-openai:LuZ0.4.5-DeepSeek-v4-Flash-DGXspark-TP4-Ring-VL-S1-20260910b`
@@ -167,8 +205,11 @@ load/校验/身份核对细则=包内 `README-DIST.md`。GitHub Releases=发布�
 **[tools/bench/README.md](tools/bench/README.md)**。
 **boot 四查**=health 200/printenv 四机逐字/横幅直读/面指纹四机全等；另加
 **起栈接线闸门** `tools/serve_flags_gate.sh`（issue #4 采纳件：从运行进程
-argv 断言 A8/A9 两旗标，只读 fail-closed）。从零部署全流程见
-**[docs/DEPLOY-GUIDE.md](docs/DEPLOY-GUIDE.md)**。
+argv 断言 A8/A9 两旗标，只读 fail-closed）。从零部署**主路径**=
+**[docs/DEPLOY-STEP-BY-STEP.md](docs/DEPLOY-STEP-BY-STEP.md)**（0.3.2 交换机形
+逐步档）；**[docs/DEPLOY-GUIDE.md](docs/DEPLOY-GUIDE.md)** 保留为 0.3.1 基线
+部署档（其 §9 VL 面部署仍有效）；环网形从零部署=
+**[docs/RING-DEPLOY.md](docs/RING-DEPLOY.md)**。
 
 **FL6 召回修复（0.3.1 期，51 键历史定版）**：FL6-PROMO 转正窗已闭 GREEN——0.3.1
 产线现役=51 键修复形 **ENV51 `PROD-R51W5FL6-spec1.env`（2ac74586，服务器在役位名；
@@ -202,6 +243,10 @@ docs/        定版成果：release(0.3.2 RELEASE-NOTE+发布索引)/report(0.3.
              VL-NATIVE 三档)/DEPLOY-GUIDE(含 §9 VL 面部署)/
              ACKNOWLEDGEMENTS(定版 111 条：上游谱系/社区同行/官方资产/外部对照/工具田野)/
              RING-0.3.2-COMPAT(环网形可用边界+已知缺口)/
+             GETTING-STARTED(三十分钟入门)/GLOSSARY-PUBLIC(术语表 44 条)/
+             DEPLOY-STEP-BY-STEP(从零部署主路径·交换机形)/RING-DEPLOY(环网形从零部署)/
+             PITFALLS-AND-FAQ(排障词典 86 条·按现象查)/CALIBER-AND-MEASUREMENT(量测口径正典)/
+             RUNTIME-PARAMETERS(env 56 键+serve 九参词典)/KNOWN-ISSUES(已知问题+误判澄清)/
              deploy/DEADLOCK-MITIGATION-AND-FORENSICS-20261018(0.3.2 死锁规避+py-spy 取证包)
 deploy/      服务面全集：env(0.3.1 历史形+CBX1A 现役+VL 四臂)/bin(r3 链+VL 双臂 boot+冒烟量具)/
              reconstruct/0.3.2(现役形逐文件重建包：env/adapter/overlay/b12x/image/weights/boot)/

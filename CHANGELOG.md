@@ -3,6 +3,45 @@
 > 提炼自战役仓 git log（`luz-0.3.0-r1`（2026-10-05，32c6acd）之后 632 commits）
 > 与总卡/定稿报告。逐项档锚见 `docs/` 各分档。
 
+## 2026-10-30 公开面修复与文档治理批（0.3.2-p1）
+
+> 来源：外部镜像部署站点回传的两本踩坑手册（升级/部署篇，97 条编号条目）+
+> 一份思考流质量证据包，全部逐条核验后处置。核验记录与误报澄清见
+> [`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md) §2。
+
+**代码修复五件**（每处带出处注释；bash -n / py_compile / 功能抽测全绿）：
+
+1. `deploy/bin/r3-boot-arm.sh`、`boot_mvl41_native.sh`、`boot_mvl40exp_r2.sh`：
+   env 注入循环加**尾行守护**（`|| [ -n "$line" ]`）——env 文件末尾缺换行时
+   `while read` 静默丢末行，而 env-lint 件自带守护会照常 PASS（lint 绿但键丢）。
+2. `tools/packages/gateway/payload/concurrency_proxy_v2.py`：思考链注入改**双键**
+   （`chat_template_kwargs.thinking`〔V4.1 族 overlay 实读键〕+
+   `enable_thinking`〔其他模型族兼容键〕）——此前单注入 `enable_thinking`
+   对 V4.1 族是 no-op（假键）。
+3. `tools/packages/fabric-net/payload/diag/fabric-doctor.sh`：`--json` 在
+   `_lib` 层级失锚时显式 `exit 2`（此前静默跳过=三字段出口失能无报错）。
+4. `tools/packages/fabric-net/payload/guards/fabric-sentinel.sh`：idle 双确认门
+   兼容 `{"loads":[…]}` 包裹形（此前只认顶层 list，包裹形下恒读 0/0=在飞请求盲判）。
+5. 同文件：带外判据改 **awk 浮点比较**（`ar_probe.py` 输出 `%.1f` 浮点，
+   `[ -gt ]` 恒假=verdict 恒 0 永不告警）；站点绑定全面参数化
+   （`SENTINEL_ASSETS/IMAGE/MASTER_ADDR/W1-W3/SUDO_USER`，缺参拒跑），
+   清除旧网段 registry/主机名/家目录硬编码。
+
+**md5 变化**：`r3-boot-arm.sh` 公开件自 `9ac6e113` 起变（以 `md5sum` 实测为准，
+头注有变更记录）；其余四件同理。产线内部源形不受影响——本批为公开仓独立修复，
+内部产线面同步另窗承载。
+
+**文档治理（八件新增 + 六处补注）**：新增 `docs/GETTING-STARTED.md`、
+`docs/GLOSSARY-PUBLIC.md`、`docs/DEPLOY-STEP-BY-STEP.md`（从零部署主路径，承接
+DEPLOY-GUIDE）、`docs/RING-DEPLOY.md`（环网形部署）、`docs/PITFALLS-AND-FAQ.md`
+（排障词典，手册 97 条全量吸收）、`docs/CALIBER-AND-MEASUREMENT.md`（量具口径
+全集）、`docs/RUNTIME-PARAMETERS.md`（运行参数词典）、`docs/KNOWN-ISSUES.md`
+（已知现象，含思考流重复退化判词与缓解）；`UPGRADE-0.3.2.md` §9 验收门勘正
+（argv 直证替代 `Config.Cmd`）+新增 §15 停机窗五步/§16 通信面铁律/§17 取源顺序；
+`docs/RING-0.3.2-COMPAT.md` 加 PEER_HCA_MAPS 属主映射表警示；
+`tools/packages/cfgmgmt/README.md` 加 0.3.1 时点快照代际声明；
+`tools/packages/fabric-net/README.md` 加外部采用者必读（兄弟仓取件+站点适配）。
+
 ## 0.3.2 基线回滚点（2026-10-22；tag `v0.3.2-baseline-20261022`）
 
 - 以 r032c OCI index `sha256:47f6d91ada988d7a828be5dd87faeec53b0cd633f617bbfbd850468080e2ffc4`

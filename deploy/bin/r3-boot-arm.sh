@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # ── 交付仓快照注记（2026-10-20 参面全同步；非活件）────────────────────────────
 # 本件=产线现役形快照镜像（GH-PUSH 遗留-2 兑现）：源形 md5=20f22bc63c63b47ea4a1a0edbafec3b7
-# （四机 ~/migrate-assets/bin/ 同体；cfgmgmt 包锚=FINGERPRINT 5ebac6ca〔第十五滚〕boot-chain.md5
-#  r3-boot-arm 行同钉；0.3.2 终态五件套成员，IMAGE 指针=0.3.2-r032c）。参面=NCCL 部署双 rail 对
+# （四机 ~/migrate-assets/bin/ 同体；作者内部 cfgmgmt 包锚=FINGERPRINT 5ebac6ca〔第十五滚〕
+#  boot-chain.md5 r3-boot-arm 行同钉——**注意：本仓 tools/packages/cfgmgmt/ 内的 boot-chain.md5
+#  是 0.3.1 时点快照（c051bb41），与源形不同钉属已知代际差，勿据彼表判本件漂移**；
+#  0.3.2 终态五件套成员，IMAGE 指针=0.3.2-r032c）。
+# 2026-10-30 公开面修复（外部站点 bug 报告）：ARM_ENV_FILE 注入循环加尾行守护
+#  （env 文件末尾缺换行时旧版静默丢末行）——修复后 md5 以 md5sum 实测为准，
+#  变更记录见 CHANGELOG.md 2026-10-30 条。参面=NCCL 部署双 rail 对
 # rocep1s0f0,roceP2p1s0f1+NCCL_IB_TC=106（TOS/PEER_HCA 退役）+环网补丁链全链退役（RETIRED 注记）+
 # SERVER_ARGS 九参（含 A8 --tool-call-parser deepseekv41/A9 --enable-cache-report/--sleep-on-idle）
 # +D15 五门断言段在役。与源形唯一差异=用户名路径掩码（/home/liux***ya/，三处；源形为实值）。
@@ -441,8 +446,11 @@ if [[ -n "${GATE_FORM:-}" ]]; then
 fi
 
 # ── ARM 注入面（doc102 W1 单变量开臂）：ARM_ENV_FILE 每行一个 KEY=VAL，注入 COMMON_ENV ──
+# 2026-10-30 修复（外部站点 bug 报告）：read 循环加尾行守护 || [ -n "$line" ]——
+# env 文件末尾缺换行时 while read 会静默丢掉最后一行（恰常为关键开关），且
+# r3-gate-env-lint.sh 的 lint 循环自带同款守护会照常 PASS，形成"lint 绿但键丢"。
 if [[ -n "${ARM_ENV_FILE:-}" && -f "$ARM_ENV_FILE" ]]; then
-  while IFS= read -r line; do
+  while IFS= read -r line || [ -n "$line" ]; do
     [[ -z "$line" || "$line" == \#* ]] && continue
     COMMON_ENV+=(-e "$line")
     echo "[arm] +env $line"
