@@ -1,0 +1,76 @@
+# R033 FI072 writer amax-floor removal patch (G-k byte-gate A-verdict) -- 0.3.3 F2C staging (2026-10-25)
+# 呈裁件（未应用；staging 面）：D52 附裁 A（DECISIONS-RESOLVED-20261024.md 第十三批）——
+#   G-k 设备面对拍 gauss 带 3,072 B 失配的唯一语义根因=0.7.2 writer 对「比值」下限
+#   （fmaxf(amax/448, 1e-4)，最小 scale 2^-13、字节≥114），而 0.6.18 族在役参考对
+#   「amax」先下限再除（clamp(amax,1e-4)/448，零行 scale 2^-22、字节 105）。本补丁去外层
+#   比值 floor、保留 amax 内层下限（参考语义一致），2 文件：kernel 1 行语义改动 + 注释/文档串同步。
+# 法源：
+#   GK-BYTEMISMATCH-ANALYSIS-20261025.md §1.2 表行 1（唯一实证差异；bf16 全域穷举：分歧 iff
+#   amax<=448*2^-14=0.02734375，真实数据命中 ~10^-53，唯零/近零组触发）、§3.1 变体 A-1
+#   （GK 报告原案=「:164 去掉外层 fmaxf(…, kAmaxFloor)（1 行）＋k 值域注释（:165，k∈[-22,120]）
+#   ＋文档串两处同步（.cu:21-23、_api.py:1604-1606）」；本件即该案，doc 串换行扩展致行数略超估计）。
+#   D52 裁定原文：「A 附裁批准（wheel 侧 1 行 kernel 补丁去外层 floor+doc 串同步，~4 行 2 文件，
+#   staging 面呈裁件，随 F2 承接窗容器内应用，生产零影响）」。
+# 基底（精确制 diff 源=fi072.whl md5 78be27fe8783f2881fdd71762ac6dd94 只读解包 /tmp，与
+#   logs/S-FIS0-STAGING-20261018/fi072-unpacked 参照件逐字节一致核验）：
+#   flashinfer/data/csrc/sparse_mla_sm120/cake_dsv41_fp8_cache_ops.cu  md5 81089c1519f624581f14684ea378356f
+#   flashinfer/mla/_sparse_mla_sm120/_api.py                          md5 0d673bd2e72f42b6f9db39160b4dc799
+# 改动面（8 行 2 文件：kernel 语义 1 行+注释 2 行+文档串 5 行）：
+#   1) cake_dsv41_fp8_cache_ops.cu:164  ratio=fmaxf(__fdiv_rn(fmaxf(amax,kAmaxFloor),kE4m3Max),kAmaxFloor)
+#      -> ratio=__fdiv_rn(fmaxf(amax,kAmaxFloor),kE4m3Max)   ← 唯一语义行（去外层比值 floor）
+#   2) 同文件 :165 注释 k∈[-13,120] -> [-22,120]（amax=1e-4 下限下 ratio_min=1e-4/448，
+#      pow2_ceil_exponent -> k=-22，零行 scale 字节 114->105）
+#   3) 同文件 :161 注释与 :21-22 文档串公式同步为 clamp(amax,1e-4)/448 形（smallest scale 2^-22）
+#   4) _api.py:1604-1606 pack API 文档串同一公式同步（消除「bit-identical to the torch
+#      reference quantizer」主张与 0.6.18 族参考在 amax<=0.0273 域的矛盾面）
+# 影响面（GK §3.1 评估承袭）：仅 amax<=0.02734375 的组变字节（真实数据 ~10^-53 命中；零填充行
+#   字节 114->105）；UE8M0 字节 105 对读者合法（读侧按 2^(b-127) 泛型解码，零码×任意 scale=0，
+#   读者零改）；生产零影响（staging 面呈裁件，未应用）。
+# 应用（staging 容器内，whl 解包/pip target 安装树根 -p1）：
+#   git apply -p1 r033-fi072-writer-amax-floor-remove.patch   # 后随 JIT 重建（源 hash 变更自动触发）
+# 回退：git apply -R -p1 r033-fi072-writer-amax-floor-remove.patch（逐字节回基底）。
+--- a/flashinfer/data/csrc/sparse_mla_sm120/cake_dsv41_fp8_cache_ops.cu
++++ b/flashinfer/data/csrc/sparse_mla_sm120/cake_dsv41_fp8_cache_ops.cu
+@@ -18,8 +18,9 @@
+ // B/token: 512 B E4M3 covering all 512 dims including RoPE + a 16 B footer of
+ // 16 UE8M0 scales, one per 32-wide group) read by the SM120 sparse-MLA kernels'
+ // main (SWA) cache path. The conversion mirrors the FlashMLA FP8 FOOTER torch
+-// trajectory bit for bit: scale = 2^ceil(log2(max(amax / 448, 1e-4))) with
+-// amax clamped at 1e-4 (so the smallest scale is 2^-13), values divided by the
++// trajectory bit for bit: scale = 2^ceil(log2(clamp(amax, 1e-4) / 448)) with
++// amax clamped at 1e-4 before the division (so the smallest scale is 2^-22),
++// values divided by the
+ // power-of-two scale (exact) and converted with round-to-nearest-even
+ // saturating E4M3. Non-finite inputs follow the torch trajectory as well: a
+ // NaN anywhere in the group gives a 0xFF scale byte and 0x7F (NaN) codes; an
+@@ -158,11 +159,11 @@
+       codes[i] = isinf(values[i]) ? 0x7F : (signbit(values[i]) ? 0x80 : 0x00);
+     }
+   } else {
+-    // scale = 2^ceil(log2(max(max(amax, 1e-4) / 448, 1e-4))); the division is the
++    // scale = 2^ceil(log2(max(amax, 1e-4) / 448)); the division is the
+     // only inexact step of the reference and must round to nearest (the module
+     // builds with -use_fast_math).
+-    const float ratio = fmaxf(__fdiv_rn(fmaxf(amax, kAmaxFloor), kE4m3Max), kAmaxFloor);
+-    const int k = pow2_ceil_exponent(ratio);  // k in [-13, 120] for fp16 / bf16 inputs
++    const float ratio = __fdiv_rn(fmaxf(amax, kAmaxFloor), kE4m3Max);
++    const int k = pow2_ceil_exponent(ratio);  // k in [-22, 120] for fp16 / bf16 inputs
+     scale_byte = static_cast<uint8_t>(k + 127);
+     const float inv_scale = __uint_as_float(static_cast<uint32_t>(127 - k) << 23);  // 2^-k
+ #pragma unroll
+--- a/flashinfer/mla/_sparse_mla_sm120/_api.py
++++ b/flashinfer/mla/_sparse_mla_sm120/_api.py
+@@ -1601,9 +1601,10 @@
+         ``[num_pages, page_size, 512]``. A singleton latent-head axis is also
+         accepted in HND or NHD position. All 512 values per token (RoPE dims
+         included) are quantized in groups of 32 to E4M3 with one UE8M0
+-        (power-of-two) scale per group: ``scale = 2**ceil(log2(max(amax /
+-        448, 1e-4)))`` with ``amax`` clamped at ``1e-4``, values divided by
+-        the scale and rounded to nearest-even E4M3 saturating at 448 (the
++        (power-of-two) scale per group: ``scale = 2**ceil(log2(clamp(amax,
++        1e-4) / 448))`` with ``amax`` clamped at ``1e-4`` before the division
++        (smallest scale ``2**-22``), values divided by the scale and rounded
++        to nearest-even E4M3 saturating at 448 (the
+         FlashMLA FP8 FOOTER trajectory; bit-identical to the torch reference
+         quantizer used by the FlashInfer tests). A NaN in a group writes a
+         ``0xFF`` scale byte and ``0x7F`` codes; an infinite group writes a

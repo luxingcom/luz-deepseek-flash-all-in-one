@@ -1,0 +1,26 @@
+{
+  "schema": "yoco-l1-meta-v1",
+  "kind": "visible_window",
+  "case_id": "05_vw_window_matrix_w2",
+  "description": "Window matrix W=2 with span longer than W (visible window wider than causal) and span shorter than W; padding rows present.",
+  "swa_window": 2,
+  "chunk": 32,
+  "expect": "match",
+  "padded_num_tokens": 100,
+  "requests": [
+    {
+      "seq_len": 40,
+      "prefix_len": 8,
+      "extend_len": 32,
+      "req_pool_index": 0,
+      "image_offsets": [[12, 30]]
+    },
+    {
+      "seq_len": 16,
+      "prefix_len": 0,
+      "extend_len": 16,
+      "req_pool_index": 1,
+      "image_offsets": [[10, 11]]
+    }
+  ]
+}

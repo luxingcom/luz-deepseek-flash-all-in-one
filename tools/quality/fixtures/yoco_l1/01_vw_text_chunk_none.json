@@ -1,0 +1,26 @@
+{
+  "schema": "yoco-l1-meta-v1",
+  "kind": "visible_window",
+  "case_id": "01_vw_text_chunk_none",
+  "description": "Pure text chunk -> compute_visible_window_overrides returns None (dsv4_visible_window.py:97-98); chunk-boundary helpers still operate on the request's old (prefix-resident) image spans.",
+  "swa_window": 128,
+  "chunk": 256,
+  "expect": "none",
+  "requests": [
+    {
+      "seq_len": 300,
+      "prefix_len": 128,
+      "extend_len": 172,
+      "req_pool_index": 0,
+      "image_offsets": []
+    },
+    {
+      "seq_len": 400,
+      "prefix_len": 200,
+      "extend_len": 200,
+      "req_pool_index": 1,
+      "image_offsets": [[20, 80]],
+      "boundary_probes": [25, 50, 150, 80]
+    }
+  ]
+}

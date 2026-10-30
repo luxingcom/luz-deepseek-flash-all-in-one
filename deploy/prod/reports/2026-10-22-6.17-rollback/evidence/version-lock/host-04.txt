@@ -1,0 +1,51 @@
+host=dgxspark04
+utc=2026-10-23T00:56:05Z
+kernel=6.17.0-1031-nvidia
+driver=580.173.02
+kmod=580.173.02
+grub_default=GRUB_DEFAULT="1>2"
+--- version-lock check ---
+[version-lock] OK kernel=6.17.0-1031-nvidia driver=580.173.02 holds=29 lock=22 guard=7 pins=/etc/apt/preferences.d/99-prod-version-lock grub=1>2
+--- holds (kernel/nvidia guard set) ---
+libnvidia-cfg1-580	580.173.02-1ubuntu1
+libnvidia-common-580	580.173.02-1ubuntu1
+libnvidia-compute-580	580.173.02-1ubuntu1
+libnvidia-decode-580	580.173.02-1ubuntu1
+libnvidia-encode-580	580.173.02-1ubuntu1
+libnvidia-extra-580	580.173.02-1ubuntu1
+libnvidia-fbc1-580	580.173.02-1ubuntu1
+libnvidia-gl-580	580.173.02-1ubuntu1
+libnvidia-gpucomp-580	580.173.02-1ubuntu1
+libxnvctrl0	610.57.04-1ubuntu1
+linux-headers-6.17.0-1031-nvidia	6.17.0-1031.31
+linux-image-6.17.0-1031-nvidia	6.17.0-1031.31
+linux-image-nvidia-hwe-24.04	7.0.0-1019.19~24.04.2
+linux-modules-6.17.0-1031-nvidia	6.17.0-1031.31
+linux-modules-nvidia-580-6.17.0-1031-nvidia	6.17.0-1031.31
+linux-modules-nvidia-580-open-7.0.0-1019-nvidia	7.0.0-1019.19~24.04.2+2
+linux-modules-nvidia-580-open-nvidia-hwe-24.04	7.0.0-1019.19~24.04.2+2
+linux-nvidia-6.17-headers-6.17.0-1031	6.17.0-1031.31
+linux-nvidia-6.17-tools-6.17.0-1031	6.17.0-1031.31
+linux-nvidia-hwe-24.04	7.0.0-1019.19~24.04.2
+linux-tools-6.17.0-1031-nvidia	6.17.0-1031.31
+nvidia-compute-utils-580	580.173.02-1ubuntu1
+nvidia-firmware-580-580.173.02	580.173.02-0ubuntu0.24.04.1
+nvidia-kernel-common-580	580.178.04-0ubuntu0.24.04.1
+nvidia-kernel-source-580-open	580.178.04-0ubuntu0.24.04.1
+nvidia-modprobe	610.57.04-1ubuntu1
+nvidia-persistenced	580.173.02-1ubuntu1
+nvidia-settings	610.57.04-1ubuntu1
+nvidia-utils-580	580.173.02-1ubuntu1
+holds_total=29
+--- auto-upgrade units ---
+once=masked
+nvidia-spark-ota-check.timer=masked
+apt-daily.timer=masked
+apt-daily-upgrade.timer=masked
+prod-version-lock.timer=enabled
+version_lock_service=success
+--- full-upgrade simulation (kernel/nvidia only) ---
+NONE
+is_system_running=running
+failed_units=0
+prod-version-lock.timer_active=active

@@ -1,0 +1,25 @@
+{
+  "schema": "yoco-l1-meta-v1",
+  "kind": "combine",
+  "case_id": "11_combine_visible_window_swa_win",
+  "description": "v4vl-79cafec0 HAS_SWA_WIN arm (dsv4_sparse_prefill_kernels.py:84-91): per-query visible windows from an image span wider than W (span 23 tokens vs W=8 -> swa_win_max_len 30 > W, eff_window widens the combined row per utils:166-173); second request stays causal. The o12c1-prod arm of the same fixture runs causal-only (no swa_win params in that tree).",
+  "swa_window": 8,
+  "chunk": 64,
+  "combine": {
+    "compress_ratio": 4,
+    "topk": 16,
+    "topk_width": 16,
+    "swa_win": true,
+    "seed": 13
+  },
+  "requests": [
+    {
+      "seq_len": 40,
+      "prefix_len": 4,
+      "extend_len": 36,
+      "req_pool_index": 0,
+      "image_offsets": [[10, 33]]
+    },
+    { "seq_len": 24, "prefix_len": 8, "extend_len": 16, "req_pool_index": 1 }
+  ]
+}

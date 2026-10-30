@@ -1,0 +1,26 @@
+{
+  "schema": "yoco-l1-meta-v1",
+  "kind": "visible_window",
+  "case_id": "06_vw_window_matrix_w8",
+  "description": "Window matrix W=8: span start at W-1/W inside the chunk, span exactly W long, two spans in one request (multi-block image), queries whose causal left edge clamps at 0.",
+  "swa_window": 8,
+  "chunk": 64,
+  "expect": "match",
+  "padded_num_tokens": 132,
+  "requests": [
+    {
+      "seq_len": 96,
+      "prefix_len": 32,
+      "extend_len": 64,
+      "req_pool_index": 0,
+      "image_offsets": [[39, 47], [50, 58]]
+    },
+    {
+      "seq_len": 24,
+      "prefix_len": 0,
+      "extend_len": 24,
+      "req_pool_index": 1,
+      "image_offsets": [[8, 15]]
+    }
+  ]
+}

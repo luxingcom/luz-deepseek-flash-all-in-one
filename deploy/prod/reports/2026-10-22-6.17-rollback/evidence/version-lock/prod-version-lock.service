@@ -1,0 +1,12 @@
+[Unit]
+Description=Verify production kernel/driver version locks
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/sbin/version-lock.sh check
+Nice=10
+TimeoutStartSec=60
+# Read-only: never changes holds, pins, packages, or running containers.

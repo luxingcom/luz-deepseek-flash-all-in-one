@@ -1,0 +1,187 @@
+{
+  "timestamp": "2026-10-22T16:40:15Z",
+  "mode": "--fast",
+  "checks": [
+    {
+      "status": "PASS",
+      "name": "stack",
+      "detail": "r3prod-head running"
+    },
+    {
+      "status": "PASS",
+      "name": "health",
+      "detail": "HTTP 200"
+    },
+    {
+      "status": "PASS",
+      "name": "server_info",
+      "detail": "tok=9600000 ctx=600000 mrr=16"
+    },
+    {
+      "status": "PASS",
+      "name": "model_id",
+      "detail": "deepseek-v4.1-flash"
+    },
+    {
+      "status": "PASS",
+      "name": "env:dgxspark01",
+      "detail": "56 keys; missing/mismatch=0"
+    },
+    {
+      "status": "PASS",
+      "name": "env:dgxspark02",
+      "detail": "56 keys; missing/mismatch=0"
+    },
+    {
+      "status": "PASS",
+      "name": "env:dgxspark03",
+      "detail": "56 keys; missing/mismatch=0"
+    },
+    {
+      "status": "PASS",
+      "name": "env:dgxspark04",
+      "detail": "56 keys; missing/mismatch=0"
+    },
+    {
+      "status": "PASS",
+      "name": "argv",
+      "detail": "all SPEC6/SPEC1 args present"
+    },
+    {
+      "status": "PASS",
+      "name": "overlay",
+      "detail": "28 overlay mounts"
+    },
+    {
+      "status": "PASS",
+      "name": "in_container_md5",
+      "detail": "serving_chat=3151a2edf2c21e4d3492dff5bbc6ec10 recipe=da98467d3fd7d5019ea025b3d5273a20"
+    },
+    {
+      "status": "PASS",
+      "name": "banner",
+      "detail": "banner29=4 kv_fp4=on lm_cert=built prefill_sp=armed"
+    },
+    {
+      "status": "PASS",
+      "name": "ring:dgxspark01",
+      "detail": "rx=4096"
+    },
+    {
+      "status": "PASS",
+      "name": "ring:dgxspark02",
+      "detail": "rx=4096"
+    },
+    {
+      "status": "PASS",
+      "name": "ring:dgxspark03",
+      "detail": "rx=4096"
+    },
+    {
+      "status": "PASS",
+      "name": "ring:dgxspark04",
+      "detail": "rx=4096"
+    },
+    {
+      "status": "PASS",
+      "name": "kernel:dgxspark01",
+      "detail": "7.0.0-1019-nvidia"
+    },
+    {
+      "status": "PASS",
+      "name": "kernel:dgxspark02",
+      "detail": "7.0.0-1019-nvidia"
+    },
+    {
+      "status": "PASS",
+      "name": "kernel:dgxspark03",
+      "detail": "7.0.0-1019-nvidia"
+    },
+    {
+      "status": "PASS",
+      "name": "kernel:dgxspark04",
+      "detail": "7.0.0-1019-nvidia"
+    },
+    {
+      "status": "PASS",
+      "name": "adapter:dgxspark01",
+      "detail": "fingerprint=c41b1a45 files=97"
+    },
+    {
+      "status": "PASS",
+      "name": "adapter:dgxspark02",
+      "detail": "fingerprint=c41b1a45 files=97"
+    },
+    {
+      "status": "PASS",
+      "name": "adapter:dgxspark03",
+      "detail": "fingerprint=c41b1a45 files=97"
+    },
+    {
+      "status": "PASS",
+      "name": "adapter:dgxspark04",
+      "detail": "fingerprint=c41b1a45 files=97"
+    },
+    {
+      "status": "PASS",
+      "name": "nic:dgxspark01",
+      "detail": "fw=28.50.1002 lossless_buf=523296 trust=dscp"
+    },
+    {
+      "status": "PASS",
+      "name": "nic:dgxspark02",
+      "detail": "fw=28.50.1002 lossless_buf=523296 trust=dscp"
+    },
+    {
+      "status": "PASS",
+      "name": "nic:dgxspark03",
+      "detail": "fw=28.50.1002 lossless_buf=523296 trust=dscp"
+    },
+    {
+      "status": "PASS",
+      "name": "nic:dgxspark04",
+      "detail": "fw=28.50.1002 lossless_buf=523296 trust=dscp"
+    },
+    {
+      "status": "PASS",
+      "name": "gpu_clock:dgxspark01",
+      "detail": "cap_unit=disabled/inactive max_sm=3003MHz (EC auto)"
+    },
+    {
+      "status": "PASS",
+      "name": "gpu_clock:dgxspark02",
+      "detail": "cap_unit=disabled/inactive max_sm=3003MHz (EC auto)"
+    },
+    {
+      "status": "PASS",
+      "name": "gpu_clock:dgxspark03",
+      "detail": "cap_unit=disabled/inactive max_sm=3003MHz (EC auto)"
+    },
+    {
+      "status": "PASS",
+      "name": "gpu_clock:dgxspark04",
+      "detail": "cap_unit=disabled/inactive max_sm=3003MHz (EC auto)"
+    },
+    {
+      "status": "PASS",
+      "name": "fan_policy:dgxspark01",
+      "detail": "EC auto (nvfancontrol module unloaded)"
+    },
+    {
+      "status": "PASS",
+      "name": "fan_policy:dgxspark02",
+      "detail": "EC auto (nvfancontrol module unloaded)"
+    },
+    {
+      "status": "PASS",
+      "name": "fan_policy:dgxspark03",
+      "detail": "EC auto (nvfancontrol module unloaded)"
+    },
+    {
+      "status": "PASS",
+      "name": "fan_policy:dgxspark04",
+      "detail": "EC auto (nvfancontrol module unloaded)"
+    }
+  ],
+  "fails": 0
+}

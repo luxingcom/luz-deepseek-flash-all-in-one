@@ -1,0 +1,25 @@
+{
+  "schema": "yoco-l1-meta-v1",
+  "kind": "has_visible_span",
+  "case_id": "14_has_visible_span_false",
+  "description": "has_visible_window_span False arm: every span either fully before or fully after the extend range (skipped by dsv4_visible_window.py:52-53); non-image items ignored.",
+  "swa_window": 128,
+  "chunk": 256,
+  "requests": [
+    {
+      "seq_len": 512,
+      "prefix_len": 256,
+      "extend_len": 256,
+      "req_pool_index": 0,
+      "image_offsets": [[10, 90]],
+      "non_image_offsets": [[300, 340]]
+    },
+    {
+      "seq_len": 512,
+      "prefix_len": 256,
+      "extend_len": 256,
+      "req_pool_index": 1,
+      "image_offsets": []
+    }
+  ]
+}

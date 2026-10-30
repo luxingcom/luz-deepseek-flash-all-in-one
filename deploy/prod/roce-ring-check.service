@@ -1,0 +1,9 @@
+[Unit]
+Description=Check RoCE host profile; heal only when the engine is stopped
+After=network-online.target
+ConditionPathExists=/sys/class/net/enp1s0f0np0
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/roce-ring-apply.sh heal-if-down
+TimeoutStartSec=90

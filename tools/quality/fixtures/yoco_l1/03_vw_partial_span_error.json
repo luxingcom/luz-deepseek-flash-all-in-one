@@ -1,0 +1,25 @@
+{
+  "schema": "yoco-l1-meta-v1",
+  "kind": "visible_window",
+  "case_id": "03_vw_partial_span_error",
+  "description": "Image block crossing the prefill range must raise ValueError (dsv4_visible_window.py:54-58 'crosses the prefill range') instead of silently changing attention. Left-crossing and right-crossing requests.",
+  "swa_window": 128,
+  "chunk": 256,
+  "expect": "value_error",
+  "requests": [
+    {
+      "seq_len": 600,
+      "prefix_len": 256,
+      "extend_len": 256,
+      "req_pool_index": 0,
+      "image_offsets": [[240, 300]]
+    },
+    {
+      "seq_len": 600,
+      "prefix_len": 256,
+      "extend_len": 256,
+      "req_pool_index": 1,
+      "image_offsets": [[500, 520]]
+    }
+  ]
+}

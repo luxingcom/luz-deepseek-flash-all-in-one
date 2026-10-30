@@ -1,0 +1,57 @@
+{
+ "seed": "needle-20261022",
+ "base": "http://127.0.0.1:8899",
+ "form": "unknown",
+ "form_limit": 131072,
+ "water_m": 8000,
+ "rows": [
+  {
+   "target_tokens": 8192,
+   "est_tokens": 8184,
+   "magic": "bcbdb86e",
+   "prompt_tokens": 5429,
+   "completion_tokens": 6,
+   "elapsed_s": 1.31,
+   "answer_head": "bcbdb86e",
+   "status": "PASS",
+   "pass": true
+  },
+  {
+   "target_tokens": 32768,
+   "est_tokens": 32761,
+   "magic": "082283ed",
+   "prompt_tokens": 21617,
+   "completion_tokens": 4,
+   "elapsed_s": 4.03,
+   "answer_head": "082283ed",
+   "status": "PASS",
+   "pass": true
+  },
+  {
+   "target_tokens": 65536,
+   "est_tokens": 65528,
+   "magic": "b974d81d",
+   "prompt_tokens": 43111,
+   "completion_tokens": 6,
+   "elapsed_s": 8.37,
+   "answer_head": "b974d81d",
+   "status": "PASS",
+   "pass": true
+  },
+  {
+   "target_tokens": 131072,
+   "est_tokens": 131064,
+   "magic": "47866e74",
+   "prompt_tokens": 86248,
+   "completion_tokens": 5,
+   "elapsed_s": 16.95,
+   "answer_head": "47866e74",
+   "status": "PASS",
+   "pass": true
+  }
+ ],
+ "n_pass": 4,
+ "n_fail": 0,
+ "n_skip": 0,
+ "gate_pass": true
+}

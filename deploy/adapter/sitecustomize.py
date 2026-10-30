@@ -204,6 +204,21 @@ class EngramLoader(importlib.abc.Loader):
                     and os.environ.get('SGLANG_ROCE_ALLREDUCE', '0').strip() == '1'):
                 from roce_ar import install_parallel_state as install_roce_ar_ps
                 install_roce_ar_ps(module)
+        elif module.__name__ == 'sglang.srt.observability.metrics_collector':
+            # I14-C (case B): four RoCE AR gauges toward /metrics (INV-07 4.2;
+            # R36-b case A+B merged single arm). Gated on DSV41_ROCE_METRICS=1 AND
+            # an armed RoCE counter surface in THIS process (armed() inside the
+            # module); registration is fail-safe -- any exception prints a REFUSED
+            # banner and never breaks boot or the metrics endpoint. Default-off:
+            # no key -> no gauge, zero behavior change.
+            if os.environ.get('DSV41_ROCE_METRICS', '0').strip() == '1':
+                try:
+                    from roce_metrics_gauge import install_for_hook
+                    install_for_hook(module)
+                except Exception as _roce_gauge_exc:
+                    print(f'[roce_metrics_gauge] REFUSED '
+                          f'{type(_roce_gauge_exc).__name__}: {_roce_gauge_exc}',
+                          flush=True)
         elif module.__name__ == 'sglang.srt.layers.linear':
             # EP1f: column-split of ReplicatedLinear layers over the TP group (bit-exact or off).
             # Gated on DSV41_REPLICATED_SPLIT=<suffix list>, inactive by default.

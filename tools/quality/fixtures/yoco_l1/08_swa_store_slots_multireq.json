@@ -1,0 +1,21 @@
+{
+  "schema": "yoco-l1-meta-v1",
+  "kind": "swa_store",
+  "case_id": "08_swa_store_slots_multireq",
+  "description": "Store slots across multiple requests/pool rows: identical geometry on different req_pool_index rows must translate through each row's req_to_token mapping; offsets cumsum closure across requests; one zero-extend boundary case.",
+  "swa_window": 128,
+  "chunk": 256,
+  "pool": {
+    "row_base": 4321,
+    "row_stride": 11,
+    "full_pool": 100003,
+    "swa_mult": 791,
+    "swa_mod": 7919
+  },
+  "requests": [
+    { "seq_len": 700, "prefix_len": 300, "extend_len": 400, "req_pool_index": 0 },
+    { "seq_len": 700, "prefix_len": 300, "extend_len": 400, "req_pool_index": 3 },
+    { "seq_len": 700, "prefix_len": 300, "extend_len": 400, "req_pool_index": 7 },
+    { "seq_len": 256, "prefix_len": 129, "extend_len": 127, "req_pool_index": 9 }
+  ]
+}

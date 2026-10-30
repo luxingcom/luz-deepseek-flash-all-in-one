@@ -1,0 +1,9 @@
+{
+  "arm_tag": "r3prod-pinned-20261022-161712",
+  "timestamp": "20261022-161712",
+  "boot_rc": 0,
+  "selfcheck_rc": 0,
+  "env_md5": "0729e18d6a93c1c05a82e1a5d528c488",
+  "boot_script_md5": "20f22bc63c63b47ea4a1a0edbafec3b7",
+  "profile": "/home/liuxiaoya/migrate-assets/prod/prod-profile.env"
+}

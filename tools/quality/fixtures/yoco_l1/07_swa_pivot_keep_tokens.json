@@ -1,0 +1,24 @@
+{
+  "schema": "yoco-l1-meta-v1",
+  "kind": "swa_store",
+  "case_id": "07_swa_pivot_keep_tokens",
+  "description": "SWA pivot / keep-tokens matrix (YoCo lo=max(pos-window+1, N-keep, 0) analog at request granularity): fresh whole seq, mid-sequence chunk, decode-like extend=1, seq<W, seq==W-1, seq==W, extend+W-1==seq boundary. build_swa_token_ids vs analytic reference on both overlay trees.",
+  "swa_window": 128,
+  "chunk": 256,
+  "pool": {
+    "row_base": 1234,
+    "row_stride": 7,
+    "full_pool": 100003,
+    "swa_mult": 1009,
+    "swa_mod": 7919
+  },
+  "requests": [
+    { "seq_len": 400, "prefix_len": 0, "extend_len": 400, "req_pool_index": 0 },
+    { "seq_len": 1000, "prefix_len": 600, "extend_len": 400, "req_pool_index": 1 },
+    { "seq_len": 900, "prefix_len": 899, "extend_len": 1, "req_pool_index": 2 },
+    { "seq_len": 64, "prefix_len": 0, "extend_len": 64, "req_pool_index": 3 },
+    { "seq_len": 129, "prefix_len": 1, "extend_len": 128, "req_pool_index": 4 },
+    { "seq_len": 128, "prefix_len": 1, "extend_len": 127, "req_pool_index": 5 },
+    { "seq_len": 127, "prefix_len": 0, "extend_len": 127, "req_pool_index": 6 }
+  ]
+}

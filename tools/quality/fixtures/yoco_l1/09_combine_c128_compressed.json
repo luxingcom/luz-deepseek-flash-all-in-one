@@ -1,0 +1,20 @@
+{
+  "schema": "yoco-l1-meta-v1",
+  "kind": "combine",
+  "case_id": "09_combine_c128_compressed",
+  "description": "Compressed key ranges at c128 (production ratio, topk 64, input topk width 256 > topk): topk_len boundary at (pos+1)%128==0 including pos==c_max*128-1 and ==c_max*128; -1 entries inside the valid prefix; nonzero query_start_loc base (cross-chunk offset rebase, utils docstring 'query_start_loc can include a cross-chunk offset'); SWA segment rebasing into the flat workspace.",
+  "swa_window": 128,
+  "chunk": 256,
+  "combine": {
+    "compress_ratio": 128,
+    "topk": 64,
+    "topk_width": 256,
+    "qsl_base_offset": 512,
+    "swa_win": false,
+    "seed": 11
+  },
+  "requests": [
+    { "seq_len": 512, "prefix_len": 384, "extend_len": 128, "req_pool_index": 0 },
+    { "seq_len": 130, "prefix_len": 0, "extend_len": 130, "req_pool_index": 1 }
+  ]
+}

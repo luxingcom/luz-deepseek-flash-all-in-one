@@ -1,0 +1,397 @@
+# T33-01A overlay-serving-chat patch -- K16 max_tokens + response_format 条件注入
+# (0.3.3 / 2026-10-24 / W5 前置批·recipe 线重基形。呈裁件：未应用。)
+#
+# 与前基件的关系: 本补丁 = tools/patches/t33-01a.overlay-serving-chat.patch（补丁基
+#       b77a736c·前基形，2026-10-24 整合批已应用于交付仓树 c506bab5）的 recipe 线
+#       重基：4 接线区（W1-W4）插入行逐字一致、canonical 内嵌段逐字一致（本批
+#       构建器自前基件 + 行原样搬运，零手写），仅锚点随 recipe 基平移——
+#       W1/W2 上下文未变、行号 +9；W3 前基位 attach_task 后在 recipe 基被 effort
+#       提升三行隔开 → 重定位至提升块后 encode_messages 前（仍 = "encode 前"）；
+#       W4 前基位 prompt_ids 赋值后在 recipe 基为 recipe 编码块+回退赋值 →
+#       重定位至回退赋值后（仍 = "prompt_ids 终值后"）。
+# 目标基: serving_chat.py md5 3151a2edf2c21e4d3492dff5bbc6ec10（recipe 线 /
+#       r032c 容器保形 / 靴路径 01 现役形；来源 ~/migrate-assets/v4vl/
+#       sglang-overlay.o12c1-prod/serving_chat.py，本批只读未触碰）。
+# 回退: `git apply -R` 本补丁；运行期回退=不设下列三键（全部默认关=recipe 现役
+#       行为逐字节不变，任务书 §T33-01A 回退面"overlay 单文件回滚"同承）。
+# 应用前置: 前基件头注"W5 应用前置"四条（env cap 臂决策 / INV-05 §4.6 thinking
+#       键 / tests/quality xfail 处置 / 0-1 靴验证）同承；另 01 vs 02-04 两形部署
+#       形态（本件 vs 前基件并存/择一）为 W5 呈裁项，见
+#       docs/plan/033-W1/W5-PREP-BATCH-20261024.md 任务 2。
+#
+# 语义正典: tools/proto/k16_protocol.py（sentinel 段与本补丁内嵌段逐字一致，
+#           tests/unit/test_k16_protocol.py::test_patch_canonical_identity_recipe 强制）。
+# 语义基线: tests/quality/test_max_tokens_matrix.py::resolve_max_tokens_k16（T33-01C A 层）。
+#
+# 接线点（INV-05 §6 T33-01A 改动面，任务书 §T33-01A 目标 1-4 承载；与前基件同语义）:
+#   W1 模块级: canonical core（三开关默认关）。
+#   W2 _validate_request: >131072 的 400（EFFORT_DEFAULT 门内）+ RF 投影校验（RF_INJECT 门内）。
+#   W3 dsv41 分支（encode 前）: response_format schema-only 注入首条 system
+#      （RF_INJECT 门；tools 在场不注入；json_object 走 grammar 不注入；P6 regex 休眠子门）。
+#   W4 dsv41 分支（prompt_ids 后）: 缺省 effort 注入（Max 131072/其余 65536，thinking 门）
+#      + 显式值收敛/512k pin + input/original/clamped[/pinned=512k] 日志
+#      （EFFORT_DEFAULT 门；写回发生在 to_sampling_params 之前，protocol.py `mct or max_tokens` 同序）。
+#
+--- a/deploy/overlay/o12c1-prod/serving_chat.py
++++ b/deploy/overlay/o12c1-prod/serving_chat.py
+@@ -131,6 +131,310 @@
+ 
+ logger = logging.getLogger(__name__)
+ 
++# ============================================================
++# T33-01A (K16 protocol) canonical core -- 0.3.3 呈裁接线件内嵌段。
++# 语义正典位: tools/proto/k16_protocol.py（sentinel 段逐字一致，
++# tests/unit/test_k16_protocol.py::test_patch_canonical_identity 强制）。
++# 三开关默认关：SGLANG_DSV41_EFFORT_DEFAULT / SGLANG_DSV41_RF_INJECT /
++# SGLANG_DSV41_RF_REGEX；全关 = 现役行为逐字节不变。
++# ---- t33-01a canonical: begin
++# （本标记段会被逐字内嵌进 overlay serving_chat.py 补丁；改动须同步补丁，
++#   tests/unit/test_k16_protocol.py::test_patch_canonical_identity 强制一致）
++# ============================================================
++
++_T33_01A_PROTOCOL_LIMIT = 131072  # K16：显式 >131072 → 400
++_T33_01A_DEFAULT_NON_MAX = 65536  # K16：缺省非 Max 65536（不照搬官方 8192/393216）
++_T33_01A_DEFAULT_MAX = 131072  # K16：缺省 Max 131072
++_T33_01A_PIN_512K = 65536  # K16：512k 档 pin 65536（C8×512k 池位红线）
++_T33_01A_PROMPT_512K_TOKENS = 524288  # 512k 档判定阈（token 计）
++_T33_01A_EFFORT_FLAG = "SGLANG_DSV41_EFFORT_DEFAULT"
++_T33_01A_RF_INJECT_FLAG = "SGLANG_DSV41_RF_INJECT"
++_T33_01A_RF_REGEX_FLAG = "SGLANG_DSV41_RF_REGEX"
++_T33_01A_TRUTHY = ("1", "true", "on", "yes")  # 与 G-RF _rf_inject_enabled 同集
++_T33_01A_REGEX_MAX_LEN = 2048  # P6 regex pattern 长度上限（自有渲染防御位）
++
++
++class T33_01AMaxTokensProtocolError(ValueError):
++    """K16：显式 max_tokens|max_completion_tokens > 131072 的 400 语义。"""
++
++
++def _t33_01a_environ(env=None):
++    if env is None:
++        import os
++
++        env = os.environ
++    return env
++
++
++def _t33_01a_flag(env=None, name=""):
++    """严格真值解析：未设/空白/非真值一律视为关（G-RF 护栏②同律）。"""
++    return str(_t33_01a_environ(env).get(name, "")).strip().lower() in _T33_01A_TRUTHY
++
++
++def _t33_01a_max_tokens_policy_enabled(env=None):
++    return _t33_01a_flag(env, _T33_01A_EFFORT_FLAG)
++
++
++def _t33_01a_rf_inject_enabled(env=None):
++    return _t33_01a_flag(env, _T33_01A_RF_INJECT_FLAG)
++
++
++def _t33_01a_get(obj, name, default=None):
++    """dict / pydantic 对象统一取字段（CPU 测试用 dict，接线层传 request 对象）。"""
++    if isinstance(obj, dict):
++        return obj.get(name, default)
++    return getattr(obj, name, default)
++
++
++def _t33_01a_resolve_max_tokens(
++    requested=None,
++    effort="high",
++    prompt_len=8192,
++    ctx_len=600000,
++    thinking_mode=True,
++):
++    """K16 解析器（任务书 §T33-01A 目标 1/2/4；语义=01C resolve_max_tokens_k16）。
++
++    - requested=None：缺省按 effort 注入——Max 131072、其余 65536；Max 档以
++      thinking_mode=True 为前提（INV-05 §6 排期条款：§4.6 thinking 键验证未闭合时
++      Max 缺省只对显式 thinking=true 生效，不阻塞其余项），关则回落 65536。
++    - 显式 65537-131072：对 Max/非 Max 同权允许（K16；不采纳 AUDIT-05 #5），
++      不静默削顶。
++    - 显式 >131072：raise T33_01AMaxTokensProtocolError（接线层 400）。
++    - 512k 档（prompt_len>=524288）：pin 65536，日志写 pinned=512k。
++    - 其余按 ctx_len − prompt_len − 1 收敛（与官方 resolve_max_tokens 同形）。
++    返回 {"effective": int, "log": {input, original, clamped[, pinned]}}。
++    pool 侧收敛由现役 scheduler 链承载（本模块不重复实现池账）。
++    """
++    log = {"input": prompt_len, "original": requested}
++    if requested is None:
++        base = (
++            _T33_01A_DEFAULT_MAX
++            if (effort == "max" and thinking_mode)
++            else _T33_01A_DEFAULT_NON_MAX
++        )
++    else:
++        if requested > _T33_01A_PROTOCOL_LIMIT:
++            raise T33_01AMaxTokensProtocolError(
++                f"max_tokens/max_completion_tokens is too large: {requested}. "
++                f"This API supports at most {_T33_01A_PROTOCOL_LIMIT} "
++                "completion tokens."
++            )
++        base = requested
++    if prompt_len >= _T33_01A_PROMPT_512K_TOKENS:
++        effective = min(base, _T33_01A_PIN_512K)
++        log["pinned"] = "512k"
++    else:
++        effective = max(1, min(base, ctx_len - prompt_len - 1))
++    log["clamped"] = effective
++    return {"effective": effective, "log": log}
++
++
++def _t33_01a_format_max_tokens_log(log):
++    """K16 日志行：input/original/clamped（+pinned=512k）。"""
++    parts = [
++        "max_tokens_k16",
++        f"input={log.get('input')}",
++        f"original={log.get('original')}",
++        f"clamped={log.get('clamped')}",
++    ]
++    if log.get("pinned") is not None:
++        parts.append(f"pinned={log['pinned']}")
++    return " ".join(parts)
++
++
++def _t33_01a_requested_tokens(request):
++    """(值, 字段名)：max_completion_tokens 优先（protocol.py:1132 同序）。"""
++    mct = _t33_01a_get(request, "max_completion_tokens")
++    mt = _t33_01a_get(request, "max_tokens")
++    if mct is not None:
++        return mct, "max_completion_tokens"
++    if mt is not None:
++        return mt, "max_tokens"
++    return None, "max_tokens"
++
++
++def _t33_01a_validate_requested_limit(requested, env=None):
++    """K16 400 校验（仅策略开关开时生效；关=现役无此校验，行为不变）。"""
++    if not _t33_01a_max_tokens_policy_enabled(env):
++        return None
++    if requested is not None and requested > _T33_01A_PROTOCOL_LIMIT:
++        return (
++            f"max_tokens/max_completion_tokens is too large: {requested}. "
++            f"This API supports at most {_T33_01A_PROTOCOL_LIMIT} "
++            "completion tokens."
++        )
++    return None
++
++
++def _t33_01a_validate_json_schema(schema):
++    """schema 校验后才注入（任务书 A1）：dict + JSON 可序列化。"""
++    if not isinstance(schema, dict):
++        return "json_schema response format requires a JSON object schema."
++    try:
++        import json
++
++        json.dumps(schema)
++    except (TypeError, ValueError):
++        return "json_schema response format schema is not JSON-serializable."
++    return None
++
++
++def _t33_01a_validate_regex_pattern(pattern):
++    """P6 自有渲染防御位：非空字符串 + 长度上限 + 可编译。"""
++    if not isinstance(pattern, str) or not pattern:
++        return "regex response_format requires a non-empty pattern string."
++    if len(pattern) > _T33_01A_REGEX_MAX_LEN:
++        return (
++            "regex response_format pattern exceeds "
++            f"{_T33_01A_REGEX_MAX_LEN} characters."
++        )
++    import re
++
++    try:
++        re.compile(pattern)
++    except re.error as exc:
++        return f"regex response_format pattern is invalid: {exc}"
++    return None
++
++
++def _t33_01a_project_response_format(response_format, env=None, tools_present=False):
++    """request 级 response_format → (schema-only payload | None, 错误串 | None)。
++
++    - 开关未开 / tools 在场（工具约束优先，禁双重约束）/ json_object（走 grammar，
++      prompt 不注入）/ text：payload=None，messages 保持逐字节不变。
++    - json_schema：取 .json_schema.schema_ 投影（schema-only，反例 R3 禁整包外壳）。
++    - regex（P6 休眠位）：须 RF_REGEX+RF_INJECT 双门同开才渲染（无客户证据不启用）。
++    """
++    if tools_present:
++        return None, None
++    if not _t33_01a_rf_inject_enabled(env):
++        return None, None
++    rf_type = _t33_01a_get(response_format, "type")
++    if rf_type == "json_schema":
++        holder = _t33_01a_get(response_format, "json_schema")
++        schema = _t33_01a_get(holder, "schema_") if holder is not None else None
++        if schema is None:
++            return None, (
++                "schema_ is required for json_schema response format request."
++            )
++        err = _t33_01a_validate_json_schema(schema)
++        if err is not None:
++            return None, err
++        return schema, None
++    if rf_type in ("json_object", "text"):
++        return None, None
++    if rf_type == "regex":
++        if not _t33_01a_flag(env, _T33_01A_RF_REGEX_FLAG):
++            return None, None
++        pattern = _t33_01a_get(response_format, "regex")
++        if pattern is None:
++            pattern = _t33_01a_get(response_format, "pattern")
++        err = _t33_01a_validate_regex_pattern(pattern)
++        if err is not None:
++            return None, err
++        return {"type": "regex", "pattern": pattern}, None
++    return None, (
++        f"Unsupported response_format type: {rf_type!r}; expected one of "
++        "text, json_object, json_schema."
++    )
++
++
++def _t33_01a_attach_response_format(messages, payload):
++    """payload=None 原样返回（同一 list 对象，字节不变）；否则深拷贝后写入首条
++    system 的 response_format 字段（无 system 时插入空 system 宿主，同 tools 宿主
++    机制）。"""
++    if payload is None:
++        return messages
++    import copy
++
++    msgs = copy.deepcopy(messages)
++    if not msgs or _t33_01a_get(msgs[0], "role") != "system":
++        msgs.insert(0, {"role": "system", "content": ""})
++    if isinstance(msgs[0], dict):
++        msgs[0]["response_format"] = copy.deepcopy(payload)
++    return msgs
++
++
++def _t33_01a_apply_response_format(messages, request, env=None):
++    """接线层入口（dsv41 分支）：开关/工具/type 判定后 schema-only 注入。
++    校验错误在 _validate_request 阶段已 400，此处防御性跳过。"""
++    response_format = _t33_01a_get(request, "response_format")
++    if response_format is None:
++        return messages
++    payload, _err = _t33_01a_project_response_format(
++        response_format,
++        env=env,
++        tools_present=bool(_t33_01a_get(request, "tools")),
++    )
++    return _t33_01a_attach_response_format(messages, payload)
++
++
++def _t33_01a_validate_chat_request(request, env=None):
++    """_validate_request 钩子：>131072 的 400 + RF 投影校验（各自受门控，
++    两键全关时返回 None，现役校验行为不变）。"""
++    requested, _field = _t33_01a_requested_tokens(request)
++    err = _t33_01a_validate_requested_limit(requested, env=env)
++    if err is not None:
++        return err
++    response_format = _t33_01a_get(request, "response_format")
++    if response_format is not None and _t33_01a_rf_inject_enabled(env):
++        _payload, err = _t33_01a_project_response_format(
++            response_format,
++            env=env,
++            tools_present=bool(_t33_01a_get(request, "tools")),
++        )
++        if err is not None:
++            return err
++    return None
++
++
++def _t33_01a_resolve_for_request(
++    request, prompt_len, ctx_len, thinking_mode=True, effort="high", env=None
++):
++    """门控入口：策略开关关 → None（接线层不动 request，现役链承载）；
++    开 → 对缺省与显式值统一按 K16 解析（显式 >131072 已在 _validate_request
++    阶段 400，此处 raise 为防御位）。"""
++    if not _t33_01a_max_tokens_policy_enabled(env):
++        return None
++    requested, _field = _t33_01a_requested_tokens(request)
++    return _t33_01a_resolve_max_tokens(
++        requested,
++        effort=effort,
++        prompt_len=prompt_len,
++        ctx_len=ctx_len,
++        thinking_mode=thinking_mode,
++    )
++
++
++def _t33_01a_apply_max_tokens(
++    request, prompt_len, context_len, thinking_mode=True, effort="high", env=None
++):
++    """接线层入口（dsv41 分支 prompt_ids 生成后）：写回有效 max_tokens（写客户端
++    实际使用的字段；缺省注入写 max_tokens，protocol.py:1132 `mct or mt` 同序）并
++    打 input/original/clamped[/pinned] 日志。开关关 → None，零改动零日志。"""
++    resolution = _t33_01a_resolve_for_request(
++        request,
++        prompt_len=prompt_len,
++        ctx_len=context_len,
++        thinking_mode=thinking_mode,
++        effort=effort,
++        env=env,
++    )
++    if resolution is None:
++        return None
++    _value, field = _t33_01a_requested_tokens(request)
++    setattr(request, field, resolution["effective"])
++    import logging
++
++    logging.getLogger(__name__).info(
++        "%s", _t33_01a_format_max_tokens_log(resolution["log"])
++    )
++    return resolution
++
++# ============================================================
++# ---- t33-01a canonical: end
++
+ _MEDIA_CONTENT_PART_TYPES = frozenset({"image_url", "video_url", "audio_url"})
+ _CHAT_TEMPLATE_CACHE_MAX_SIZE = 128
+ 
+@@ -1107,6 +1411,14 @@
+             schema = getattr(request.response_format.json_schema, "schema_", None)
+             if schema is None:
+                 return "schema_ is required for json_schema response format request."
++
++        # T33-01A (K16): gated protocol-limit 400 for explicit
++        # max_tokens|max_completion_tokens > 131072 + response_format projection
++        # validation. Inert unless SGLANG_DSV41_EFFORT_DEFAULT /
++        # SGLANG_DSV41_RF_INJECT is enabled (default off = no behavior change).
++        _t33_01a_error = _t33_01a_validate_chat_request(request)
++        if _t33_01a_error is not None:
++            return _t33_01a_error
+ 
+         return None
+ 
+@@ -1602,6 +1914,12 @@
+                 dsv41_reasoning_effort = self._resolve_dsv41_reasoning_effort(
+                     request.reasoning_effort
+                 )
++                # T33-01A: conditional response_format injection (schema-only
++                # into first system; gated by SGLANG_DSV41_RF_INJECT; tools
++                # present -> tool-call constraint wins, no double constraint;
++                # json_object goes via grammar and is NOT prompt-injected).
++                # Inert when the switch is off (messages unchanged).
++                messages = _t33_01a_apply_response_format(messages, request)
+                 real_input, media = encoding_dsv41.encode_messages(
+                     messages,
+                     thinking_mode=thinking_mode,
+@@ -1636,6 +1954,21 @@
+                     )
+                 if prompt_ids is None:
+                     prompt_ids = self.tokenizer_manager.tokenizer.encode(real_input)
++                # T33-01A (K16): effort-based default injection (Max 131072 /
++                # others 65536, thinking-gated) + explicit-value resolution with
++                # input/original/clamped[/pinned=512k] log. Gated by
++                # SGLANG_DSV41_EFFORT_DEFAULT; inert (no write-back, no log)
++                # when the switch is off. Write-back happens before
++                # to_sampling_params (protocol.py: `mct or max_tokens`).
++                _t33_01a_apply_max_tokens(
++                    request,
++                    prompt_len=len(prompt_ids),
++                    context_len=get_model().context_length,
++                    thinking_mode=bool(thinking_mode),
++                    effort=self._resolve_dsv41_reasoning_effort(
++                        request.reasoning_effort
++                    ),
++                )
+             else:
+                 real_input = encoding_dsv32.encode_messages(
+                     messages, thinking_mode=thinking_mode

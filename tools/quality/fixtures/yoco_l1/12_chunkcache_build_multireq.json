@@ -1,0 +1,21 @@
+{
+  "schema": "yoco-l1-meta-v1",
+  "kind": "chunkcache",
+  "case_id": "12_chunkcache_build_multireq",
+  "description": "Full production builder SparsePrefillChunkCache.build on both overlay trees: query_start_loc cumsum, SWA union pivots/slots, c0 SWA-only precompute (topk=0, compress_ratio=1, swa_base=swa_offsets[:-1]), and v4vl-vs-o12c1 cross-tree causal equality. swa_page_size=256 per backend hardcode (deepseek_v4_backend.py:1128).",
+  "swa_window": 128,
+  "chunk": 256,
+  "swa_page_size": 256,
+  "pool": {
+    "row_base": 99,
+    "row_stride": 13,
+    "full_pool": 100003,
+    "swa_mult": 1217,
+    "swa_mod": 7919
+  },
+  "requests": [
+    { "seq_len": 300, "prefix_len": 100, "extend_len": 200, "req_pool_index": 2 },
+    { "seq_len": 1000, "prefix_len": 900, "extend_len": 100, "req_pool_index": 0 },
+    { "seq_len": 128, "prefix_len": 0, "extend_len": 128, "req_pool_index": 1 }
+  ]
+}

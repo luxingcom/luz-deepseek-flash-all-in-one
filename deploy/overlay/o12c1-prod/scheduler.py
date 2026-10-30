@@ -15,6 +15,7 @@
 
 import dataclasses
 import faulthandler
+import json
 import logging
 import math
 import os
@@ -26,7 +27,7 @@ from collections import deque
 from contextlib import contextmanager, nullcontext
 from functools import partial
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Deque, Dict, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Deque, Dict, List, Optional, Set, Tuple, Union
 
 from sglang.srt.runtime_context import (
     SpawnRanks,
@@ -461,6 +462,531 @@ TEST_RETRACT_INTERVAL = envs.SGLANG_TEST_RETRACT_INTERVAL.get()
 TEST_RETRACT_NO_PREFILL_BS = envs.SGLANG_TEST_RETRACT_NO_PREFILL_BS.get()
 
 
+# SCHED_STATS_V1 (T33-03 Phase 1) -- 只读调度账本，env 默认关（零开销）；
+# 类体与 tools/obs/sched_stats_v1.py sentinel 段逐字一致（单测强制）。
+class SchedStatsV1:
+    """SCHED_STATS_V1 只读调度账本（T33-03 Phase 1；默认关，零副作用）。
+
+    热路径入口 on_step/on_skip/on_defer 在 enabled=False 时第一行返回，
+    不读时钟、不分配、不输出。emit 每 interval 步（默认 40）或窗墙钟
+    >= 2.0s（步边界评估，无定时器线程）产出一行
+    ``SCHED_STATS_V1 {json}``（compact separators，allow_nan=False）。
+    """
+
+    SCHEMA = "sched-stats-v1"
+    LINE_PREFIX = "SCHED_STATS_V1"
+    WINDOW_MAX_SEC = 2.0
+    RING_SLOTS = 64
+    MAX_EMIT_FAILURES = 3
+    DEFAULT_INTERVAL = 40
+    ENV_ENABLE = "SGLANG_SCHED_STATS"
+    ENV_INTERVAL = "SGLANG_SCHED_STATS_INTERVAL"
+    ENV_TAG = "SGLANG_SCHED_STATS_TAG"
+    _OFF_VALUES = ("", "0", "false", "off")
+
+    def __init__(
+        self,
+        env: Optional[Dict[str, str]] = None,
+        gamma: int = 0,
+        interval: Optional[int] = None,
+        tag: Optional[str] = None,
+        sink: Optional[Callable[[str], None]] = None,
+        clock: Optional[Callable[[], float]] = None,
+        get_running: Optional[Callable[[], int]] = None,
+        get_waiting: Optional[Callable[[], int]] = None,
+        get_kv: Optional[Callable[[], Tuple[int, int]]] = None,
+        get_graph_bs: Optional[Callable[[], Any]] = None,
+        get_rank: Optional[Callable[[], int]] = None,
+    ) -> None:
+        if env is None:
+            env = os.environ
+        self.enabled = (
+            str(env.get(self.ENV_ENABLE, "0")).strip().lower()
+            not in self._OFF_VALUES
+        )
+        self.gamma = int(gamma or 0)
+        if interval is None:
+            interval = self._parse_interval(env.get(self.ENV_INTERVAL))
+        self.interval = interval
+        if tag is None:
+            tag = str(env.get(self.ENV_TAG, "") or "")
+        self.tag = tag
+        self._sink = sink
+        self._clock = clock if clock is not None else time.monotonic
+        self._get_running = get_running
+        self._get_waiting = get_waiting
+        self._get_kv = get_kv
+        self._get_graph_bs = get_graph_bs
+        self._get_rank = get_rank
+        self._reset_window()
+        self._reset_totals()
+
+    # -- 配置解析 ---------------------------------------------------------
+    @classmethod
+    def _parse_interval(cls, raw: Any) -> int:
+        try:
+            v = int(str(raw).strip())
+        except (TypeError, ValueError):
+            return cls.DEFAULT_INTERVAL
+        return v if v > 0 else cls.DEFAULT_INTERVAL
+
+    # -- 窗口/累计状态 ----------------------------------------------------
+    def _reset_window(self) -> None:
+        self._win_steps = 0
+        self._win_start: Optional[float] = None
+        self._p_steps = 0
+        self._p_busy_us = 0
+        self._p_uncached_tokens = 0
+        self._p_ring = [0] * self.RING_SLOTS
+        self._p_ring_n = 0
+        self._d_steps = 0
+        self._d_busy_us = 0
+        self._d_batch_sum = 0
+        self._d_gen_tokens = 0
+        self._d_us_max = 0
+        self._d_ring = [0] * self.RING_SLOTS
+        self._d_ring_n = 0
+        self._d_spec_steps = 0
+        self._d_spec_batch_sum = 0
+        self._d_spec_gen_tokens = 0
+        self._mixed_steps = 0
+        self._prefill_defer = 0
+        self._skip_noncontig = 0
+        self._skip_health = 0
+        self._skip_range = 0
+
+    def _reset_totals(self) -> None:
+        self._tot_windows = 0
+        self._tot_win_steps = 0
+        self._tot_d_gen_tokens = 0
+        self._tot_d_batch_sum = 0
+        self._tot_d_spec_batch_sum = 0
+        self._tot_d_spec_gen_tokens = 0
+        self._tot_p_uncached_tokens = 0
+        self._emit_fail_tot = 0
+
+    # -- 热路径入口（关=零开销） ------------------------------------------
+    def on_step(
+        self,
+        is_prefill: bool,
+        step_us: int,
+        batch_size: int = 0,
+        gen_tokens: int = 0,
+        extend_num_tokens: int = 0,
+        is_target_verify: bool = False,
+        is_mixed: bool = False,
+    ) -> None:
+        if not self.enabled:
+            return
+        now = self._clock()
+        if self._win_steps == 0:
+            self._win_start = now
+        self._win_steps += 1
+        if is_prefill:
+            self._p_steps += 1
+            self._p_busy_us += step_us
+            self._p_uncached_tokens += extend_num_tokens
+            self._p_ring[self._p_ring_n % self.RING_SLOTS] = step_us
+            self._p_ring_n += 1
+            if is_mixed:
+                self._mixed_steps += 1
+        else:
+            self._d_steps += 1
+            self._d_busy_us += step_us
+            self._d_batch_sum += batch_size
+            self._d_gen_tokens += gen_tokens
+            self._d_ring[self._d_ring_n % self.RING_SLOTS] = step_us
+            self._d_ring_n += 1
+            if step_us > self._d_us_max:
+                self._d_us_max = step_us
+            if is_target_verify:
+                self._d_spec_steps += 1
+                self._d_spec_batch_sum += batch_size
+                self._d_spec_gen_tokens += gen_tokens
+        if self._win_steps >= self.interval or (
+            now - self._win_start >= self.WINDOW_MAX_SEC
+        ):
+            self.emit(now=now)
+
+    def on_skip(self, kind: str) -> None:
+        """早退分支计数（未被计入窗口的步）：health / noncontig / range。"""
+        if not self.enabled:
+            return
+        if kind == "health":
+            self._skip_health += 1
+        elif kind == "noncontig":
+            self._skip_noncontig += 1
+        elif kind == "range":
+            self._skip_range += 1
+
+    def on_defer(self) -> None:
+        """_should_defer_prefill 返回 True 的次数（只计数，不改调度）。"""
+        if not self.enabled:
+            return
+        self._prefill_defer += 1
+
+    # -- 产出面（损坏/半写不崩主流程） ------------------------------------
+    def emit(self, now: Optional[float] = None) -> Optional[Dict[str, Any]]:
+        if not self.enabled:
+            return None
+        try:
+            if now is None:
+                now = self._clock()
+            rec = self._build_record(now)
+            line = self.LINE_PREFIX + " " + json.dumps(
+                rec, separators=(",", ":"), allow_nan=False
+            )
+            if self._sink is not None:
+                self._sink(line)
+        except Exception:
+            rec = None
+        if rec is not None:
+            self._tot_windows += 1
+            self._tot_win_steps += self._win_steps
+            self._tot_d_gen_tokens += self._d_gen_tokens
+            self._tot_d_batch_sum += self._d_batch_sum
+            self._tot_d_spec_batch_sum += self._d_spec_batch_sum
+            self._tot_d_spec_gen_tokens += self._d_spec_gen_tokens
+            self._tot_p_uncached_tokens += self._p_uncached_tokens
+        else:
+            self._emit_fail_tot += 1
+            if self._emit_fail_tot >= self.MAX_EMIT_FAILURES:
+                # 输出面连续损坏：熔断（永不再 emit），调度主流程不受影响。
+                self.enabled = False
+        self._reset_window()
+        return rec
+
+    # -- 记录构造 ---------------------------------------------------------
+    def _build_record(self, now: float) -> Dict[str, Any]:
+        d_busy_s = self._d_busy_us / 1e6
+        p_busy_s = self._p_busy_us / 1e6
+        base_b = base_g = None
+        accept_base = None
+        if self.gamma > 0 and self._d_spec_batch_sum > 0:
+            base_b, base_g, accept_base = (
+                self._d_spec_batch_sum,
+                self._d_spec_gen_tokens,
+                "spec",
+            )
+        elif self._d_batch_sum > 0:
+            base_b, base_g, accept_base = self._d_batch_sum, self._d_gen_tokens, "all"
+        d_accepted = base_g - base_b if base_b is not None else None
+        if accept_base == "spec":
+            d_verified = self.gamma * base_b
+        else:
+            d_verified = None  # γ=0 或窗内无 verify 子集：置 null，不参与判读
+        d_accept_len = (
+            self._fin(base_g / base_b) if base_b is not None and base_b > 0 else None
+        )
+        d_accept_rate = (
+            self._fin(d_accepted / d_verified)
+            if d_verified is not None and d_verified > 0 and d_accepted is not None
+            else None
+        )
+        d_verified_len = self.gamma if accept_base == "spec" and self.gamma > 0 else None
+        d_committed = (
+            self._fin(self._d_gen_tokens / d_busy_s) if d_busy_s > 0 else None
+        )
+        d_full = (
+            self._fin(d_committed * (1 + self.gamma) / d_accept_len)
+            if self.gamma > 0
+            and d_committed is not None
+            and d_accept_len is not None
+            and d_accept_len > 0
+            else None  # γ=0（SPEC=0 臂）不参与双口径判读
+        )
+        p_uncached_tps = (
+            self._fin(self._p_uncached_tokens / p_busy_s) if p_busy_s > 0 else None
+        )
+        kv_free, kv_total = self._snap_kv()
+        kv_used = kv_total - kv_free if kv_total is not None and kv_free is not None else None
+        rec: Dict[str, Any] = {
+            "schema": self.SCHEMA,
+            "tag": self.tag,
+            "rank": self._snap_int(self._get_rank),
+            "gamma": self.gamma,
+            "interval": self.interval,
+            "win_steps": self._win_steps,
+            "win_wall_us": (
+                int((now - self._win_start) * 1e6)
+                if self._win_start is not None
+                else 0
+            ),
+            "ident_ok": self._ident_ok(base_b, base_g, d_accepted, d_accept_len, d_accept_rate, d_verified),
+            "p_steps": self._p_steps,
+            "p_busy_us": self._p_busy_us,
+            "p_uncached_tokens": self._p_uncached_tokens,
+            "p_uncached_tps": p_uncached_tps,
+            "p_step_us_p50": self._pctl(self._ring_values(self._p_ring, self._p_ring_n), 50),
+            "p_step_us_p99": self._pctl(self._ring_values(self._p_ring, self._p_ring_n), 99),
+            "d_steps": self._d_steps,
+            "d_spec_steps": self._d_spec_steps,
+            "d_spec_batch_sum": self._d_spec_batch_sum,
+            "d_spec_gen_tokens": self._d_spec_gen_tokens,
+            "d_batch_sum": self._d_batch_sum,
+            "d_batch_mean": self._fin(self._d_batch_sum / self._d_steps) if self._d_steps else None,
+            "d_gen_tokens": self._d_gen_tokens,
+            "d_accepted": d_accepted,
+            "d_verified": d_verified,
+            "d_accept_len": d_accept_len,
+            "d_accept_rate": d_accept_rate,
+            "d_verified_len": d_verified_len,
+            "d_accept_base": accept_base,
+            "d_committed_tps": d_committed,
+            "d_full_accept_equiv_tps": d_full,
+            "d_step_us_p50": self._pctl(self._ring_values(self._d_ring, self._d_ring_n), 50),
+            "d_step_us_p99": self._pctl(self._ring_values(self._d_ring, self._d_ring_n), 99),
+            "d_step_us_max": self._d_us_max if self._d_steps else None,
+            "d_busy_us": self._d_busy_us,
+            "mixed_steps": self._mixed_steps,
+            "graph_bs_max": self._snap_graph_bs(),
+            "running_after": self._snap_int(self._get_running),
+            "waiting_after": self._snap_int(self._get_waiting),
+            "kv_used": kv_used,
+            "kv_free": kv_free,
+            "kv_total": kv_total,
+            "kv_usage_pct": (
+                self._fin(kv_used / kv_total * 100.0)
+                if kv_used is not None and kv_total
+                else None
+            ),
+            "prefill_defer": self._prefill_defer,
+            "skip_noncontig": self._skip_noncontig,
+            "skip_health": self._skip_health,
+            "skip_range": self._skip_range,
+            "tot_windows": self._tot_windows + 1,
+            "tot_win_steps": self._tot_win_steps + self._win_steps,
+            "tot_d_gen_tokens": self._tot_d_gen_tokens + self._d_gen_tokens,
+            "tot_d_batch_sum": self._tot_d_batch_sum + self._d_batch_sum,
+            "tot_d_spec_batch_sum": self._tot_d_spec_batch_sum + self._d_spec_batch_sum,
+            "tot_d_spec_gen_tokens": self._tot_d_spec_gen_tokens + self._d_spec_gen_tokens,
+            "tot_p_uncached_tokens": self._tot_p_uncached_tokens + self._p_uncached_tokens,
+            "emit_fail_tot": self._emit_fail_tot,
+        }
+        return rec
+
+    def _ident_ok(self, base_b, base_g, d_accepted, d_accept_len, d_accept_rate, d_verified):
+        """每窗账目闭合自检（INV-02 §6.6 硬门；不成立=接线/计数有 bug）。"""
+        if base_b is None or base_g is None:
+            return True
+        ok = base_g == d_accepted + base_b
+        if d_accept_len is not None and d_accept_rate is not None:
+            ok = ok and abs(d_accept_len - (1 + self.gamma * d_accept_rate)) <= 1e-6
+        if d_verified is not None:
+            ok = ok and d_verified == self.gamma * base_b
+        return ok
+
+    # -- 快照（emit 时一次性调用；任何异常→null，绝不抛进调度） ------------
+    def _snap_int(self, fn):
+        try:
+            v = fn() if fn is not None else None
+            return int(v) if v is not None else None
+        except Exception:
+            return None
+
+    def _snap_kv(self):
+        try:
+            if self._get_kv is None:
+                return None, None
+            free, total = self._get_kv()
+            free = int(free)
+            total = int(total)
+            if total <= 0 or free < 0 or free > total:
+                return None, None
+            return free, total
+        except Exception:
+            return None, None
+
+    def _snap_graph_bs(self):
+        try:
+            if self._get_graph_bs is None:
+                return None
+            v = self._get_graph_bs()
+            if v is None:
+                return None
+            if isinstance(v, (list, tuple, set)):
+                ints = [int(x) for x in v if x is not None]
+                return max(ints) if ints else None
+            return int(v)
+        except Exception:
+            return None
+
+    # -- 工具 -------------------------------------------------------------
+    @staticmethod
+    def _fin(x):
+        """非有限浮点→None（保 allow_nan=False 的 dumps 永不抛）。"""
+        if x is None:
+            return None
+        try:
+            xf = float(x)
+        except (TypeError, ValueError):
+            return None
+        return xf if math.isfinite(xf) else None
+
+    @staticmethod
+    def _pctl(xs, q):
+        """nearest-rank 分位：P_q = sorted[ceil(q/100*n)-1]；小样本不外插。"""
+        ys = sorted(xs)
+        n = len(ys)
+        if n == 0:
+            return None
+        i = math.ceil(q * n / 100.0) - 1
+        if i < 0:
+            i = 0
+        if i >= n:
+            i = n - 1
+        return ys[i]
+
+    @staticmethod
+    def _ring_values(ring, n):
+        return ring[: n] if n <= len(ring) else ring[:]
+
+
+# I14-C (T33-08) -- 案 A 低频采样 + 案 B gauge 刷新（0 靴纯开发件 2026-10-24）。
+# 类体/工厂与 tools/obs/roce_i14c.py 逐字一致（单测强制同步）；默认关零开销；
+# env 键 DSV41_ROCE_SYNC_SAMPLE（案 A）/ DSV41_ROCE_METRICS（案 B）；R36-b 合并单臂。
+
+class RoceSyncSampler:
+    """I14-C 案 A 低频采样核心（每 N 个结果一次；query() 门控；异常吞掉计数）。
+
+    热路径（observe 非采样迭代）= 一次自增 + 一次取模比较，零 IO 零时钟。
+    采样迭代：先 `copy_done.query()`，未完成即跳过（skipped_busy），绝不
+    synchronize 阻塞（INV-07 N3 反例）；完成才调 check_fn（其内部
+    synchronize 在事件已完成时立即返回）与 refresh_fn（案 B gauge set()），
+    并产一行 `ROCE_I14C_SAMPLE {json}` 低频日志（周期 stats 口径）。
+    """
+
+    LOG_PREFIX = "ROCE_I14C_SAMPLE"
+
+    def __init__(
+        self,
+        every: int,
+        check_fn: Optional[Callable[[Any], None]] = None,
+        refresh_fn: Optional[Callable[[], None]] = None,
+        log_fn: Optional[Callable[..., None]] = None,
+        stats_fn: Optional[Callable[[], Dict[str, Any]]] = None,
+    ) -> None:
+        self.every = int(every)
+        if self.every <= 0:
+            raise ValueError("RoceSyncSampler: every must be >= 1")
+        self.check_fn = check_fn
+        self.refresh_fn = refresh_fn
+        self.log_fn = log_fn
+        self.stats_fn = stats_fn
+        self.observations = 0
+        self.checked = 0
+        self.skipped_busy = 0
+        self.no_copy_done = 0
+        self.errors = 0
+        self.last_payload: Optional[Dict[str, Any]] = None
+
+    def observe(self, result: Any) -> Optional[Dict[str, Any]]:
+        """对每个 batch result 调用；每 every 个做一次 query() 门控健康检查。"""
+        self.observations += 1
+        if self.observations % self.every != 0:
+            return None
+        copy_done = getattr(result, "copy_done", None)
+        if copy_done is None:
+            self.no_copy_done += 1
+            return None
+        try:
+            done = bool(copy_done.query())
+        except Exception:
+            self.errors += 1
+            return None
+        if not done:
+            # 未完成即跳过：绝不等待（逐 batch synchronize = INV-07 N3 反例）。
+            self.skipped_busy += 1
+            return None
+        self.checked += 1
+        if self.check_fn is not None:
+            try:
+                self.check_fn(copy_done)
+            except Exception:
+                self.errors += 1
+        if self.refresh_fn is not None:
+            try:
+                self.refresh_fn()
+            except Exception:
+                self.errors += 1
+        payload: Dict[str, Any] = {
+            "observations": self.observations,
+            "checked": self.checked,
+            "skipped_busy": self.skipped_busy,
+            "no_copy_done": self.no_copy_done,
+            "errors": self.errors,
+        }
+        if self.stats_fn is not None:
+            try:
+                payload["roce_ar"] = self.stats_fn()
+            except Exception:
+                pass
+        self.last_payload = payload
+        if self.log_fn is not None:
+            try:
+                self.log_fn(
+                    "%s %s",
+                    self.LOG_PREFIX,
+                    json.dumps(payload, separators=(",", ":"), sort_keys=True),
+                )
+            except Exception:
+                self.errors += 1
+        return payload
+
+
+def _make_roce_i14c_sampler():
+    """I14-C 案 A 低频采样 + 案 B gauge 刷新（R36-b A+B 合并单臂；env 默认关 → None）。
+
+    法源: 任务书 §T33-08 目标 3；INV-07 §4.2/§4.3；W4 §5.6 阻清单。
+    DSV41_ROCE_SYNC_SAMPLE=N（N>=1 每 N 个 batch result 一次；0/未设=关）。
+    check_fn 取自 pynccl 面 synchronize_and_check_roce（NCCL 臂无该面 → REFUSED
+    返回 None）；query() 门控、未完成即跳过，绝不逐 batch synchronize。
+    案 B gauge 刷新（adapter roce_metrics_gauge.refresh_gauges，自带
+    DSV41_ROCE_METRICS 门控）随同点低频执行；缺面=静默降级（案 A 单独成立）。
+    """
+    try:
+        every = int(str(os.environ.get("DSV41_ROCE_SYNC_SAMPLE", "0")).strip() or "0")
+    except ValueError:
+        every = 0
+    if every <= 0:
+        return None
+    check_fn = None
+    try:
+        from sglang.srt.distributed.device_communicators import (
+            pynccl as _roce_i14c_pynccl,
+        )
+        check_fn = getattr(_roce_i14c_pynccl, "synchronize_and_check_roce", None)
+    except Exception:
+        check_fn = None
+    if check_fn is None:
+        logger.info(
+            "ROCE_I14C REFUSED pynccl face has no synchronize_and_check_roce"
+        )
+        return None
+    refresh_fn = None
+    try:
+        from roce_metrics_gauge import refresh_gauges as refresh_fn
+    except Exception:
+        refresh_fn = None
+    try:
+        from roce_ar import stats as _roce_ar_stats
+    except Exception:
+        _roce_ar_stats = None
+    sampler = RoceSyncSampler(
+        every=every,
+        check_fn=check_fn,
+        refresh_fn=refresh_fn,
+        log_fn=logger.info,
+        stats_fn=_roce_ar_stats,
+    )
+    logger.info(
+        "ROCE_I14C ARMED every=%d metrics_refresh=%s",
+        every,
+        "on" if refresh_fn is not None else "off",
+    )
+    return sampler.observe
+
+
 STEP_MAX_US = 2_000_000
 
 # Min wall-clock between load publishes on the stalled no-batch path, which
@@ -540,6 +1066,8 @@ class Scheduler(
 
         # Parse args
         self.server_args = server_args
+        self._sched_stats = None  # SCHED_STATS_V1 (T33-03): 默认关
+        self._roce_i14c = None  # I14-C (T33-08): 案 A/B 默认关（None=零开销）
         self.nccl_port = port_args.nccl_port
         self.schedule_policy = get_schedule().schedule_policy
         self.enable_priority_scheduling = get_schedule().enable_priority_scheduling
@@ -1466,6 +1994,8 @@ class Scheduler(
             return False
 
         self._prefill_decode_interval_remaining -= 1
+        if self._sched_stats is not None:
+            self._sched_stats.on_defer()
         return True
 
     def _arm_prefill_decode_interval(self, batch: Optional[ScheduleBatch]) -> None:
@@ -1490,6 +2020,25 @@ class Scheduler(
             metrics_collector_context=self.metrics_collector_context,
             metrics_collector=self.metrics_collector,
         )
+        self._sched_stats = self._init_sched_stats()
+        self._roce_i14c = _make_roce_i14c_sampler()
+
+    def _init_sched_stats(self):
+        """SCHED_STATS_V1 只读账本（env 默认关 → None，热路径单分支检查）。"""
+        stats = SchedStatsV1(
+            gamma=max(
+                int(getattr(get_spec(), "speculative_num_draft_tokens", 0) or 0) - 1, 0
+            ),
+            sink=lambda line: logger.info("%s", line),
+            get_running=lambda: len(self.running_batch.reqs),
+            get_waiting=lambda: len(self.waiting_queue),
+            get_kv=lambda: (
+                self.token_to_kv_pool_allocator.available_size(),
+                self.max_total_num_tokens,
+            ),
+            get_graph_bs=lambda: self.tp_worker.get_decode_cuda_graph_bs(),
+        )
+        return stats if stats.enabled else None
 
     def init_schedule_policy(self):
         # Init schedule policy and new token estimation
@@ -4918,6 +5467,9 @@ class Scheduler(
         # Flush async trace ops here: in overlap mode this CPU work runs while
         # the next batch's GPU forward is in flight, giving free overlap.
         flush_trace_batch(batch.reqs)
+        # I14-C 案 A 低频采样 + 案 B gauge 刷新（默认关：self._roce_i14c=None）。
+        if self._roce_i14c is not None:
+            self._roce_i14c(result)
         snapshot = self.publish_load_snapshot(force=batch.forward_mode.is_extend())
         # Router-facing gauge on the dedicated PUB socket, reusing the
         # snapshot above rather than walking the queues again.
@@ -4964,6 +5516,8 @@ class Scheduler(
         if not (is_prefill or mode.is_decode() or mode.is_target_verify()):
             return
         if all(is_health_check_generate_req(req) for req in batch.reqs):
+            if self._sched_stats is not None:
+                self._sched_stats.on_skip("health")
             return
         if is_prefill and mode.is_split_prefill():
             start_iter, start_ts = batch.split_prefill_start
@@ -4993,21 +5547,42 @@ class Scheduler(
         else:
             # Decode regression uses launch cadence and skips boundaries.
             if not contiguous:
+                if self._sched_stats is not None:
+                    self._sched_stats.on_skip("noncontig")
                 return
             step_us = int((batch.launch_ts - prev_launch_ts) * 1e6)
         if not 0 < step_us < STEP_MAX_US:
+            if self._sched_stats is not None:
+                self._sched_stats.on_skip("range")
             return
         if is_prefill:
             self.total_prefill_busy_us += step_us
             self.total_prefill_uncached_tokens += batch.extend_num_tokens
         else:
             batch_size = len(batch.reqs)
+            gen_tokens = result.get_num_generated_tokens(batch_size)
             _accumulate_decode_moment(
                 self.decode_moment_totals,
                 batch_size,
                 step_us,
-                result.get_num_generated_tokens(batch_size),
+                gen_tokens,
             )
+        if self._sched_stats is not None:
+            if is_prefill:
+                self._sched_stats.on_step(
+                    is_prefill=True,
+                    step_us=step_us,
+                    extend_num_tokens=batch.extend_num_tokens,
+                    is_mixed=bool(getattr(self, "is_mixed_chunk", False)),
+                )
+            else:
+                self._sched_stats.on_step(
+                    is_prefill=False,
+                    step_us=step_us,
+                    batch_size=batch_size,
+                    gen_tokens=gen_tokens,
+                    is_target_verify=mode.is_target_verify(),
+                )
 
     def maybe_send_health_check_signal(self):
         if self.return_health_check_ipcs:

@@ -1,0 +1,7 @@
+utc=2026-10-22T23:59:40Z
+health=200
+max_total_num_tokens=9600000
+context_length=600000
+max_running_requests=16
+model_path=/models/DeepSeek-V4.1-Flash
+r3prod-head Up 23 minutes

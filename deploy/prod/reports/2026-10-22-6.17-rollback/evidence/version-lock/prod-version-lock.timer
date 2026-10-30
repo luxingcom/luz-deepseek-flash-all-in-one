@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodic production kernel/driver version-lock check
+
+[Timer]
+OnBootSec=4min
+OnUnitActiveSec=30min
+AccuracySec=30s
+Persistent=false
+
+[Install]
+WantedBy=timers.target

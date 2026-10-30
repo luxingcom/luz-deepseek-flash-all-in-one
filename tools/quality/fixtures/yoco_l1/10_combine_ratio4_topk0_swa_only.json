@@ -1,0 +1,19 @@
+{
+  "schema": "yoco-l1-meta-v1",
+  "kind": "combine",
+  "case_id": "10_combine_ratio4_topk0_swa_only",
+  "description": "SWA-only combine (topk=0, the c0 precompute shape, utils:418-437) at compress_ratio 4 with W=8: compressed range empty for every query; SWA window min(pos+1, W) with pos+1 == W boundary; short seq (seq < W) clamps at 0.",
+  "swa_window": 8,
+  "chunk": 64,
+  "combine": {
+    "compress_ratio": 4,
+    "topk": 0,
+    "topk_width": 1,
+    "swa_win": false,
+    "seed": 5
+  },
+  "requests": [
+    { "seq_len": 40, "prefix_len": 16, "extend_len": 24, "req_pool_index": 0 },
+    { "seq_len": 9, "prefix_len": 0, "extend_len": 9, "req_pool_index": 1 }
+  ]
+}

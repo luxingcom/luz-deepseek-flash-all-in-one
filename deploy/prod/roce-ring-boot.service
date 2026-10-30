@@ -1,0 +1,16 @@
+[Unit]
+Description=Pin RoCE host profile (ring/firmware/lossless buffer/PFC) for LuZ 0.3.2
+Documentation=file:///usr/local/sbin/roce-ring-apply.sh
+After=network-online.target aicad-roce-tune.service
+Wants=network-online.target
+Before=docker.service
+ConditionPathExists=/sys/class/net/enp1s0f0np0
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/roce-ring-apply.sh apply
+RemainAfterExit=yes
+TimeoutStartSec=90
+
+[Install]
+WantedBy=multi-user.target
