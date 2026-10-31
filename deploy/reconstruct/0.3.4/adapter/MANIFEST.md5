@@ -1,0 +1,82 @@
+# MANIFEST.md5 — reconstruct/0.3.4/adapter 身份备查面逐件 md5（2026-10-31 落位）
+# 与 deploy/adapter/0.3.4-MANIFEST.md5 同口径同律：覆盖本目录全部供给件
+#   （71 *.py canon98 前态正典面 + NOTES.md 备查注记件）；本件自身不计。
+#   find -type f 排除 __pycache__；LC_ALL=C sort；md5sum 同形行。
+# *.py 面正典指纹（fingerprint.py 口径）：count=71 /
+#   manifest-md5=5c2c88eb61411d67d8a040b5407e5e3d /
+#   sitecustomize.py=45ca6e3e1ca0eb34c3ff21abb0023571（与供给位 deploy/adapter 共锚）。
+# 身份备查区：只作正典全文对照不作运行供给；供给位/装钩器/代际=NOTES.md。
+# 验收：cd deploy/reconstruct/0.3.4/adapter && md5sum -c MANIFEST.md5（应全绿）。
+# 格式律（EQ-12 同律）：条目行 / # 注释行 / 空行，其余任何行=格式红。
+f41a5dfd2c664fc622a84c57aba41195  ./NOTES.md
+ffdd73ec12640fd888a5dbf342aacad5  ./a23_parity_core.py
+237a96f33924622114e28f4a6265e712  ./a23_prefill_ar.py
+ecabf17bf87448a0c17a4b3c3cbfa4e3  ./admission_gate.py
+7769a33ecf348d017cf7d0b1b0ce3fc6  ./admission_r1.py
+58a6776149cba5c99e68c31d4b9a8b1c  ./admission_segment.py
+0d0dcb8b02f0b2fefb96401d068ab4da  ./deep_gemm_sm121.py
+81cff577c4d78a304bcfca44880296b7  ./draft_head_fp8.py
+7a5d599218f2d5b1b923b36c71337bba  ./draft_head_fp8_tp4.py
+54490c64b4e24fde304e0bf19420fe75  ./draft_main_proj.py
+2cd8e638ea7b45343d281aede6012728  ./draft_tau.py
+da98467d3fd7d5019ea025b3d5273a20  ./dsv41_recipe.py
+7fd499ca0af802e85d1a1417e78deafc  ./eager_glue.py
+2050bdcb35f55df6c316e431469f21b5  ./engram_backend.py
+1042b3b3499b413ba8d8d15618c39458  ./engram_compact.py
+e1f1874ad2004f697f0a49fe5bf0f818  ./engram_prefetch.py
+0b6f13f163127a0905623e904b4b277e  ./fi_r1/__init__.py
+2fe0c0c3cf06854fbf206cdb828facc1  ./fi_r1/t_r1_equiv.py
+b87cbb5ef00abf8e50510ffddffa7c40  ./fl6_recall.py
+5ef60ec5c6a70dfccd789ea8e3fa05cb  ./folded_result_fence.py
+59df1cc97a8dda2f6fb8377b728363e0  ./hc_fused.py
+930a81b306f940e226f67fda111d58fa  ./idle_release.py
+fd03078d8b43a2936562d7256f2d1e2d  ./indexer_budget.py
+69fca588765d666791eeb9ec262a391c  ./indexer_hoist.py
+7506243285b54ca7a42de7d892c87785  ./kv_fp4.py
+060be9938108cfe75741cc6f8a347011  ./kv_fp4_repack.py
+e8e8675d7087e71254cc9e51373cf2e3  ./l2_prefetch.py
+42438834b1225a4519e73dfc6efd1588  ./l2pf_attn.py
+995be63c0eedea9c4f4538f42aa24614  ./lm_cert.py
+030a8f3fbe3262d4aff87b2fbaaf61fd  ./loop_abort.py
+f213dbea64504a5b13b0cd6267d8e226  ./mm_alloc_hygiene.py
+0aac0402c6e306e5c6d062b35d019046  ./mm_feature_lifecycle.py
+12c8705f28f4753080f3f4060393234f  ./mm_lifecycle_glue.py
+610b710cfff9189ad7ff90a0561a6f22  ./moe_b12x.py
+2cb7a736fb4b63d3908d91f5a6f1a720  ./moe_b12x_next.py
+5827cb7f5d652411cc45cc0baa49a43d  ./mxfp8_b12x.py
+06fa437dc42d77c33aefd5036f0390dd  ./overlay/__init__.py
+2bb6569c851a4a872186085f1c091d7c  ./overlay/a23_forms.py
+1c4443cdc43c661fd074de8b1b3cad6d  ./overlay/a23_group_overlay.py
+000390909260026daad461da9e13cd5b  ./p12_assertion_graph_gather.py
+a45d82265366da9ad8c48fe5c088160f  ./prefill_empty_cache.py
+32cf9abf0b6944fb0db6927d12d76c53  ./prefill_sp.py
+052ceb37c0040067f8dad73c2fd8a7de  ./probe_a23_ar_parity.py
+973f0dbdcd4a16533dc2e8ced9766f7d  ./recipe_lib/deepseek_recipe/__init__.py
+9bfe0111b9ac264fe13063fa33696205  ./reference_impl.py
+70f3bf8d7262e7f9b182309a48ccd291  ./replay_guard.py
+7d6f79b02677e64f1592f41dea7375e6  ./replicated_split.py
+de401d20923652461edc67ea8d1bee89  ./roce_ar.py
+93a2c82369478ca3f232f5e1f3099a43  ./roce_gather.py
+e40f62659d63e9f9aa039a2711cf1295  ./roce_metrics_gauge.py
+7bc9870fe7e9aec2397979d98f49f801  ./router_live.py
+08ca1d4c353786c1a60187550cf1f98d  ./sanity_host.py
+a65797a554f3d4c5a1ef8bc0b9793b3d  ./seam_mount.py
+b6d356cf9446274ed1bad5c9d8dcc59d  ./selection_dump.py
+ff392acfe559fe823a9d6e0180f5da88  ./shared_pad_k.py
+45ca6e3e1ca0eb34c3ff21abb0023571  ./sitecustomize.py
+e7dc1c44f30569876ef5f73db7499539  ./skip_nonfinal_decoder.py
+8427a4c871a176e10bb30129eb16b886  ./spark_prefill_split.py
+0067abc4bdeafe68c1b07e04611aa192  ./sparse_wire.py
+18e38c95971da817405b60f9e423710a  ./spec_sync_free.py
+d2e8a8a717f92a275ed147a69237f492  ./tests/bench_repack_cuda.py
+be1e3031579f10eb09a221c57c334a04  ./tests/test_repack_cuda.py
+fc63622696f7c4b2c7c3fde07891884a  ./tests/test_repack_hybrid.py
+ee34bbb261c0e186d0699f9a2437c0fe  ./tests/test_replay_guard.py
+2644ef9dc1147c4e3019a8c02591c910  ./tests/test_score_budget_knob.py
+b63691cb2e40a692803225ff0250af5f  ./tl_segment.py
+6b9ae44cb31f2823ab08ba691b5f5a97  ./token_req_compact.py
+a04bc949bd92f5abd1807bb1470fd3e9  ./tp3_pad.py
+24d96f9d26693c1bb7210aec3bf144fc  ./triton_kernel.py
+6613d84f7495c7b02c6e7e3ff249625b  ./verify_cap.py
+77cef20f92cff2d2b22381ca7f72c98d  ./verify_cap_static.py
+353aefec508abaf5ccb9c56e26166baa  ./wo_a_w8.py

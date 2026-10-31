@@ -16,7 +16,7 @@
 | ① 镜像 | tag + RepoDigest（见下表） | `docker image inspect <tag> --format '{{range .RepoDigests}}{{.}}{{end}}'` 对 digest |
 | ② boot 镜像行（他处亦称「目行」） | repo 件 `deploy/bin/r3-boot-arm.sh:40` 为注入形 `IMAGE="${IMAGE:?…}"`，tag 实值来自环境变量 IMAGE / prod-profile 的 PROD_IMAGE（同源） | 核 `echo "$IMAGE"`（或 profile 的 PROD_IMAGE）尾部 tag 是否=①的 tag；内部在役件为 :12 字面量形，以 `sed -n '12p'` 核 |
 | ③ overlay 整面 | `deploy/overlay/o12c1-prod/` 29 件 + map，对照权威清单 `deploy/prod/overlay-md5.txt` 逐件核 md5 | `cd deploy/overlay/o12c1-prod && md5sum -c ../../prod/overlay-md5.txt` 应 29 行全绿 |
-| ④ adapter 面 | 99 件；装载缝 `sitecustomize.py`=dd69c59a（含 bypass 钩）、`prefill_bypass.py`=c4875258 | `bash tools/bypass/install-prefill-bypass.sh`（幂等，装好即 OK） |
+| ④ adapter 面 | 99 件（装钩后武装面口径；基底面=98 前态面 sitecustomize=45ca6e3e、交付锚=deploy/adapter/0.3.4-MANIFEST.md5；回正前现树/GitHub main/网盘包实测 sitecustomize=b4822e37 为 EQ-12 重钉漂移代，回正后以 0.3.4-MANIFEST.md5 为准——2026-10-31 注记）；装载缝 `sitecustomize.py`=dd69c59a（含 bypass 钩）、`prefill_bypass.py`=c4875258 | `bash tools/bypass/install-prefill-bypass.sh`（幂等，装好即 OK） |
 | ⑤ env 61 键 | 含第 60 键 `DSV41_PREFILL_BYPASS=2048`、末行（第 61 键）`DSV41_ENGRAM_CACHE_GIB=2`、倒数第三行 `SGLANG_DSV4_KV_LAYOUT=v41` | 数键数+抽查三键值（内容判据，勿套内部 md5 锚） |
 
 ## 一、镜像世代表
@@ -52,6 +52,8 @@ cd deploy/overlay/o12c1-prod && md5sum -c ../../prod/overlay-md5.txt    # 期望
 
 # 5) adapter 面核验/补装（幂等）
 bash tools/bypass/install-prefill-bypass.sh                              # 期望 OK（幂等）或完成 98→99
+#    注：缺省 ADAPTER_DIR=$HOME/migrate-assets/dsv41/adapter（内部四机在役位）；无该位的机
+#    须以 ADAPTER_DIR=<供给面目录绝对路径> 覆盖运行，裸跑必 PANIC exit 9=防呆（2026-10-31 注）
 
 # 6) env 面核验：61 键、第 60 键 BYPASS=2048、末行（第 61 键）ENGRAM_CACHE_GIB=2、倒数第三行 KV_LAYOUT=v41 在位
 

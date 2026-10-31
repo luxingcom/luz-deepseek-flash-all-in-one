@@ -3,12 +3,13 @@
 法源=TLSEGMENT-CARD-20261006.md 案 A（主会话审定 3b97071）+A23RESTART-ENG-CARD
 §二(a) shared tile 网格法。本件是战役 dev 树新文件：**不改在役件任何行**（引擎
 树/adapter 零接触）；install 形=sparse_wire.install_scoring 同法（模块属性 patch，
-scoring.py:192-207 的 score_tiles 调用期读模块全局——单点覆盖 dense topk+块发布+
-块消费三路，full_topk.py:73-78/dense_blocks.py:220,298）。
+scoring.py:210-225 的 score_tiles 调用期读模块全局——单点覆盖 dense topk+块发布+
+块消费三路，full_topk.py:73-74/dense_blocks.py:256,310）。
 
 == 与在役 sparse_wire 的关系（2026-10-05 实测定谳，如实登记）==================
 M0731W2 靴日志直证：0731 线 adapter 挂载（PYTHONPATH=/opt/dsv41/adapter）下
-sparse_wire.install_scoring **常开生效**（seg4-teardown-logs/<prod-log>：「sparse_wire: scoring row-chunk budgets <- ..(deep_gemm
+sparse_wire.install_scoring **常开生效**（seg4-teardown-logs/r3boot-m0731-worker-
+dgxspark04.docker.log：「sparse_wire: scoring row-chunk budgets <- ..(deep_gemm
 2,147,483,648->134217728..)」）——TLSEGMENT-CARD §1.1「0731 现形=stock 2GiB」
 的预算面前提**已被实测推翻**：A4 黑名单剥的是 env 键（arm env 不得设
 DSV41_DENSE_INDEXER_LOGITS_BUDGET_BYTES），不是 install 本体。因此本件 ①预算
@@ -354,7 +355,7 @@ def kernel_probe(inputs: dict) -> dict:
 
     输入 fixtures（O13 窗在役构取，构造面=引擎同源）：
       q      = (q_fp4[rows,heads,64] int8, q_sf[rows,heads] int32)   # 任意位型合法
-      kv     = get_low_ratio_index_k_fp4 产物（full_topk.py:75 同源）
+      kv     = get_low_ratio_index_k_fp4 产物（full_topk.py:73 同源）
       weights= [rows,heads] fp32；starts/lengths=int32；context_lengths=list
     判据（预登记，零事后改）：
       full = flat_index_logits_tiles(budget=STOCK)   ⇒ 单 tile，M=rows（或 stock M）

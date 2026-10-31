@@ -33,6 +33,18 @@
 （期望 `RECON-KIT PASS`）。基座镜像与权重/engram 本体不分发，包内给身份指纹与
 下载后校验清单。
 
+### 0.1 0.3.4 面口径（2026-10-31 增补；上表 87 件/b58e49ff 等为 0.3.2 装配口径行值保留）
+
+0.3.4 **公开树交付面=98 前态面**（canon98 前态正典面；deploy/adapter 整面回正，
+*.py 口径 71 件、sitecustomize.py=`45ca6e3e`），逐件锚=`deploy/adapter/0.3.4-MANIFEST.md5`
+（91 件=71 *.py+20 非 py；`cd deploy/adapter && md5sum -c 0.3.4-MANIFEST.md5` 直验全绿，
+*.py 面正典指纹 manifest-md5=`5c2c88eb`）。**99 武装面**=交付面基础上
+`bash tools/bypass/install-prefill-bypass.sh` 一键升入（sitecustomize 45ca6e3e→`dd69c59a`、
+`prefill_bypass.py`=`c4875258` 入面，面件数 +1；env 门控 DSV41_PREFILL_BYPASS，未设键零突变、
+已装=幂等），细节与武装验收门=[tools/bypass/README.md](../tools/bypass/README.md)、
+[deploy/adapter/README.md](../deploy/adapter/README.md) 权威口径节、
+[IMAGE-UPGRADE-GUIDE.md](IMAGE-UPGRADE-GUIDE.md) ④。
+
 ## 1. 硬件前置
 
 | 项 | 要求 |
@@ -106,7 +118,7 @@ engram 分片（**宿主生成物，约 189G，不随仓分发**）：`~/dsv41-e
 | `deploy/bin/` | `~/migrate-assets/bin/` | r3-boot-arm.sh 部署链（0.3.2 产线 md5 **20f22bc6**；公开件 9ac6e113=脱敏头）+gate 四件+stop/watchdog |
 | `deploy/reconstruct/0.3.2/` | 按包内 README 分段落位 | **0.3.2 现役增量全件**：CBX1A env、adapter 13+4、overlay/b12x、r032c 16 件、1017/engram 台账 |
 | `deploy/bin/boot_mvl41_native.sh`+`boot_mvl40exp_r2.sh`+`vl_smoke_gv1.py` | `~/luz030-opt-campaign/dev/vl-native/`（战役位；或任意可写位+`CAMP=` 覆写） | VL-NATIVE 窗执行件（2026-10-13 全绿收录）：V4.1 原生视觉臂 boot+V4.0exp overlay 复原臂 boot+G-V1/G-V5 冒烟量具（knapcio 双形状 1024/1024 SAT 断言）；用法=§9 |
-| `deploy/adapter/` | `~/migrate-assets/dsv41/adapter/` | **0.3.1 基底 83 件/约 3.0M**（=0.3.2 装配基底；B1 收录 2026-10-13：顶层 68+fi_r1/ 6+lib/ 1+overlay/ 3+tests/ 5；sitecustomize 55b1e412 装载缝+闭包 48 件+留役休眠件+`.so`/json/构建源；排除 `*.bak*` 39+变体 1+EP1 陈旧清单 2）。0.3.2 终态=基底+`reconstruct/0.3.2/adapter/files/` 覆盖，装配后 **87 个运行时件**；逐件账=`deploy/adapter/0.3.2-MANIFEST.md5`，步骤=`deploy/adapter/0.3.2-ASSEMBLY.md` |
+| `deploy/adapter/` | `~/migrate-assets/dsv41/adapter/` | **0.3.1 基底 83 件/约 3.0M**（=0.3.2 装配基底；B1 收录 2026-10-13：顶层 68+fi_r1/ 6+lib/ 1+overlay/ 3+tests/ 5；sitecustomize 55b1e412 装载缝+闭包 48 件+留役休眠件+`.so`/json/构建源；排除 `*.bak*` 39+变体 1+EP1 陈旧清单 2）。0.3.2 终态=基底+`reconstruct/0.3.2/adapter/files/` 覆盖，装配后 **87 个运行时件**；逐件账=`deploy/adapter/0.3.2-MANIFEST.md5`，步骤=`deploy/adapter/0.3.2-ASSEMBLY.md`；**0.3.4 面=98 前态面（现树交付形，§0.1；逐件账=`deploy/adapter/0.3.4-MANIFEST.md5`）** |
 | `deploy/env/` | `~/migrate-assets/dsv41/env/` | **0.3.2 现役=`CBX1A-CERTM-spec1.env`（56 键/0729e18d）**；E16B2/E16B1/FB54 逐级链在 `reconstruct/0.3.2/env/`；仓内另有 0.3.1 两形+**VL 四臂形**历史/回退样本（VL41N-SPEC0/K6/K6CG 三级阶梯+VL40EXP-R2-C24T；详=§9） |
 | `deploy/overlay/o12c1-prod/` | `~/migrate-assets/v4vl/sglang-overlay.o12c1-prod/`（=`SGLANG_OVERLAY_DIR`） | **0.3.4 形快照（2026-10-31 备查同步窗）**：目录 30 件=29 个 `.py` 活件影子挂载+1 映射表（对表 `deploy/prod/overlay-md5.txt`，`md5sum -c` 29 行全绿；scheduler `4a7822a6`/backend `73c80259`/serving_chat `9b60a463`/page_map_export `c0dfe59a`；0.3.4 面 boot 钉面 `prod-profile.env:12 COUNT=29`）。0.3.2 期历史形=28 活件（r3-boot-arm.sh `ov_n` 门==28 属 0.3.2 boot 链时点）；逐件身份/换血表/旧形取回=[deploy/README-说明.md](../deploy/README-说明.md) |
 | `deploy/overlay/v4vl-79cafec0/` | `~/migrate-assets/vl-native/sglang-overlay.v4vl-79cafec0/` | **VL 专用 overlay 复原树 28 件**（V4.0exp 臂供给面；内容指纹 cbf986df×4 机全等——VL-NATIVE S5 整树复原律；boot_mvl40exp_r2.sh 内嵌 OV_MAP 平铺键→容器路径映射+28 件 fail-closed 计数断言；与 o12c1-prod 零交叠） |
@@ -141,7 +153,7 @@ serve 参=**SPEC6 八参**（六参基座 + A8 `--tool-call-parser deepseekv41` 
 adapter 装载缝在 0.3.2 为 **beb131ab**（A6）；0.3.1 的 55b1e412 仅作历史对照。
 adapter 终态装配与 87 件逐件账见 `deploy/adapter/0.3.2-ASSEMBLY.md` /
 `deploy/adapter/0.3.2-MANIFEST.md5`；完整升级流程见
-[UPGRADE-0.3.2.md](../UPGRADE-0.3.2.md)。
+[UPGRADE-0.3.2.md](../UPGRADE-0.3.2.md)。0.3.4 面口径（98 前态面/装钩器升 99）另见 §0.1。
 
 ## 7. boot 与四查
 

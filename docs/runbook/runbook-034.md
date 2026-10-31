@@ -136,7 +136,7 @@ md5sum $SDB_DIR/sd_bench.py \
    └───────────────────────────────────────────────────────────────────────┘
 ```
 
-> **§四图口径注（2026-10-30 补）**：①图内「adapter 98件/`d52b0e3d`」为 2026-10-28 锁档（修复固化面、BYPASS 未入包）时点值；BYPASS 采用（D121）后 `prefill_bypass.py` 入包=**在役 99 件**（整树签名 `0beb4bee`，正典=[034-VERSION-LOCK](../release/034-VERSION-LOCK-20261028.md) §六-1 与 [README](../../README.md) §1 口径注）——两数同代不同时点，非矛盾。②图内网关「rc3.8.7」为 0.3.4 调优终态时点值；**0.3.4re 批后现役=rc3.8.8**（公开适配形 md5 `4f12f2d3`，含 DF-05 `INJECT_CONSERVATIVE_SAMPLING` 开关、默认关；开关关闭时与 rc3.8.7 行为零差异），见 [DEPLOY-STEP-BY-STEP](../DEPLOY-STEP-BY-STEP.md) §4.5。
+> **§四图口径注（2026-10-30 补）**：①图内「adapter 98件/`d52b0e3d`」为 2026-10-28 锁档（修复固化面、BYPASS 未入包）时点值；BYPASS 采用（D121）后 `prefill_bypass.py` 入包=**在役 99 件**（整树签名 `0beb4bee`，正典=[034-VERSION-LOCK](../release/034-VERSION-LOCK-20261028.md) §六-1 与 [README](../../README.md) §1 口径注）——两数同代不同时点，非矛盾。②图内网关「rc3.8.7」为 0.3.4 调优终态时点值；**0.3.4re 批后现役=rc3.8.8**（公开适配形 md5 `4f12f2d3`，含 DF-05 `INJECT_CONSERVATIVE_SAMPLING` 开关、默认关；开关关闭时与 rc3.8.7 行为零差异），见 [DEPLOY-STEP-BY-STEP](../DEPLOY-STEP-BY-STEP.md) §4.5。③现值锚（2026-10-31 回正）：现树交付面前态清单=[deploy/adapter/0.3.4-MANIFEST.md5](../../deploy/adapter/0.3.4-MANIFEST.md5)（71 *.py/manifest-md5 `5c2c88eb`/sitecustomize `45ca6e3e`），装钩器后 99 武装面口径另列（=[deploy/adapter/README.md](../../deploy/adapter/README.md) 权威口径节）。
 
 ## 五、回退 0.3.3 程序
 

@@ -3,6 +3,37 @@
 > 提炼自战役仓 git log（`luz-0.3.0-r1`（2026-10-05，32c6acd）之后 632 commits）
 > 与总卡/定稿报告。逐项档锚见 `docs/` 各分档。
 
+## 2026-10-31 adapter 面回正批（canon98 前态面落公开树 + 0.3.4 逐件账）
+
+> 闭合「公开树 deploy/adapter 与 0.3.4 锁档修复固化面前态面漂移」缺口。零 git 写、
+> 零引擎触碰；锁档档案（034-VERSION-LOCK/MANIFEST-034LOCK/runbook 图行等）一律不改值，
+> 仅加代际注记（下述「98/99 件数两说」裁定行原样保留，与本批注记并存对照）。
+
+- **deploy/adapter 整面回正=canon98 前态面**：13 件漂移覆盖+2 件补入
+  （`dsv41_recipe.py`、`recipe_lib/deepseek_recipe/__init__.py`）+0 件多出，*.py 面
+  69→71 件；面指纹（fingerprint.py 口径）manifest-md5=`5c2c88eb`…/sitecustomize=
+  `45ca6e3e`…（回正前=`05760a5d`/69 件/sitecustomize=`b4822e37`）。
+  prefill_bypass.py 不在面内（正典件住 `tools/bypass/`，交付面默认不携钩）。
+- **逐件账落位=`deploy/adapter/0.3.4-MANIFEST.md5`**（91 件=71 *.py+20 非 py；
+  `cd deploy/adapter && md5sum -c 0.3.4-MANIFEST.md5` 实测全绿）。
+- **99 武装面经装钩器达成**：`bash tools/bypass/install-prefill-bypass.sh` 一键升入
+  （sitecustomize 45ca6e3e→`dd69c59a`、prefill_bypass.py=`c4875258` 入面，面件数 +1）。
+- **sitecustomize 三代谱系记档**：`45ca6e3e`（canon98 前态）→`b4822e37`（EQ-12 重钉
+  漂移代，回正前现树=GitHub main=网盘包三渠道实测同值）→`dd69c59a`（装钩武装态）；
+  本批现树钉回 45ca6e3e。
+- **备查面结构对称**：`deploy/reconstruct/0.3.4/adapter/` 新增 canon98 前态面 71 件
+  副本+同款 MANIFEST.md5（72 条目实测全绿）+NOTES.md（供给位=deploy/adapter、
+  装钩器=tools/bypass、本区=身份备查）。
+- **文档交叉口径**：根 README §1、GLOSSARY、IMAGE-UPGRADE-GUIDE ④、GETTING-STARTED、
+  UPGRADE-0.3.4、DEPLOY-GUIDE、DEPLOY-STEP-BY-STEP、deploy/README、gates/config 两
+  tsv、tools/bypass/README、runbook §四图注、锁档档案档首等约 19 处加代际注记
+  （历史值行一律保留不删）。
+- **发布包重切待办记档**：网盘发布包（`luz-deepseek-flash-all-in-one-0.3.4re-snapshot.tar.gz`）
+  内仓快照 fb9c200 的 `deploy/adapter` 仍为回正前漂移代（sitecustomize=`b4822e37`、
+  无 `0.3.4-MANIFEST.md5`；包内 MANIFEST.md5=`f6482638` 旧账系判读批实测）——本回正批
+  未随包分发，发布包须随 `0.3.4-MANIFEST.md5` **重切**（另窗执行）；重切前包外取件
+  adapter 面以本仓 main 回正批为准（见 deploy/README-说明.md §7.3）。
+
 ## 2026-10-31 备查同步批（0.3.4re：overlay 29 件本体 + 三件正典全文入公开树）
 
 > 闭合 0.3.4re 已知布局缺口「overlay 29 件本体未随批入公开树」。零引擎触碰、零

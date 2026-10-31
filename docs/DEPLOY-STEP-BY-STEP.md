@@ -17,6 +17,13 @@
 > [release/0.3.4-RELEASE-NOTE.md](release/0.3.4-RELEASE-NOTE.md) 为正典；键值逐键
 > 语义见 [RUNTIME-PARAMETERS.md](RUNTIME-PARAMETERS.md) §1。
 >
+> **adapter 增量（2026-10-31 补）**：0.3.4 面交付=公开树 deploy/adapter 已整面回正为
+> **98 前态面**（canon98 前态正典面，91 件=71 *.py+20 非 py、sitecustomize=45ca6e3e），
+> 逐件锚=[`deploy/adapter/0.3.4-MANIFEST.md5`](../deploy/adapter/0.3.4-MANIFEST.md5)
+> （`cd deploy/adapter && md5sum -c 0.3.4-MANIFEST.md5` 直验）；99 武装面经
+> [`tools/bypass/`](../tools/bypass/README.md) 装钩器升入。§4.2 的 87 件为 0.3.2
+> 装配账口径，行值保留。
+>
 > 读者：拿到 4×DGX Spark（交换机以太网形态）+ 本仓、要从零部署到引擎在役的工程师。
 > 读法：按节号顺序执行，**不要跳节**；每步红掉时先看该步末尾的"失败先查"。
 

@@ -52,7 +52,9 @@ p12_realtrace_negative_control.log）。
 容器冒烟 p12 增补两步（进 container_smoke_r1.py 的 p12 相位，不另开相位）：
   P12.G1 捕获窗断言：在 p12 的真 torch.cuda.graph 捕获段外再包一层
       torch.profiler.profile(activities=[CUDA])，捕获走 seam 的 GatherConsumeDenseBlocks
-      .consume_decode（真引擎入参形状的合成批）；停采后对本断言器喂 trace 路径。
+      .consume_decode（真引擎入参形状的合成批；520d6d0 四方法签名面=
+      publish/consume_{decode,prefill} 无 out 参，合成批按 inputs 合同构造）；
+      停采后对本断言器喂 trace 路径。
   P12.G2 replay 窗断言（长 ctx 形）：profile 下 replay 捕获图一次，断言 gather 名
       以「graph id≠0」出现 ≥1 件——把「图内」落成可测。
   P12.G3（R1-FIX-2 FIX-A 面）：PREFILL=1 形态下 eager prefill 消费窗内 gather

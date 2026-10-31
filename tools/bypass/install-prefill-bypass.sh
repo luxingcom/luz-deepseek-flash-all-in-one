@@ -90,7 +90,7 @@ python3 -m py_compile "$AD/prefill_bypass.py" && rm -rf "$AD/__pycache__"
 [ "$(m "$SC")" = "$SC_POST" ] || { echo "PANIC: 挂钩后 sitecustomize=$(m "$SC") ≠ 期望后态 $SC_POST（插入非确定性，停手呈报）"; exit 9; }
 n=$(find "$AD" -type f ! -path '*__pycache__*' | wc -l)
 fp=$(cd "$AD" && find . -type f ! -path '*__pycache__*' | LC_ALL=C sort | xargs -r md5sum 2>/dev/null | LC_ALL=C sort | md5sum | cut -c1-8)
-echo "$(hostname -s): sitecustomize=$(m "$SC" | cut -c1-8) prefill_bypass=$(m "$AD/prefill_bypass.py" | cut -c1-8) adapter=${fp}/${n} 件（期望 99 件）"
+echo "$(hostname -s): sitecustomize=$(m "$SC" | cut -c1-8) prefill_bypass=$(m "$AD/prefill_bypass.py" | cut -c1-8) adapter=${fp}/${n} 件（件数=磁盘实数仅回显非断言；锁档在役全文件口径期望 99 件，公开仓供给面=91+1 装钩件，两者差=包外宿主件——面验收以清单 md5sum -c 为准）"
 if [ -n "${OVERLAY_DIR:-}" ] && [ -f "${OVERLAY_DIR:-}/scheduler.py" ]; then
   echo "overlay 回显: scheduler=$(m "$OVERLAY_DIR/scheduler.py" | cut -c1-8) schedule_policy=$(m "$OVERLAY_DIR/schedule_policy.py" | cut -c1-8)（仅供参考，engine 树本件零改）"
 fi

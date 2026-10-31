@@ -38,7 +38,9 @@
 > [deploy/README-说明.md](deploy/README-说明.md)）。**绑定律不变**：overlay 与镜像
 > 代际绑定，本 29 件配 `0.3.4-x6bake-20261026` 镜像；如需先行验证 0.3.2 历史定版
 > 形，按 [DEPLOY-STEP-BY-STEP](docs/DEPLOY-STEP-BY-STEP.md) 全 0.3.2 面（r032c
-> 镜像+56 键 env+87 件 adapter+0.3.2 overlay）整套起栈——**禁止**拿 0.3.2 overlay
+> 镜像+56 键 env+87 件 adapter+0.3.2 overlay〔87 件=0.3.2 装配账口径带入 0.3.2 起栈
+> 语境；0.3.4 面验收=deploy/adapter/0.3.4-MANIFEST.md5（98 前态面，*.py 口径 71 件）
+> ——2026-10-31 代际注记〕）整套起栈——**禁止**拿 0.3.2 overlay
 > 增量件（`deploy/reconstruct/0.3.2/overlay/`）拼 0.3.4 镜像（绑定律/混形禁忌，
 > 0.3.4 镜像×0.3.2 overlay=无档混形）。
 

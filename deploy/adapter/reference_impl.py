@@ -79,7 +79,7 @@ def read_index_k_payload(
     """按槽读 fp4 索引 K 的原始字节。
 
     ``table`` = 池的 2D uint8 视图 ``[pages, page_size*64 + page_size*4]``
-    （= ``get_index_k_with_scale_buffer`` 的返回布局，``scoring.py:367``）；
+    （= ``get_index_k_with_scale_buffer`` 的返回布局，``scoring.py:404``）；
     ``slots`` int64 任意形状。返回 ``(payload uint8 [*, 64], scale_bytes uint8 [*, 4])``，
     与 Triton 内核的寻址式逐字节同源（``fp4_indexer.py:479-500``）：
     ``page = slot // page_size``，``off = slot % page_size``，
@@ -338,7 +338,7 @@ def _write_like_write_decode(
     lens: torch.Tensor,
     lmax: int,
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
-    """``scoring.py:374-382 write_decode`` 的合同：-1→lmax → 按位置升序 → reach=位置<lens →
+    """``scoring.py:465-471 write_decode`` 的合同：-1→lmax → 按位置升序 → reach=位置<lens →
     page_indices=槽（否则 -1）、raw_indices=位置（否则 -1）。"""
     posx = picked.masked_fill(picked < 0, lmax)
     order = posx.argsort(dim=-1)

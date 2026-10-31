@@ -7,6 +7,16 @@
 > 补丁/全文/构建配方、1017 权重与 engram 分片台账）。
 > adapter 终态=0.3.1 基底+reconstruct 覆盖，装配账=
 > [`adapter/0.3.2-MANIFEST.md5`](adapter/0.3.2-MANIFEST.md5)（87 个运行时件）。
+>
+> **0.3.4 面锚（2026-10-31 增补）**：公开树交付面=**98 前态面**（canon98 前态正典面，
+> sitecustomize=`45ca6e3e`），逐件锚=[`adapter/0.3.4-MANIFEST.md5`](adapter/0.3.4-MANIFEST.md5)
+> （91 件=71 *.py+20 非 py；`cd deploy/adapter && md5sum -c 0.3.4-MANIFEST.md5` 直验全绿；
+> *.py 面正典指纹 manifest-md5=`5c2c88eb`）；99 武装面经
+> [`tools/bypass/`](../tools/bypass/README.md) 装钩器升入。**三账代际**（并存不混用）：
+> `adapter/0.3.2-MANIFEST.md5`=0.3.2 版本账 87 件；`adapter/MANIFEST.md5`=EQ-12 在役账
+> 84 条目（时点快照：回正前实测 3 件失配+缺 roce_metrics_gauge.py 条目；本批整面换血后
+> 实测失配扩至 13 件——恰为换血 13 件，历史账不修值，验收勿用）；`adapter/0.3.4-MANIFEST.md5`=
+> canon98 前态面账（**现役验收账**）。逐件身份/换血表=[README-说明.md](README-说明.md)。
 > `bin/r3-boot-arm.sh` 已同步 0.3.2 终态参面（SERVER_ARGS 含 A8/A9；原第九参
 > `--sleep-on-idle` 2026-10-30 退役=上游 #43050 idle-wake hang host 侧规避〔禁参，
 > 见 SPEC6-SERVE-REF〕、D15 五门、IMAGE 指针 `0.3.2-r032c`）。0.3.2 全量差异与性能见

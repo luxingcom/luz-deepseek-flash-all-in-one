@@ -1,5 +1,12 @@
 """FP4-KV port gate and installer (fork-v4-fp4 on main 79cafec0) — R1 dev copy.
 
+[R1-FORMAL 2026-10-19, S-R1-BOOT-20261019] Formalized in-service form (KA-C1
+window; base = feaaadd4 R1 deployment form). Deltas vs feaaadd4 (KA-C4 batch):
+(1) `_r1_fork_call` output/out_lse now grow-only `_persistent_buffer`s (same
+helper as the repack scratch; kernel fully overwrites both tensors in place,
+so results are bit-identical by construction); (2) `summary()` banner carries
+`r1_formal=1` for boot-log direct evidence. No algorithmic change anywhere.
+
 R1-FP4KV (LuZ-0.3.1 W3): this is the dev-tree copy of the in-service adapter
 file (md5 954cab11d611e548fea22baa8b2f7386 at ~/migrate-assets/dsv41/adapter/
 kv_fp4.py, READ-ONLY). Deployment = load-window adapter-set replacement
@@ -410,11 +417,24 @@ def install_flash_mla_sm120(module) -> bool:
         if rows is not None and tl is not None:
             tl = tl[:rows]
         num_tokens, num_heads, _ = q2.shape
-        output = q2.new_empty(
-            (num_tokens, num_heads, kwargs["head_dim_v"]), dtype=torch.bfloat16
+        # [R1-FORMAL/KA-C4] grow-only persistent buffers: the fork kernel
+        # fully overwrites output and out_lse in place (same contract as the
+        # stock FFI out-params the base form fed fresh empty tensors to), so
+        # reuse is bit-identical by construction while removing the 2x
+        # per-call allocation of the ~68 MiB variable-size output.
+        from kv_fp4_repack import _persistent_buffer
+
+        output = _persistent_buffer(
+            "r1:prefill:out",
+            (num_tokens, num_heads, kwargs["head_dim_v"]),
+            torch.bfloat16,
+            q2.device,
         )
-        out_lse = torch.empty(
-            (num_tokens, num_heads), dtype=torch.float32, device=q2.device
+        out_lse = _persistent_buffer(
+            "r1:prefill:lse",
+            (num_tokens, num_heads),
+            torch.float32,
+            q2.device,
         )
         scale = kwargs.get("softmax_scale")
         if scale is None:
@@ -711,5 +731,5 @@ def summary() -> str:
         f"mode={os.environ.get(MODE_ENV, '(v4 default)')} "
         f"active={active()} "
         f"installed={','.join(sorted(_INSTALLED)) or '(none)'} "
-        f"{r1}"
+        f"{r1} r1_formal=1"
     )

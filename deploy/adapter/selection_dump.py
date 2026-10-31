@@ -58,8 +58,12 @@ def enabled() -> bool:
     return _state["dir"] is not None and not _state["disabled"]
 
 
-def maybe_dump(face: str, layer_id: int, out) -> None:
-    """seam 消费面写回完成后的落盘点（键关=一次布尔判断；任何异常自吞）。"""
+def maybe_dump(face: str, layer_id: int, page=None, raw=None) -> None:
+    """seam 消费面写回完成后的落盘点（键关=一次布尔判断；任何异常自吞）。
+
+    520d6d0 新合同：消费面无 Selection out 参——直接收张量参（page/raw；
+    decode 面 raw=None=新合同 decode 无 raw，prefill 面 raw=inputs.out_raw_indices）。
+    """
     try:
         if not enabled():
             return
@@ -77,10 +81,12 @@ def maybe_dump(face: str, layer_id: int, out) -> None:
         payload = {
             "face": face,
             "layer_id": layer_id,
-            "page_indices": out.page_indices.detach().to(torch.int32).cpu().clone(),
-            "raw_indices": (None if out.raw_indices is None else
-                            out.raw_indices.detach().to(torch.int32).cpu().clone()),
-            "note": "R1 gather consume face final Selection (post write contract)",
+            "page_indices": (None if page is None else
+                             page.detach().to(torch.int32).cpu().clone()),
+            "raw_indices": (None if raw is None else
+                            raw.detach().to(torch.int32).cpu().clone()),
+            "note": "R1 gather consume face final outputs (post write contract; "
+                    "tensor args per 520d6d0 no-Selection contract)",
         }
         torch.save(payload, path)
     except Exception as exc:  # 量具面失败不扰产径

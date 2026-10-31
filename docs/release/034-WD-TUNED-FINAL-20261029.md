@@ -36,7 +36,7 @@
   owned rows)`（对 E0 同横幅 1.0GiB/3946672/4.1% 恰翻倍；boot 硬编 :387 `=1` 早于 ARM 注入同被
   覆盖，r3-boot-arm.sh:375-391+435-441 亲读+deploy S6 活体）。
 - 产面其余各面（tp4 e225c391/guards 418414c3/overlay 4 件 73c80259·5b5ced03·982a0ad0·c0dfe59a/
-  adapter 整树 **0beb4bee·99 件**/镜像 80e4c957）：**零写零动**（doctor CFG-07..28/60/61 全 PASS）。
+  adapter 整树 **0beb4bee·99 件**/镜像 80e4c957）：**零写零动**（doctor CFG-07..28/60/61 全 PASS）。〔代际括注 2026-10-31：`0beb4bee·99 件`为 2026-10-29 时点武装面 8-hex 集签名口径，原样保留；公开树交付=98 前态面（deploy/adapter/0.3.4-MANIFEST.md5，71 *.py/`5c2c88eb`）+tools/bypass 装钩器升 99。〕
 
 ## 二、锚重钉（config-034.tsv + gates-034.tsv；tsv 亦各留 .bak-pre-deopt-adopt-20261029）
 

@@ -53,17 +53,17 @@ host 侧静态断言=unit_xcheck 第 4f 节（AST 禁表+红标本+eager 面分�
 == R1-FIX-2（2026-10-04；R1FIX2-ADJUDICATION 实施授权；本工作副本=新世系候选）====
 **FIX-A（prefill 槽双包装）**：R1RECERT 取证定谳——旧 ``return prefill,
 _ConsumesAs(gather, decode, stage2)`` 把 pair 的 prefill 槽原样返回 stock 对象，
-而引擎 prefill 分派打的是 prefill 槽（backend.py:3116/:3119），``decode_candidates
+而引擎 prefill 分派打的是 prefill 槽（backend.py:3115/:3118），``decode_candidates
 .consume_prefill`` 引擎树零调用点 ⇒ stage2 结构性死代码（横幅 prefill_consume=gather
 与运行期背离）。修法=两槽都过 ``_ConsumesAs`` + 补 ``publish_prefill`` 透传（旧行下
 不需要；包装后不补=publish 断链=新错值面）。gather.consume_prefill 只读
 ``published.blocks``，对 stock publish_prefill 两种产物（DeepGEMM flattened-K /
 torch per-request，皆 BlockIds）同构。capture 面不对称的正当性：引擎 captured-prefill
-路径（backend.py:2744→3146）结构性绕开 candidates（直调 full_topk），gather 的
+路径（backend.py:2744→3122）结构性绕开 candidates（直调 full_topk），gather 的
 consume_prefill（宿主循环 .tolist()/.item()）结构性不进捕获——eager-only 面接线修复，
 R1-FIX 的 decode 面 capture-safe 论证原样继承（FIX-A 不动 decode 执行路径）。
 **FIX-A2（消费面共轭完备，教义 #27）**：stock 消费者读 ``published.blocks`` 前等待
-publish 的 ``ready`` 事件（sparse_table.py:311）；生产路径 publish_decode 的块选择链
+publish 的 ``ready`` 事件（sparse_table.py:305）；生产路径 publish_decode 的块选择链
 在 **alt_stream** 产出（:206-226）。旧世系 gather 消费面缺此等待=潜伏跨流竞态——
 既往窗口 filtered 图从未 dispatch 故未显形；第三认证火长 ctx 窗=filtered 图首次上
 热路径，不补=图内两分支无依赖边的静默错值面（#12）。修法=``getattr(published,
@@ -72,7 +72,7 @@ BlockIds 产物无 ready→跳过。
 **FIX-C（捕获期早退 fail-loud，教义 #12）**：捕获期 ``bs==0``/``lmax==0`` 不再静默
 return，改 raise（图内零消费内核+replay 期 out 停 reset 态且无崩溃信号=静默错值原型；
 R1RECERT 已证本 boot 捕获期 lmax=容量上界≠0，本守卫零改变已验证行为，只把假想静默
-跳过变成捕获期硬红）。eager 面保留良性早退（stock decode_scores:352-360 同款）。
+跳过变成捕获期硬红）。eager 面保留良性早退（stock decode_scores:391-401 同款）。
 ``is_current_stream_capturing()`` 为宿主侧查询（无设备同步），捕获兼容。
 判据三层化（FIX-D）与长 ctx 断言见本目录 p12_assertion_graph_gather.py +
 FIXD-CRITERIA-LAYERS-20261004.md；位等三对照同构臂门设计（#21）随 RE-CERT-CARD-3
@@ -220,7 +220,7 @@ def install(module) -> bool:
         # 只换消费面：publish 语义（全量打分 + amax 块选择）原样保留——论文首层全扫。
         # 第二段（PREFILL_ENV=1）连 eager prefill 消费面一起换；decode 对先行。
         # [R1-FIX-2 FIX-A] R1RECERT 取证定谳：旧写法把 pair 的 prefill 槽原样返回
-        # stock 对象，而引擎 prefill 分派打的是 prefill 槽（deepseek_v4_backend.py:3119
+        # stock 对象，而引擎 prefill 分派打的是 prefill 槽（deepseek_v4_backend.py:3118
         # self.prefill_candidates.consume_prefill；对装配见 :1128），_ConsumesAs.consume_prefill 无任何
         # 引擎调用者 ⇒ stage2 结构性死代码（横幅 prefill_consume=gather 与运行期背离）。
         # 修法=两个槽都过 _ConsumesAs（publish_prefill/publish_decode 均原样透传，
@@ -246,22 +246,22 @@ class _ConsumesAs:
         self._orig = orig_backend
         self._stage2 = stage2
 
-    def publish_decode(self, inputs, out):
-        return self._orig.publish_decode(inputs, out)
+    def publish_decode(self, inputs):
+        return self._orig.publish_decode(inputs)
 
-    def consume_decode(self, inputs, published, out):
-        self._gather.consume_decode(inputs, published, out)
+    def consume_decode(self, inputs, published):
+        self._gather.consume_decode(inputs, published)
 
     # [R1-FIX-2 FIX-A] prefill 槽的 publish 透传（原实现缺此方法——旧行下
     # prefill 槽未包装故不需要；两槽都包装后必须补，否则 publish_prefill 断链）。
-    def publish_prefill(self, inputs, out):
-        return self._orig.publish_prefill(inputs, out)
+    def publish_prefill(self, inputs):
+        return self._orig.publish_prefill(inputs)
 
-    def consume_prefill(self, inputs, published, out):
+    def consume_prefill(self, inputs, published):
         if self._stage2:
-            self._gather.consume_prefill(inputs, published, out)
+            self._gather.consume_prefill(inputs, published)
         else:
-            self._orig.consume_prefill(inputs, published, out)
+            self._orig.consume_prefill(inputs, published)
 
 
 def _make_gather_class(base, _block_ids_cls, tier: str):
@@ -282,10 +282,10 @@ def _make_gather_class(base, _block_ids_cls, tier: str):
         """consume_decode[/consume_prefill] = 候选内 gather 打分（reference_impl
         语义，tier 决定载体）。publish_* 继承 stock（论文首层全扫）。"""
 
-        def consume_decode(self, inputs, published, out) -> None:
+        def consume_decode(self, inputs, published) -> None:
             req, pos = inputs.req_rows, inputs.positions
             bs = req.shape[0]
-            out.reset()
+            inputs.reset_outputs()
             # [R1-FIX-2 FIX-C] 捕获期早退=静默错值面（教义 #12）：若 bs==0/lmax==0
             # 在 stream capture 中早退，图内将永久记录「零消费内核」，replay 期
             # out 停在 reset 状态且无崩溃信号——比 R1STDFORM 的捕获期崩溃（fail-loud）
@@ -319,9 +319,9 @@ def _make_gather_class(base, _block_ids_cls, tier: str):
                 return
             assert published is not None and published.blocks.shape[0] == bs
             # [R1-FIX-2 FIX-A2] 共轭完备（教义 #27）：stock 消费者在读 blocks 前等待
-            # publish 的 ready 事件（sparse_table.py:311 `current_stream().wait_event
+            # publish 的 ready 事件（sparse_table.py:305 `current_stream().wait_event
             # (published.ready)`）——生产路径 SparseTableBackend.publish_decode 的
-            # 块选择链在 **alt_stream** 上产出 blocks（sparse_table.py:206-226，
+            # 块选择链在 **alt_stream** 上产出 blocks（sparse_table.py:200-222，
             # ready.record(self.alt_stream)），跨流无执行序保证；gather 消费面若不
             # 等待=第三认证火 filtered 图 replay 窗的静默错值面（#12：图内两分支
             # 无依赖边，replay 乱序 → gather 读未就绪 blocks → Selection 错值无崩溃
@@ -345,7 +345,7 @@ def _make_gather_class(base, _block_ids_cls, tier: str):
             page_size = table.shape[1] // 68
             cand_logits = _score(q, weights, cand_slot, table, page_size)
             k = min(indexer.index_topk, lmax)
-            # write_decode 合同（scoring.py:374-382）：-1→lmax → 位置升序 → reach → 双写。
+            # write_decode 合同（scoring.py:465-471）：-1→lmax → 位置升序 → reach → 双写。
             # 槽随选点走列（R1-FIX capture-safe，2026-10-03/04 根因修复；选路 (c)
             # 静态形状替代，全论证见 R1-FIX-CAPTURESAFE-20261004.md §三/§四）：
             # 位置↔槽的配对由**同一 top.indices / argsort 张量**在同一执行时刻建立
@@ -367,21 +367,21 @@ def _make_gather_class(base, _block_ids_cls, tier: str):
             pos_s = posx.gather(1, order)
             slot_s = slot_pick.gather(1, order)
             reach = pos_s < lens[:, None]
-            out.page_indices[:bs, :k] = _torch.where(
+            inputs.out_page_indices[:bs, :k] = _torch.where(
                 reach, slot_s, _torch.full_like(slot_s, -1)
             ).to(_torch.int32)
-            if out.raw_indices is not None:
-                out.raw_indices[:bs, :k] = _torch.where(
-                    reach, pos_s, _torch.full_like(pos_s, -1)
-                ).to(_torch.int32)
+            # raw 面=新合同 decode 无 raw（types.py DecodeInputs 仅 out_page_indices）。
             try:
                 import selection_dump as _sd
 
-                _sd.maybe_dump("decode", inputs.layer_id, out)
+                _sd.maybe_dump(
+                    "decode", inputs.layer_id,
+                    page=inputs.out_page_indices[:bs, :k], raw=None,
+                )
             except Exception:
                 pass  # 量具面失败不扰产径（dump 自身 fail-closed 于键）
 
-        def consume_prefill(self, inputs, published, out) -> None:
+        def consume_prefill(self, inputs, published) -> None:
             """第二段：eager prefill 消费面 gather 化（每请求只对候选位置打分）。
 
             torch 链与 stock ``_torch_consume_prefill`` 同源（prefill_requests 的
@@ -401,7 +401,7 @@ def _make_gather_class(base, _block_ids_cls, tier: str):
             _ready = getattr(published, "ready", None)
             if _ready is not None:
                 _torch.cuda.current_stream().wait_event(_ready)
-            out.reset()
+            inputs.reset_outputs()
             pool = self.token_to_kv_pool
             ratio = inputs.compress_ratio
             indexer = inputs.indexer
@@ -437,7 +437,7 @@ def _make_gather_class(base, _block_ids_cls, tier: str):
                     ).view(index_k.shape[0], index_k.shape[1])
                     logits = s.masked_fill(cand_slot < 0, float("-inf"))
                 picked = _topk_cand(logits, cand_pos, k)
-                # write_prefill 合同（scoring.py:322-333）：位置升序 → reach → 槽查表。
+                # write_prefill 合同（scoring.py:339-353）：位置升序 → reach → 槽查表。
                 # 槽按位置索引查（候选列槽先散成位置槽表——列/位混用 bug 同 decode 面）。
                 idx = picked.sort(dim=-1).values
                 reach = idx < lens_r[:, None]
@@ -449,17 +449,22 @@ def _make_gather_class(base, _block_ids_cls, tier: str):
                 b_idx, c_idx = live.nonzero(as_tuple=True)
                 slot_by_pos[b_idx, cand_pos[b_idx, c_idx]] = cand_slot[b_idx, c_idx]
                 slot_of = slot_by_pos.gather(1, idx.clamp_min(0).clamp_max(width - 1))
-                out.page_indices[tok, :k] = _torch.where(
-                    reach, slot_of, _torch.full_like(slot_of, -1)
-                ).to(_torch.int32)
-                if out.raw_indices is not None:
-                    out.raw_indices[tok, :k] = _torch.where(
-                        reach, idx, _torch.full_like(idx, -1)
+                # 新合同（types.py PrefillInputs）：out_page_indices 可选、out_raw_indices
+                # 必在（stock write_prefill scoring.py:348-352 同序同守卫）。
+                if inputs.out_page_indices is not None:
+                    inputs.out_page_indices[tok, :k] = _torch.where(
+                        reach, slot_of, _torch.full_like(slot_of, -1)
                     ).to(_torch.int32)
+                inputs.out_raw_indices[tok, :k] = _torch.where(
+                    reach, idx, _torch.full_like(idx, -1)
+                ).to(_torch.int32)
             try:
                 import selection_dump as _sd
 
-                _sd.maybe_dump("prefill", inputs.layer_id, out)
+                _sd.maybe_dump(
+                    "prefill", inputs.layer_id,
+                    page=inputs.out_page_indices, raw=inputs.out_raw_indices,
+                )
             except Exception:
                 pass
 

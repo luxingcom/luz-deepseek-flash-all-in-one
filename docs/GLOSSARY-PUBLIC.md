@@ -41,7 +41,7 @@
 - **serve 参数（SPEC）**
   三元组第二面：boot 时传给引擎进程的命令行参数谱，现役为八参（调度间隔、排队上限、推理/思考流两个 parser、缓存上报等），由 boot 脚本固定面注入；第九参 `--sleep-on-idle` 空闲降耗 2026-10-30 因上游缺陷退役（九参谱转史档，禁参三门拦截）。详见：[deploy/SPEC6-SERVE-REF.md](../deploy/SPEC6-SERVE-REF.md)
 - **adapter**
-  三元组第三面的一半：boot 时注入 SGLang 进程的自研优化件集合（0.3.2 装配 87 个运行时件；0.3.4 现役 99 件＝98 个修复固化件+BYPASS 采用新增 1 件，98 件为 2026-10-28 锁档时点值），经 sitecustomize.py 装载缝挂入，与引擎镜像按绑定律同批切换。详见：[deploy/adapter/README.md](../deploy/adapter/README.md)
+  三元组第三面的一半：boot 时注入 SGLang 进程的自研优化件集合（0.3.2 装配 87 个运行时件；0.3.4 现役 99 件＝98 个修复固化件+BYPASS 采用新增 1 件，98 件为 2026-10-28 锁档时点值；公开树交付=98 前态面〔0.3.4-MANIFEST.md5 逐件锚、*.py 口径 71 件〕，99=装钩器后在役口径——2026-10-31 代际注记），经 sitecustomize.py 装载缝挂入，与引擎镜像按绑定律同批切换。详见：[deploy/adapter/README.md](../deploy/adapter/README.md)
 - **overlay（影子挂载）**
   三元组第三面的另一半：宿主目录里的上游同名源码文件，boot 时逐个挂进容器盖住镜像内版本（挂载计数 fail-closed 断言），从而不改镜像修正上游行为。详见：[DEPLOY-GUIDE.md](DEPLOY-GUIDE.md) §5 · [PITFALLS-AND-FAQ.md](PITFALLS-AND-FAQ.md) P2-2
 - **engram**

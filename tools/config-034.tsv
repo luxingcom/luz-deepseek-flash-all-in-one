@@ -45,6 +45,8 @@ CFG-21	any	overlay	mhc md5	982a0ad0e15772f6aa94aaee2ce2366d	__ASSETS_ROOT__/v4vl
 CFG-22	any	overlay	page_map md5	c0dfe59a244f1441311a39e69b423264	__ASSETS_ROOT__/v4vl/sglang-overlay.o12c1-prod/page_map_export.py:整件	md5sum __ASSETS_ROOT__/v4vl/sglang-overlay.o12c1-prod/page_map_export.py | awk '{print $1}'	A.2 面（第 29 源）被改=停窗呈报
 CFG-23	any	overlay	overlay-map.tsv 数据行数	29	__ASSETS_ROOT__/v4vl/sglang-overlay.o12c1-prod/overlay-map.tsv:表体	awk -F'\t' '!/^#/ && NF>=2 && $1!="" {n++} END{print n+0}' __ASSETS_ROOT__/v4vl/sglang-overlay.o12c1-prod/overlay-map.tsv	≠29=映射面漂移（boot :465 die）；停窗呈报
 CFG-24	any	overlay	overlay-md5.txt 清单 md5（01 专属件）	fd59c03bee7866aea29ecd35b7e14cf5	__ASSETS_ROOT__/prod/overlay-md5.txt:整件	md5sum __ASSETS_ROOT__/prod/overlay-md5.txt | awk '{print $1}'	清单失配=overlay 件变更未入档；停窗呈报
+# 代际注记（2026-10-31）：CFG-25/CFG-26 的 0beb4bee·99 件=装钩后武装面口径（同 BL-BYP1）；
+#   交付面前态面锚=deploy/adapter/0.3.4-MANIFEST.md5（71 *.py/5c2c88eb/sitecustomize 45ca6e3e）。
 CFG-25	any	adapter	整树指纹（99 件，D121 staged 三件入包后）	0beb4bee	__ASSETS_ROOT__/dsv41/adapter:整树	cd __ASSETS_ROOT__/dsv41/adapter && find . -type f ! -path '*__pycache__*' | LC_ALL=C sort | xargs -r md5sum 2>/dev/null | LC_ALL=C sort | md5sum | cut -c1-8	adapter 面被改（D81-① 锁定面+D121 sitecustomize 钩/prefill_bypass 入包）=停窗呈报
 CFG-26	any	adapter	整树文件数	99	__ASSETS_ROOT__/dsv41/adapter:整树	find __ASSETS_ROOT__/dsv41/adapter -type f ! -path '*__pycache__*' | wc -l	≠99=件面增删（99=+prefill_bypass.py〔D121〕；.bak/单测件残留=复位零残留律）；停窗呈报
 CFG-27	any	adapter	librow_store.so md5	9eec98f8f164d00a180f0d03de715e4d	__ASSETS_ROOT__/dsv41/adapter/librow_store.so:整件	md5sum __ASSETS_ROOT__/dsv41/adapter/librow_store.so | awk '{print $1}'	.so 非 X2 回滚终态件（keepalive 构件残留=隐性面）=停窗呈报

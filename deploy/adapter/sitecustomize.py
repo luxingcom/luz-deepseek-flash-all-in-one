@@ -372,6 +372,25 @@ class EngramLoader(importlib.abc.Loader):
             # bytes, and the SM120 repack bridge. Gated on DSV41_FP4KV_PORT
             # (off by default); dispatch by module name is inside kv_fp4, and
             # each installer self-orders via _ensure_memory_pool_patched.
+            # A6 (2026-10-16, UPSTREAM-REPORT §3 row 3): this tuple hits
+            # memory_pool FIRST (loader chain order), so the later #1b elif
+            # (G3 break: pin indexer page 64) was DEAD CODE -- sparse_wire's
+            # pin never ran in service. Install the INDEX-K page pin here, in
+            # the branch that actually hits, BEFORE kv_fp4 (upstream: 实际命中
+            # 分支先安装 INDEX-K page64). The call self-gates on
+            # DSV41_DG_SPARSE_SM121 (gate off = inert; zero new keys), and any
+            # exception = REFUSED banner + stock page path intact (fail-safe:
+            # the boot continues, kv_fp4 still runs).
+            if module.__name__ == 'sglang.srt.mem_cache.deepseek_v4_memory_pool':
+                try:
+                    from sparse_wire import install_memory_pool as _a6_pin_indexk
+                    _a6_rc = bool(_a6_pin_indexk(module))
+                    print(f'[indexk-pin] installed={_a6_rc} gate='
+                          f'{os.environ.get("DSV41_DG_SPARSE_SM121", "(unset)")!r} '
+                          f'page={getattr(module, "DSV41_INDEX_PAGE_SIZE", "?")}', flush=True)
+                except Exception as _a6_exc:
+                    print(f'[indexk-pin] REFUSED -> stock page path intact. why: '
+                          f'{type(_a6_exc).__name__}: {_a6_exc}', flush=True)
             from kv_fp4 import install as install_kv_fp4
             install_kv_fp4(module)
         elif module.__name__ == 'sglang.srt.layers.deep_gemm_wrapper.configurer':
@@ -472,6 +491,12 @@ class EngramLoader(importlib.abc.Loader):
         ):
             # G3 break #1b: pin indexer page 64 (SM121 iron law) via memory_pool
             # anchor; inert without DSV41_DG_SPARSE_SM121.
+            # A6 (2026-10-16): UNREACHABLE via this loader chain -- the kv_fp4
+            # tuple above hits memory_pool first, which is exactly why #1b was
+            # dead in service. The live pin now runs there (A6 hunk1); this
+            # arm is retained verbatim as the anchor/documentation of the
+            # pin's purpose and is a no-op if ever reached (install_memory_pool
+            # is idempotent by _INSTALLED key).
             from sparse_wire import install_memory_pool
             install_memory_pool(module)
         elif module.__name__ == (
@@ -490,8 +515,19 @@ class EngramLoader(importlib.abc.Loader):
             # planner with its own 128-page geometry -- forcing here misroutes
             # decode metadata into the dense builder (assert block_kv==64) and
             # breaks the paged-v2 topk. Step aside in the sparse world.
+            # A6 (2026-10-16, UPSTREAM-REPORT §3 row 3): step-aside is only
+            # correct while the pool page rides main's gate coupling (128).
+            # With the A6 page pin LIVE (#1b now actually installed), the
+            # ratio-1/2 pool page is 64 and the metadata carries
+            # compressed_page_size=64 -- the SM120 FP4 kernel split-128
+            # geometry -- so restore the force for that exact case: SM12x x
+            # ratio in (1,2) x page64 (upstream: 仅对SM12x、ratio1/2 和page64
+            # 恢复对应metadata). page 128 (native flow) keeps standing aside:
+            # byte-for-byte the pre-A6 behavior. One-time direct line, so
+            # installed!=engaged is tellable from the boot/decode log.
             cls = module.PagedIndexerMetadata
             original = cls.__post_init__
+            _a6_meta_banner = [False]
             def post_init(self):
                 sm12 = bool(getattr(module, '_IS_SM120', False) or
                             getattr(module, '_IS_SM121', False))
@@ -499,8 +535,15 @@ class EngramLoader(importlib.abc.Loader):
                     from sglang.srt.layers.deep_gemm_wrapper.configurer import (
                         DEEPGEMM_PAGED_SPARSE_MQA_LOGITS as _sparse_on,
                     )
-                    if not _sparse_on:
+                    pinned_index = int(getattr(self, 'compressed_page_size', 0) or 0) == 64
+                    if (not _sparse_on) or pinned_index:
                         self.force_deep_gemm_metadata = True
+                        if not _a6_meta_banner[0]:
+                            _a6_meta_banner[0] = True
+                            print(f'[indexk-metadata] force dense deep_gemm metadata '
+                                  f'(sparse={bool(_sparse_on)} '
+                                  f'page={getattr(self, "compressed_page_size", "?")} '
+                                  f'ratio={self.compress_ratio}) -> SM12x split-128 planner', flush=True)
                 original(self)
             cls.__post_init__ = post_init
 

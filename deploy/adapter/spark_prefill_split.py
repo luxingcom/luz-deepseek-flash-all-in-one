@@ -69,6 +69,32 @@ def _int(name, default):
         return default
 
 
+def _unwrap_dense_backend(obj, dbb_cls, max_depth=4):
+    """Drill through the seam_mount _ConsumesAs facade to the dense backend.
+
+    The facade is an appearance keeper that proxies NO attributes (reading
+    use_deep_gemm_prefill on the wrapper itself is an AttributeError), so the
+    dense-form guards walk the _orig/_gather chain instead of testing the
+    wrapper (A23ALPHA r2 semantics; WCBOOT69 root cause / G0 §6.1). Only
+    these two attributes are ever read -- never an arbitrary facade
+    attribute (G0 §6.3). The live chain is exactly one level deep; the bound
+    is defensive against deeper wraps. Returns the first dbb_cls instance
+    found, else None.
+    """
+    stack = [(obj, 0)]
+    while stack:
+        x, depth = stack.pop()
+        if isinstance(x, dbb_cls):
+            return x
+        if depth >= max_depth:
+            continue
+        for attr in ("_gather", "_orig"):  # LIFO: _orig branch is walked first
+            nxt = getattr(x, attr, None)
+            if nxt is not None and nxt is not x:
+                stack.append((nxt, depth + 1))
+    return None
+
+
 def partition(rows, world, rank, tile=128):
     """Community partition, verbatim: tile-aligned extents, start=rank*extent."""
     if rows < 0 or world < 1 or not 0 <= rank < world or tile < 1:
@@ -140,11 +166,17 @@ def make_split_dense(module):
         # different metadata form -- both belong to the stock path.
         if not self.full_topk_indexer.use_deep_gemm_prefill:
             return False
-        if source and not (
-            isinstance(self.prefill_candidates, DenseBlocksBackend)
-            and self.prefill_candidates.use_deep_gemm_prefill
-        ):
-            return False
+        if source:
+            # G0 §6.2: face-aware decline. The seam _ConsumesAs facade hides a
+            # dense pair behind a non-DenseBlocksBackend wrapper; the old bare
+            # isinstance silently routed every source layer to stock while the
+            # init banner said engaged. Unwrap first; still refuse genuinely
+            # non-dense forms (torch prefill / sparse publish -> stock path).
+            dense_candidate = _unwrap_dense_backend(
+                self.prefill_candidates, DenseBlocksBackend
+            )
+            if dense_candidate is None or not dense_candidate.use_deep_gemm_prefill:
+                return False
 
         inputs = self._make_low_ratio_prefill_indexer_inputs(
             layer, x, q_lora, req, pos, forward_batch, rows_per_request
@@ -225,10 +257,11 @@ def make_split_dense(module):
                 del logits
         gathered = tp.group.all_gather(packed, dim=0)[:num_rows]
 
-        # ---- publish: the base's own Selection / BlockIds forms ----
-        out = self._get_low_ratio_selection(layer.compress_ratio)
-        out.reset()
-        data.write_selection(selected=gathered[:, :topk], out=out)
+        # ---- publish: the base's own outputs / BlockIds forms ----
+        # 520d6d0 新合同：write_selection 收 inputs（页槽写回内部走
+        # inputs.out_page_indices/out_raw_indices），无 Selection 池取用面。
+        inputs.reset_outputs()
+        data.write_selection(selected=gathered[:, :topk], inputs=inputs)
         if source:
             self._publish_candidate_metadata(
                 BlockIds(
@@ -331,9 +364,18 @@ def install(module):
             # protocol door became this structural refusal: the split
             # publishes BlockIds, which only the DeepGEMM DenseBlocksBackend
             # pair consumes.
+            # G0 §6.1 / A23ALPHA r2: the live prefill slot is a seam_mount
+            # _ConsumesAs facade over a dense pair (sparse_wire REFUSED path),
+            # so unwrap the _orig/_gather chain before the isinstance +
+            # use_deep_gemm_prefill judgment -- the facade itself proxies no
+            # attributes (G0 §6.3). The full_topk slot keeps its attribute-only
+            # test: FullTopKIndexer is never a DenseBlocksBackend, and adding
+            # an isinstance there mis-killed legal boots once already
+            # (A23ALPHA RED2).
+            dense_candidate = _unwrap_dense_backend(self.prefill_candidates, _DBB)
             if not (
-                isinstance(self.prefill_candidates, _DBB)
-                and self.prefill_candidates.use_deep_gemm_prefill
+                dense_candidate is not None
+                and dense_candidate.use_deep_gemm_prefill
                 and self.full_topk_indexer.use_deep_gemm_prefill
             ):
                 raise RuntimeError(
@@ -368,9 +410,13 @@ def install(module):
                 group, group.rank_in_group, world, min_context, min_rows, budget
             )
             logger.warning(
-                "DSV41 prefill TP split initialized rank=%s world=%s min_ctx=%s "
-                "min_rows=%s budget=%s (no init collective)",
-                group.rank_in_group, world, min_context, min_rows, budget,
+                # G0 §6.2 (2): print the UNWRAPPED candidate type so the boot
+                # log itself disproves the silent-stock trap (banner engaged +
+                # layers declining). cand= is the post-unwrap class name.
+                "DSV41 prefill TP split initialized cand=%s rank=%s world=%s "
+                "min_ctx=%s min_rows=%s budget=%s (no init collective)",
+                type(dense_candidate).__name__, group.rank_in_group, world,
+                min_context, min_rows, budget,
             )
 
     cls.__init__ = __init__

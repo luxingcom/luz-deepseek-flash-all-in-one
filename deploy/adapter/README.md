@@ -1,5 +1,47 @@
 # deploy/adapter/ — adapter 供给面整面快照（B1 收录 2026-10-13）
 
+> **权威口径（2026-10-31 回正）：本目录=0.3.4 公开树交付面=canon98 前态正典面**
+> （0.3.4 锁档修复固化面在 BYPASS 未入包时点的正典形态，即「98 前态面」）。
+>
+> - **\*.py 正典面 71 件**（顶层+`fi_r1/`/`overlay/`/`tests/`/`recipe_lib/` 子树含内），
+>   与 audit 侧 canon98 材料逐字节同；正典锚（fingerprint.py 口径）：
+>   count=71 / manifest-md5=**5c2c88eb**61411d67d8a040b5407e5e3d
+>   （manifest-sha256=c569adc8…、concat-md5=4bc363eb…）、
+>   **sitecustomize.py=45ca6e3e**1ca0eb34c3ff21abb0023571（前态，装钩前）。
+> - **逐件账=[0.3.4-MANIFEST.md5](0.3.4-MANIFEST.md5)**（全供给面 91 件=71 \*.py+20 在役
+>   非 py 件；验收：`cd deploy/adapter && md5sum -c 0.3.4-MANIFEST.md5` 全绿；*.py 面
+>   指纹公开复算配方（LC_ALL=C 钉字节序，实测逐位复现）见该清单头部注——量具
+>   fingerprint.py 为同算法实现、不随公开树分发。〔2026-10-31 复核批改注：原「验收两步」
+>   之②引 `<量具>/fingerprint.py` 对外部采用者不可达，现以公开复算配方替代。〕）。
+> - **prefill_bypass.py 不在面内（原因）**：0.3.4 交付前态面 BYPASS 未入包
+>   （2026-10-28 锁档口径），适配件正典件住 [../tools/bypass/](../../tools/bypass/README.md)
+>   （prefill_bypass.py=c4875258…），由装钩器按需升入——交付面默认不携带
+>   env 门控实验钩，保持前态零突变面。
+> - **装钩叙事（98 前态面 → 99 武装面）**：`bash tools/bypass/install-prefill-bypass.sh`
+>   一键升入：sitecustomize 45ca6e3e →确定性插钩→ **dd69c59a**1098b735dd20e8aec1baaee9、
+>   prefill_bypass.py c487525873cc2c0e09436414efb22115 入面、面件数 +1（本仓面 91→92 件；
+>   锁档全文件口径 98→99）；env 门控 DSV41_PREFILL_BYPASS，未设键零突变、已装=幂等。
+>   装钩细节与武装验收门=**[../tools/bypass/README.md](../../tools/bypass/README.md)**；
+>   镜像升级操作=**[../docs/IMAGE-UPGRADE-GUIDE.md](../../docs/IMAGE-UPGRADE-GUIDE.md) ④**。
+>   〔机侧注（2026-10-31 复核批）：装钩器缺省 `ADAPTER_DIR=$HOME/migrate-assets/dsv41/adapter`
+>   =内部四机在役位；**无该位的机须以 `ADAPTER_DIR=<供给面目录绝对路径>` 覆盖运行**——裸命令
+>   字面照跑必 PANIC exit 9「找不到 …/migrate-assets/dsv41/adapter/sitecustomize.py」=防呆设计；
+>   ADAPTER_DIR 覆盖路径已实测可照跑（45ca6e3e→dd69c59a、c4875258 入面、重跑幂等）。〕
+> - **计数口径谱系（同物异计非内容差）**：78=GitHub main deploy/adapter 顶层目录项数
+>   （74 文件+4 子目录，非递归）；87=0.3.2 版本装配账（[0.3.2-MANIFEST.md5](0.3.2-MANIFEST.md5)
+>   条目）；98=0.3.4 锁档全文件时点值（BYPASS 未入包）；71=同一前态面 \*.py 口径；
+>   99=装钩器后在役武装口径。
+>   〔代际注记（2026-10-31 复核批）：**78 系回正前（b4822e37 代）时点值**——彼时顶层=74 文件
+>   +4 子目录；回正批后本目录顶层实测 `find -maxdepth 1`=**76 文件+5 子目录=81**（新增
+>   `recipe_lib/`、`0.3.4-MANIFEST.md5` 等），同谱系唯一未标代际者即此 78，现值以
+>   0.3.4-MANIFEST.md5（91 供给件）与本目录实数为准。〕
+> - **历史指纹注记**：d52b0e3d/0beb4bee=2026-10-28 锁档「8-hex 集签名」口径时点值
+>   （生成算法不在 fingerprint.py 三法内，另律不混用）；b58e49ff=0.3.2 装配面产线记录
+>   口径（0.3.2 代）；73e5c5e4=[MANIFEST.md5](MANIFEST.md5)（EQ-12 在役账）清单文本口径
+>   ——均为历史代时点值原样保留，交付验收以 0.3.4-MANIFEST.md5 为准。
+> - 本文件以下 B1/FL6 代小节为历史注记**原样保留**（55b1e412、83 件面等=0.3.1 代
+>   时点值，行值不删不改；现役面现值一律以 0.3.4-MANIFEST.md5 逐件为准）。
+
 > 权威源=宿主 `~/migrate-assets/dsv41/adapter/`（bind mount 唯一供给面，四机全等律，
 > cfgmgmt 包红线不烘焙）；同步/对表工具=selfheal 包 `adapter-sync.sh`
 > （--apply/--check/--expect）。本目录=B1 整面收录快照（盲测呈裁「adapter 面不完整
@@ -37,6 +79,11 @@ bash tools/adapter-manifest-verify.sh --manifest deploy/adapter/MANIFEST.md5 --r
 发布生效，任务书 EQ-12 依赖注记）。
 
 ## 规模与构成（收录 83 件，约 3.0M）
+
+> 代际注记（2026-10-31）：本节为 **B1 收录（0.3.1/FL6 代）83 件口径**的历史记录，
+> 行值保留不删。现役 0.3.4 面=**91 件**（71 \*.py 前态正典面+20 在役非 py 件；较 B1 代
+> 新增 dsv41_recipe.py、recipe_lib/deepseek_recipe/\_\_init\_\_.py 等前态正典件），
+> 逐件以 [0.3.4-MANIFEST.md5](0.3.4-MANIFEST.md5) 为准。
 
 | 分区 | 件数 | 内容 |
 |---|---|---|
@@ -99,7 +146,19 @@ bash tools/adapter-manifest-verify.sh --manifest deploy/adapter/MANIFEST.md5 --r
 | `fi_r1/` 六件 | 0b6f13f1 等 | R1 八件面（49 GREEN 对拍链），逐件见 MANIFEST.md5 |
 | `spark_prefill_split.py` | eb53ea12 | TPsplit 库版（split 判负留库件；禁设键 DSV41_SPARK_PREFILL_TP_SPLIT） |
 
+> 代际注记（2026-10-31）：本表=**B1/FL6 代（0.3.1）时点值**，行值保留。0.3.4 前态面
+> 现值：`sitecustomize.py`=**45ca6e3e**（前态；装钩器后 dd69c59a，三代谱系
+> 45ca6e3e 前态→b4822e37 EQ-12 重钉漂移代→dd69c59a 武装，本仓现钉回 45ca6e3e）、
+> `kv_fp4.py`=**75062432**、`spark_prefill_split.py`=**8427a4c8**（0.3.4 锁档修复固化值）；
+> `fl6_recall.py` b87cbb5e、`prefill_sp.py` 32cf9abf 两件跨代同值未变。逐件以
+> [0.3.4-MANIFEST.md5](0.3.4-MANIFEST.md5) 为准。
+
 ## sitecustomize.py 状态注记（FL6 转正终值）
+
+> 代际注记（2026-10-31）：本节=**0.3.1/FL6 代状态记录**（55b1e412 行值保留）。
+> 0.3.4 代本件现值=**45ca6e3e**（canon98 前态面正典，见文首权威口径）；装钩器
+> （`tools/bypass/install-prefill-bypass.sh`）插钩后=dd69c59a（env 门控
+> DSV41_PREFILL_BYPASS）。下述 FL6 第 51 键机制在 0.3.4 面继续在役。
 
 - **FL6 已转正在役（GREEN 收窗）**：产线现役=51 键 ENV51
   `PROD-R51W5FL6-spec1.env`（2ac74586；仓内异名同值件=`deploy/env/

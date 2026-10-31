@@ -18,7 +18,13 @@
 - **env 键**：`DSV41_PREFILL_BYPASS=2048`（61 键 env 的第 60 键；不设或非正整数=不武装、
   零突变）；`DSV41_PREFILL_BYPASS_SCAN` 缺省 32（每轮在飞 chunk 旁最多扫的候选数）。
 - **adapter 面**：`sitecustomize.py` 挂钩后态 `dd69c59a`（装载缝）+ 本目录正典件
-  `c4875258` 入 adapter 目录（面件数 98→99）。装钩器一键完成并自验。
+  `c4875258` 入 adapter 目录（面件数 98→99）。装钩器一键完成并自验。装钩基底=
+  `deploy/adapter` **98 前态正典面**（公开树交付形；逐件锚=`deploy/adapter/0.3.4-MANIFEST.md5`：
+  磁盘供给 **91 件**=71 \*.py+20 非 py、sitecustomize 前态=`45ca6e3e`；「98 件」为锁档
+  在役全文件口径，与仓面 91 之差=包外宿主件另计，两口径对账=deploy/adapter/README.md
+  计数谱系节），c4875258 入面后**磁盘 91→92 件**（锁档在役全文件口径 98→99）。
+  〔2026-10-31 复核批措辞修正：原句把 98/99 锁档全文件口径直安在公开树目录上，与
+  0.3.4-MANIFEST.md5 实记 91 件相左，现两口径并记。〕
 - **overlay 面**：适配件内 EXPECTED 钉的是 scheduler / PrefillAdder **九个方法源**的
   sha256（dedent 后 inspect 源），不是整文件 md5——所以 overlay 的 `scheduler.py`
   从锁档形 `3db3275e` 演进到现役 `4a7822a6` 后**仍能武装**（演进未动被钉的方法源）。

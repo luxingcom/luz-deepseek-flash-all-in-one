@@ -8,7 +8,7 @@ indexer layers per step (config.index_source_layer_ids = [2, 8, 14, 20, 24,
 four ratio-1 consumes). Source-of-truth note: the census card cites the ctx600k
 OVERLAY line numbers, but production boots the IMAGE tree (r3-boot mounts only
 the adapter; no overlay volume). On the image, the block is
-sglang.srt.layers.attention.dsv4.v41_indexer.scoring.decode_scores (:335), and
+sglang.srt.layers.attention.dsv4.v41_indexer.scoring.decode_scores (:374), and
 its per-step layer-invariant prefix is exactly:
 
     lens  = (pos + 1) // ratio                                    [bs]
@@ -245,13 +245,15 @@ def _slim_prefix(inputs, req_to_token, lens, lmax):
 # ------------------------------------------------------- decode_scores wrap
 
 
-def _decode_scores_wrap(*, inputs, out, token_to_kv_pool, req_to_token):
+def _decode_scores_wrap(*, inputs, token_to_kv_pool, req_to_token, candidate_mask):
     scoring = _state["modules"]["scoring"]
     stats = _state["stats"]
     req, pos = inputs.req_rows, inputs.positions
     metadata = inputs.paged_metadata
     bs = req.shape[0]
-    out.reset()
+    # 520d6d0 新合同：decode_scores 无 out 参，写回面在 inputs.out_page_indices
+    # （stock scoring.py:392/:400/:432 全路径 reset_outputs——wrap 在入口同覆盖）。
+    inputs.reset_outputs()
     assert pos.shape[0] == bs, (
         f"decode expects one token per request, {pos.shape=} {bs=}"
     )
@@ -540,18 +542,20 @@ def install_scoring(module) -> bool:
     _state["modules"]["scoring"] = module
     _state["orig_decode_scores"] = orig
 
-    def decode_scores(*, inputs, out, token_to_kv_pool, req_to_token):
+    def decode_scores(*, inputs, token_to_kv_pool, req_to_token,
+                      candidate_mask=None):
         if (
             _state["step"] is None
             or not _device_ok(req_to_token)
             or inputs.compress_ratio not in (1, 2)
         ):
-            return orig(inputs=inputs, out=out,
+            return orig(inputs=inputs,
                         token_to_kv_pool=token_to_kv_pool,
-                        req_to_token=req_to_token)
+                        req_to_token=req_to_token,
+                        candidate_mask=candidate_mask)
         return _decode_scores_wrap(
-            inputs=inputs, out=out, token_to_kv_pool=token_to_kv_pool,
-            req_to_token=req_to_token,
+            inputs=inputs, token_to_kv_pool=token_to_kv_pool,
+            req_to_token=req_to_token, candidate_mask=candidate_mask,
         )
 
     module.decode_scores = decode_scores

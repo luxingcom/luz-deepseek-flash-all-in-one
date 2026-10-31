@@ -13,12 +13,12 @@
    block_kv == 64"，引用者=fp8_fp4_paged_mqa_logits）⇒ 必须把池页钉回 64。
    deep_gemm_sm121.install_memory_pool 原型把钉挂错模块（configurer 无
    DSV41_INDEX_PAGE_SIZE 锚）；本模块以 memory_pool 模块为锚重做。
-#2 sparse_table.py:194-202 非 chunked publish_decode 无条件内联
+#2 sparse_table.py:191-197 非 chunked publish_decode 无条件内联
    topk_transform_paged_v2、传 metadata.topk_metadata——use_topk_v2=False 时
    那是 CPU 空哑元（metadata.py:290 torch.empty((0,))）→ 核面必炸。
    修：改走 topk_transform_paged_from_metadata（其内部按 use_topk_v2 分派
    v1/v2；patch 形式=整方法重绑，语义 diff 恰为上游 2 行）。
-#3 full_topk.py:61/118 topk_decode 不查 metadata.deep_gemm_metadata is None
+#3 full_topk.py:60/129 topk_decode 不查 metadata.deep_gemm_metadata is None
    → None 落 _deep_gemm_decode 把 None 塞给核。
    修：dispatch 处 None 即转 _torch_decode（覆盖两处调用面）。
 
@@ -238,16 +238,16 @@ def install_sparse_table(module) -> bool:
         topk_transform_paged_from_metadata,
     )
 
-    def publish_decode(self, inputs, out):
-        # = stock publish_decode（main c79510c）除标注处外逐行同源；
-        # 上游化 = 删除本重绑，树内 2 行替换（见 patches/0001）。
+    def publish_decode(self, inputs):
+        # = stock publish_decode（520d6d0 版，r032b 镜像内 sparse_table.py:171）
+        # 除标注处外逐行同源；上游化 = 删除本重绑，树内 2 行替换（见 patches/0001）。
         import torch
 
         data = module.get_deep_gemm_decode_data(inputs, self.token_to_kv_pool)
         metadata = inputs.paged_metadata
         seq_lens = metadata.compressed_seq_lens.reshape(-1)
         if isinstance(metadata.deep_gemm_metadata, list):
-            return self._publish_decode_chunked(inputs, data, seq_lens, out)
+            return self._publish_decode_chunked(inputs, data, seq_lens)
         logits = module.deep_gemm_fp4_paged_mqa_logits(
             (data.q_fp4, data.q_sf),
             data.k_cache,
@@ -259,18 +259,25 @@ def install_sparse_table(module) -> bool:
         )
         main_stream = torch.cuda.current_stream()
         self.alt_stream.wait_stream(main_stream)
+        # The block-selection chain reads logits after the main stream moves on.
         logits.record_stream(self.alt_stream)
-        # ---- 断线#2 修复：原为无条件 topk_transform_paged_v2(...,
-        # metadata.topk_metadata, ...)（use_topk_v2=False 时传 CPU 空哑元）。
-        # 改走 from_metadata：其按 metadata.use_topk_v2 分派 v1/v2 计划。----
+        # ---- 断线#2 修复（2 行语义差，520d6d0 上游仍直调 v2 传
+        # metadata.topk_metadata——use_topk_v2=False 时那是 CPU 空哑元
+        # metadata.py:290 torch.empty((0,))）。
+        # 改走 from_metadata：其按 metadata.use_topk_v2 分派 v1/v2 计划；
+        # decode 新合同无 raw（from_metadata raw 缺省 None）。----
         topk_transform_paged_from_metadata(
-            logits, metadata, out.page_indices, out.raw_indices
+            logits, metadata, inputs.out_page_indices
         )
+        # per row: block count for the block top-k, sparse-row length for the
+        # consumers
         with torch.cuda.stream(self.alt_stream):
             nblocks, row_valid_lens = module.candidate_row_lens(
                 seq_lens, self.topk_blocks)
             blocks = module.amax_topk_blocks(
                 logits, seq_lens, nblocks, self.topk_blocks)
+            # in place: ascending, INT32_MAX padded, plus the blocks as pool
+            # slots / 8
             phys_blocks = module.sort_candidate_blocks(
                 blocks, seq_lens, metadata.page_table,
                 metadata.compressed_page_size)
@@ -279,6 +286,7 @@ def install_sparse_table(module) -> bool:
                 metadata.compressed_page_size, data.q_fp4.dtype,
                 self._get_request_ids(inputs, data.q_fp4.shape[0], blocks.device),
             )
+            # consume_decode reads these on the main stream
             for t in (blocks, schedule, phys_blocks, row_valid_lens):
                 t.record_stream(main_stream)
             ready = torch.cuda.Event()
@@ -306,13 +314,13 @@ def install_full_topk(module) -> bool:
         return False
     _orig = cls.topk_decode
 
-    def topk_decode(self, inputs, out):
+    def topk_decode(self, inputs):
         md = inputs.paged_metadata
         if self.use_deep_gemm_decode and getattr(md, "deep_gemm_metadata", "x") is None:
             # 上游化（patches/0002）：None = 本 forward 被指到 torch 面
             # （HIP/XPU/FORCE_TORCH），stock dispatch 会把 None 塞给核。
-            return self._torch_decode(inputs, out)
-        return _orig(self, inputs, out)
+            return self._torch_decode(inputs)
+        return _orig(self, inputs)
 
     cls.topk_decode = topk_decode
     _INSTALLED.add(key)

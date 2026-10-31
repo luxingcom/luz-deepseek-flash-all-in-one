@@ -12,7 +12,7 @@
 | 区 | 路径 | 是什么 |
 |---|---|---|
 | **overlay 快照区** | [`overlay/o12c1-prod/`](overlay/o12c1-prod/) | 产线影子挂载目录的逐字节快照：**0.3.4 形现役 30 件**（29 个 `.py` 活件 + `overlay-map.tsv` 映射表），boot 时逐个盖进容器 |
-| **正典备查区** | [`reconstruct/0.3.4/overlay/`](reconstruct/0.3.4/overlay/NOTES.md)（本批新增）、[`reconstruct/0.3.2/`](reconstruct/0.3.2/README.md) | 逐代际的身份正典全文：0.3.4 三件 / 0.3.2 完整重建包 |
+| **正典备查区** | [`reconstruct/0.3.4/overlay/`](reconstruct/0.3.4/overlay/NOTES.md)（本批新增）、[`reconstruct/0.3.4/adapter/`](reconstruct/0.3.4/adapter/NOTES.md)（2026-10-31 回正批新增）、[`reconstruct/0.3.2/`](reconstruct/0.3.2/README.md) | 逐代际的身份正典全文：0.3.4 overlay 三件 / 0.3.4 adapter 前态面 71 \*.py（回正批新增）/ 0.3.2 完整重建包 |
 | （旁支）VL 复原树 | [`overlay/v4vl-79cafec0/`](overlay/v4vl-79cafec0/) | V4.0exp 视觉臂专用 28 件复原树，与产线 o12c1-prod **零交叠**，不属本文主叙事，见 `docs/DEPLOY-GUIDE.md` §9.2 |
 
 ## 二、overlay 快照区现状（2026-10-31 起 = 0.3.4 形）
@@ -72,6 +72,7 @@
 | 5 | `overlay/o12c1-prod/overlay-map.tsv` | `efd7d89b…` | 29 行平铺名→容器路径映射表（0.3.4 新锚件） | 随 overlay 目录一起用 |
 | 6 | `prod/overlay-md5.txt` | `6c98cf8c…` | overlay 29 件对表清单（0.3.4 现役形） | `md5sum -c` 自验用 |
 | 7 | `overlay/v4vl-79cafec0/`（28 件） | 指纹 `cbf986df` | VL V4.0exp 臂专用复原树（历史臂，与产线零交叠） | 仅 VL 复原实验用 |
+| 8 | `reconstruct/0.3.4/adapter/`（71 \*.py+NOTES.md+清单，2026-10-31 回正批新增） | \*.py 面 `5c2c88eb…`（manifest-md5，count=71） | **0.3.4 前态面身份备查正典**（canon98 面全文，与供给位逐字节同） | 身份对照/审读；运行供给位=`deploy/adapter/`（逐件账 `0.3.4-MANIFEST.md5`），装钩器=`tools/bypass/`；子树内 `MANIFEST.md5`（72 条目）`md5sum -c` 自验 |
 
 **旧形全文去哪取**（社区问得最多的三件，公开树此前无全文，现口径如下）：
 
@@ -93,6 +94,7 @@
 | `tools/packages/cfgmgmt/payload/out/overlay-MANIFEST.md5` | 公开树 | **0.3.2 期**（2026-10-13；29 条目+3 行头注，serving=`b77a736c`、scheduler=`5b6fe2a3`、含 map 旧形 `a8bf0fd6`） | 0.3.2 代逐件账；查 0.3.2 期历史值用它 |
 | `deploy/reconstruct/0.3.2/MANIFEST.md5` | 公开树 | 0.3.2 重建包内件 | 只覆盖 reconstruct/0.3.2/ 包内文件（含 `a1e7c3b5` 两载体） |
 | `deploy/reconstruct/0.3.4/MANIFEST.md5` | 公开树（本批新增） | 0.3.4 三正典 | 只覆盖 reconstruct/0.3.4/ 包内文件 |
+| `deploy/reconstruct/0.3.4/adapter/MANIFEST.md5` | 公开树（2026-10-31 回正批新增） | 0.3.4 前态面备查副本 | 只覆盖 reconstruct/0.3.4/adapter/ 包内文件（72 条目；与 `deploy/adapter/0.3.4-MANIFEST.md5` 同口径共锚——\*.py 面 manifest-md5 同为 `5c2c88eb`） |
 
 ## 六、从发布镜像提取镜像面原件（写给社区用户，在你自己的机器上执行）
 
@@ -185,9 +187,16 @@ OCI 混合布局；image id=`sha256:80e4c957…8f7d0`，与锁档档案所称 x6
 
 全包任何位置都取不到完整 29 件 0.3.4 面（仓快照 23/29、镜像烘焙面 21/29）。
 起 0.3.4 栈的取件组合=**包内镜像 tar（先按包内 `CHECKSUMS.manifest` 校验）+
-本仓 main ≥85aa172 的 `deploy/overlay/o12c1-prod/` 整目录**；权重与 engram
+本仓 main ≥85aa172 的 `deploy/overlay/o12c1-prod/` 整目录 +
+本仓 main 回正批（2026-10-31）的 `deploy/adapter/` 整目录（含 `0.3.4-MANIFEST.md5`）**；
+权重与 engram
 本就不在包内，另按 [GETTING-STARTED §5](../docs/GETTING-STARTED.md) 从官方
-渠道取。包内 `README-DIST.md` §四-4「overlay 本体未入公开树、`md5sum -c` 必红
+渠道取。**adapter 面同理必须取自仓侧回正后形**：包内仓快照 fb9c200 早于回正批，
+其 `deploy/adapter` 仍是漂移代（sitecustomize=`b4822e37`、无 `0.3.4-MANIFEST.md5`），
+装钩器对其必 PANIC「面漂移」exit 9——照旧组合（镜像 tar+overlay 整目录）取件会
+留下一块既过不了 0.3.4 清单验收也装不上钩的旧 adapter（2026-10-31 复核批补注；
+发布包刷新窗应同步重切包，见 CHANGELOG 回正批「需随 0.3.4-MANIFEST.md5 重切包」口径）。
+包内 `README-DIST.md` §四-4「overlay 本体未入公开树、`md5sum -c` 必红
 属已知缺口」的警告描述的是 fb9c200 时点；85aa172 起该缺口已在仓侧闭合，包体
 文案待发布包刷新窗同步（刷新后本节 7.1/7.3 的时点与缺口描述随之更新）。
 

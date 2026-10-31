@@ -28,7 +28,7 @@ always correct; the flawed variants lived only in d7-dev/lm_cert.py and are fixe
 docs/verdicts/B3-CERTHEAD-R1P-20261002.md, rechecked by d7-dev/r1_fix_recheck.py: unsafe 0
 rows, rt 100% >= the float64 truth on the real rank-0 shard).
 
-HOOK VERIFICATION (read-only docker inspect of <registry-host>:5000/lmsysorg/sglang:
+HOOK VERIFICATION (read-only docker inspect of 192.168.5.187:5000/lmsysorg/sglang:
 main-79cafec0, 2026-10-02). Design-card (DESIGN.md §2) line numbers CONFIRMED -- ZERO DRIFT:
 
   layers/logits_processor.py:861   LogitsProcessor._get_logits(self, hidden_states, lm_head,

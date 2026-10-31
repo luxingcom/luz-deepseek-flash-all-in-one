@@ -2,4 +2,4 @@
 prefill_bypass.py	c4875258（staging 原件逐字节；knapcio b9ea6dd 血统 173 行+我树 9 哈希重钉=181 行）
 stage-one-host-bypb.sh	staging 原件（sitecustomize 钩插入 dd69c59a+防重入三断言；BYPB 注记=MV-14 名义，复用即改口为 BEN 固化）
 bypass-armed-gate.sh	phase2-boot 原件（ARMED ×2/机+refusing-to-arm=0 断言；W-d 起为 deploy 后核面）→ 2026-10-31 公开树修复批重写为参数化 v2（-l/-s/-c/-w/-H 可覆盖；断言语义不变 armed≥1 ∧ refusing=0），历史形存于内部窗
-install-prefill-bypass.sh	2026-10-31 公开树修复批新作（stage-one 存档件的功能重制：ADAPTER_DIR/PB_SRC 参数化、md5 硬断言 45ca6e3e→dd69c59a 与 c4875258、幂等可重跑）
+install-prefill-bypass.sh	2026-10-31 公开树修复批新作（stage-one 存档件的功能重制：ADAPTER_DIR/PB_SRC 参数化、md5 硬断言 45ca6e3e→dd69c59a 与 c4875258、幂等可重跑）→ 2026-10-31 复核批修 :93 回显措辞（原硬编码「期望 99 件」为锁档全文件口径、对公开仓面 91+1 永不满足易误读为自验失败；改两口径并记回显，逻辑/断言零改）
