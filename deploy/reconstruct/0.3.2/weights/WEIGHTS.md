@@ -23,7 +23,7 @@ sha256sum -c /path/to/DeepSeek-V4.1-Flash-1017.sha256
 
 `SHA256SUMS` 与上表同源；模型目录内自带一份，便于 `sha256sum -c SHA256SUMS`。
 
-### 1.1 台账第 1 行 `.gitattributes`（缺它≠权重损坏，可按下文逐字节重建）
+### 1.1 台账第 1 行 `.gitattributes`（缺它≠权重损坏，本仓已入档正典件可直取）
 
 84 行台账的**第 1 行是 `.gitattributes`**（sha256
 `0b7a51b31fd82346ce16419cdc30c0d2f21fc46d1190f9a241bddab63dfe13b5`，2143 字节，
@@ -32,10 +32,20 @@ sha256sum -c /path/to/DeepSeek-V4.1-Flash-1017.sha256
 之件：目录缺它时 `sha256sum -c` 第一行即 `FAILED open or read`，
 [DEPLOY-STEP-BY-STEP §3.1](../../../../docs/DEPLOY-STEP-BY-STEP.md) 的
 `find . -type f | wc -l` 计数门也会差 1（84→83）。常见缺失原因：rsync/scp
-没带点文件、手工拼装权重目录。**处置**：优先从官方模型仓重取同名件；或不依赖
-外部渠道，按下块内容逐字节重建（注意**行尾全 LF、末行之后没有换行符**，总长
-恰 2143 字节——复制粘贴通常会在末尾多出一个 `\n`，补一道
-`truncate -s 2143 .gitattributes` 再对锚最稳）：
+没带点文件、手工拼装权重目录。**处置（首选本仓件）**：本仓
+[`deploy/reconstruct/0.3.2/weights/.gitattributes`](.gitattributes) 即正典
+原件（与权重包内件 sha256 同源、git 逐字节保管），复制过去即回 84 行全过：
+
+```bash
+cp <本仓路径>/deploy/reconstruct/0.3.2/weights/.gitattributes \
+   /data/models/DeepSeek-V4.1-Flash-1017/.gitattributes
+sha256sum /data/models/DeepSeek-V4.1-Flash-1017/.gitattributes
+# 期望：0b7a51b31fd82346ce16419cdc30c0d2f21fc46d1190f9a241bddab63dfe13b5
+```
+
+无本仓渠道时：从官方模型仓重取同名件；或按下块内容逐字节重建（注意
+**行尾全 LF、末行之后没有换行符**，总长恰 2143 字节——复制粘贴通常会在末尾
+多出一个 `\n`，补一道 `truncate -s 2143 .gitattributes` 再对锚最稳）：
 
 ```text
 *.7z filter=lfs diff=lfs merge=lfs -text
