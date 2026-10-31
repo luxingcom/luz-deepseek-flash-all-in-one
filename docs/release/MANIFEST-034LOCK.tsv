@@ -5,6 +5,10 @@
 #   活体读=只读 md5sum/grep + registry tags 只读 GET）。
 # 读数口径：【本窗活读】=2026-10-28 建束窗 01 只读；【转引】=档载值（出处列明）。md5 一律全值 32-hex。
 # 掩码律：束内密钥行掩码形=***MASKED-034LOCK***（.env.tp4 :135；proxy.env 承 033 束掩码形原样）。
+# 注记（2026-10-31 公开树分叉，登记值与数据行零改动防破锁）：段二工具锚=内部原件/战役形 md5，
+#   公开树同名件为脱敏拷贝或产品化形故 md5 天然不同（RELEASE-NOTE:3 与 CHANGELOG「0.3.4 面公开
+#   移植批」「正典 md5 锚指内部原件」既有制式）——verify-034.sh 登记 5e664a22 vs 公开现值
+#   349d9f86、census_capture_w3.sh 登记 6e073acd vs 公开现值 f2f10cb6 属本制式非漂移。
 #
 # ── 段一：固化件面（仿 033-lock 束形；列=filename/source_machine/source_path/live_md5/archive_md5/four_machine_consistency）──
 filename	source_machine	source_path	live_md5	archive_md5	four_machine_consistency

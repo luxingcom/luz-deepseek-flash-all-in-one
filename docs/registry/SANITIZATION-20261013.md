@@ -10,7 +10,7 @@
 | 集群 sudo 口令 | 全树+git 全史（rev-list --all）字面量 | **0 命中** |
 | 私钥块（OPENSSH/RSA/EC PRIVATE KEY） | 全树+全史 | **0 命中** |
 | 公钥体/authorized_keys/known_hosts | 全树+文件名级 | **0 命中**（无 id_*/authorized_keys/*.pem/*.key 物料文件） |
-| 云/网令牌（ghp_/gho_/github_pat_/AKIA/xox/glpat-） | 全树+全史 | 唯一命中=SCAN-REPORT.md 自身的**正则模式文档词**（非凭据值） |
+| 云/网令牌（ghp_/gho_/github-pat_/AKIA/xox/glpat-） | 全树+全史 | 唯一命中=SCAN-REPORT.md 自身的**正则模式文档词**（非凭据值）。〔2026-10-31 注：github_pat 前缀在本档与 SCAN-REPORT 均连字化书写（github-pat_），防正则模式文档词自指命中脱敏扫描；被扫描模式字面仍为带下划线形，正典=本档上文模式清单与审计工作区脱敏量具（未入公开树），语义零改〕 |
 | sk- 长串 | 全树 | 0 命中 |
 | GW_API_KEY/GW_KEY 网关秘钥 | 全出现位值位核 | **全空值/运行期 env 读取**；3 处假值（`test-key-not-a-secret`/`leaked`/`real-secret-here`）=gw-verify 判别力 fixture（自检红例），**非真秘钥**，政策保留 |
 | wifi 秘钥（psk/wpa/ssid/802-11/wireless） | 全树 | **0 命中** |

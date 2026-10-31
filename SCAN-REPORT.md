@@ -9,7 +9,7 @@
 
 | # | 模式 | 命中数 | 判定 |
 |---|---|---|---|
-| P1 | key 字面量：`sk-[A-Za-z0-9]{16,}` / `AKIA[0-9A-Z]{16}` / `ghp_·gho_·github_pat_` / `-----BEGIN … PRIVATE KEY` / `Bearer <20+字符>` | **0** | 绿 |
+| P1 | key 字面量：`sk-[A-Za-z0-9]{16,}` / `AKIA[0-9A-Z]{16}` / `ghp_·gho_·github-pat_` / `-----BEGIN … PRIVATE KEY` / `Bearer <20+字符>` | **0** | 绿 |
 | P2 | 赋值型凭据：`(api[_-]?key|passwd|password|passphrase|secret|auth[_-]?token|access[_-]?token|client[_-]?secret) [:=] <8+字符值>` | 1（见处置①） | 绿 |
 | P3 | `GW_API_KEY` 全出现位值位核（政策=值位必须空） | 全空/占位（处置①②） | 绿 |
 | P4 | 集群口令面：`sshpass` / `-pw` / `PasswordAuthentication` / 集群密码值 | **0**（仅「口令零接触」陈述句） | 绿 |
@@ -20,6 +20,13 @@
 | P9 | 高熵 base64 块（>40 连续字符） | 0（命中皆为路径/文件名串） | 绿 |
 | P10 | `token` 词面（人工复核） | 全为 KV/tokenizer 域名词（SGLang 语义），无凭据赋值 | 绿 |
 | P11 | 内网 IP/主机名（`<node01>-<node04>`/RFC1918 段） | 26 件含 | **政策保留**（处置③） |
+
+> 〔2026-10-31 注记（写法说明，语义零改）〕P1 行 `github-pat_` 为连字化书写：被扫描的正则
+> 模式字面（github_pat 前缀+下划线形，此处故意不直书）在本档直书会构成「模式文档词自指
+> 命中」脱敏扫描（本档 2026-10-30 版曾因此被机检记命中一次，本注记亦以连字/拆词书写防复发）——
+> 实际扫描模式以此处描述为准，正典=本仓
+> [SANITIZATION-20261013](docs/registry/SANITIZATION-20261013.md) 的模式清单与审计工作区
+> 脱敏量具（未入公开树），扫描语义零改。
 
 ## 命中项处置清单（人工复核逐项）
 

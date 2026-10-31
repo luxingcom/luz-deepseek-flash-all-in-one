@@ -66,6 +66,11 @@ done
 c4=168.35、c8=242.83、c16=357.9（观察位）。判据：c1 全程 ≥84；c4 对同形锚
 ≥+3%；c16 不构成收益承诺。DE 只与 mt400 正典口径比，不要拿 mt64 或仪表盘数字对照。
 
+> **跨代口径注记（2026-10-31）**：上行 0.3.2 参考值仅历史列（K16-off/mt400 正典口径）；
+> 0.3.4 判读线=T33-03 PR 锚 **4384.8**／DE c1 锚 **91.64**／liter **≥3700**（判读以
+> [034-PERF-REPORT](../../docs/report/034-PERF-REPORT-20261029.md) §一/§七代际节 为准），
+> 跨代数字不比、防口径差误读为涨跌。
+
 ### 3.1 外部 prose 双读数口径注记（bug #20 落锚；0.3.4re DF-12，2026-10-30）
 
 外部移植报告（switch-v2026.10.15-b20）在同一文档内给过两个方向相反的 prose C1
@@ -142,3 +147,30 @@ done
 三次都 `PASS` 才算 3/3。水位门缺省 8000M；长上下文/大缓存 idle 形（MemAvailable
 约 6.9-7.5G）设 `NEEDLE_WATER_M=6000` 后重跑。输出 JSON 的 `water_m` 字段是本次
 有效水位线，`SKIP` 行 reason 同时带实测值与线值。
+
+## 7. 2026-10-31 缺件回填件身份台账（SOURCE-MD5 式；md5 均为 2026-10-31 落盘实测）
+
+正典锚指内部原件/战役形（[MANIFEST-034LOCK](../../docs/release/MANIFEST-034LOCK.tsv) 段二制式）；
+公开树与战役工作区布局不同构属预期（包装器按战役布局设计），本目录件均逐字节拷自战役仓正典位
+（dcgm-collector 为 $HOME 化改写形，锚指内部原件）。分叉声明=[0.3.4re-RELEASE-NOTE](../../docs/release/0.3.4re-RELEASE-NOTE.md) 卷首。
+
+| 件 | md5（落盘实测） | 身份与正典锚 | 用法一行 | 口径对应 | 依赖 |
+|---|---|---|---|---|---|
+| `../conc_pr_driver.py` | `333033ce` | 量具·liter C1 512k 判读主门（锚=MANIFEST-034LOCK 段二 `conc_pr_driver.py` 行同值逐字节） | `conc_pr_driver --base-url <引擎口v1基> --lit-dir <liter语料目录> --size 524288 --conc 1 --runs 1 --json-out <out.json>`（五参均必设） | liter C1 ≥3700 快带/≤3450 退化停窗 | 引擎口 v1 基＋liter 语料目录（`corpus/s-eng-lit7` 未入公开树，见下） |
+| `../de_c48_bench.py` | `a337f64e` | 量具·DE c1 判读门+EQOBS dec48 锚点（锚=MANIFEST-034LOCK 段二 `de_c48_bench.py` 行同值逐字节） | `de_c48_bench --tiers 1 --runs 5 --warmups 2 --arb-rounds 3 --anchors 1:91.64 --bench-repo <布线仓根> --campaign <战役仓根>` | DE c1 ≥91；对锚 ±3% IN-BAND（de_c48 口径，与 sd_bench 口径分列） | importlib 直载 `<bench-repo>/bench/sd_bench.py`，其 md5 硬钉 `410f543d`、失配即 ABORT（`SD_MD5_OVERRIDE` 显式重钉例外）。**布线**=把 `frozen/sd_bench-410f543d.py` 拷为 `<布线仓根>/bench/sd_bench.py` 再传 `--bench-repo <布线仓根>`；公开现值 `../sd_bench.py`（`4234672e`）与冻结件 diff 265 差异行（2026-10-31 实测），**不可**充任该位（必 ABORT） |
+| `../eqgate/eq_capture.py` | `f8e3fa18` | B1 EQ-S 采集件（盐 `R1EQ2026` 内建；"secret access code"=needle 测试题面非凭据） | EQ-S 同盐夹心 capture pre/post | EQ-S GREEN 6/6=PASS 门 | 引擎口 |
+| `../eqgate/eq_compare.py` | `5e62291e` | B1 逐字比对件（GREEN 6/6 判定器） | `eq_compare` 对照 pre/post 逐字相等 | 同上 | 纯本地 |
+| `../lit_driver.py` | `0fb5a0c4` | liter 串行臂（BENCHMARK-SOURCE §5.1 在册锚同值） | liter 语料串行灌入驱动 | liter 面辅助臂 | `corpus/s-eng-lit7` 语料（未入公开树，见下） |
+| `../pr_ladder7_lit.sh` | `6dcbee00` | liter 调用面（战役正典位逐字节） | liter 阶梯批量调用壳 | liter C1 512k 档 | `lit_driver.py`+语料 |
+| `../de_c48_ladder.sh` | `5cc3578e` | DE 五档梯上盖/PERFDIAG 调用面（战役正典位逐字节） | DE c1-c16 五档批量驱动 | §3 DE 五档同口径 | `de_c48_bench.py` |
+| `../census_aggregate_v31.py` | `c8ed9b0f` | census v3.1 聚合（MANIFEST-034LOCK 段二 `census_aggregate_v31.py` 行登记位；旧名 `census_aggregate.py` 并存不删） | census 采集后聚合 | census 面（时长层专用窗留位） | census 采集输出 |
+| `logs/S-034-X5-RUN-20261027/tool/x5_mixed_ttft.py`（公开树根 logs/ 下） | `0b9a5200` | 量具·混合 TTFT 探针（MANIFEST-034LOCK 段二 `x5_mixed_ttft.py` 行登记路径落位） | BYPASS A/B M1 面混合 TTFT 探针 | 记录面（M1 推导锚，非硬门） | 引擎口 |
+| `logs/S-034-RB033-20261028/phase3-payloads/dcgm/dcgm-collector.sh`（公开树根 logs/ 下） | 改写形 `27f8bf20`（2026-10-31 实测；锚 `50460f66` 指内部原件，$HOME 化改写故 md5 必不同） | dcgm 采集件（五族+RDMA 四口，60s×四机），:10/:17 内部路径已 $HOME 化 | `dcgm-collector.sh start\|stop`（**用法=start/stop 两态**；输出目录非命令行参数，在件内 :10/:17 内置为 `$HOME/luz030-opt-campaign/logs/S-034-RB033-20261028/phase3-payloads/dcgm`，起止由调用方控） | dcgm 伴随观测正典（util/SM/power/temp/PCIE_REPLAY） | nvidia dcgm 输出面＋四机 ssh 免密 |
+| `sample500.jsonl` | `7e4deefc`（帧锚，非单文件全档） | 500q 冻结帧（CFG-33：帧漂移=500q 读数不可比） | `gsm8k_dsv41 --nq 500 --data sample500.jsonl` | 500q 地板 0.955、带 [0.956,0.982] | `gsm8k_dsv41.py` |
+| `frozen/sd_bench-410f543d.py` | `410f543d` | **冻结原件并存回填**（公开现值 `4234672e`=EQ-11/DF-04 产品化形，禁覆盖） | 0.3.4 判读读数的产生原件（--key-file /dev/null） | §2/§3 主量具（判读对 T33-03 锚） | 引擎口 |
+| `frozen/gsm8k_dsv41-72f9197b.py` | `72f9197b` | **冻结原件并存回填**（公开现值 `b3a756cc`=EQ-11 契约化修复形，禁覆盖） | 0.3.4 判读 500q 读数的产生原件（API_KEY=env `DSV41_API_KEY`，缺省占位符无凭据） | §4 GSM8K 质量门 | GSM8K 题集（本仓不附） |
+
+**仍缺席两件（暂不公开+原因）**：`ppl_collect_native.py`（内部路径硬编码，须 $HOME 化改写+
+终审后另批——B7-PPL 量具缺席=公开树电池 B7 不可跑，如实注记）、`corpus/s-eng-lit7`（liter
+语料数据件，版权/来源未审）。缺席属公开树布局缺口如实登记，**非「验收链损坏」**
+（[BENCHMARK-SOURCE](../../docs/registry/BENCHMARK-SOURCE.md) §5.1 分叉注记同源）。

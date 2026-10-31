@@ -159,7 +159,7 @@ TP4 四机张量并行
 | 目标 | 读这几篇（按序） | 说明 |
 |---|---|---|
 | 我要先整体了解 | 本文 → [README.md](../README.md) → [GLOSSARY-PUBLIC.md](GLOSSARY-PUBLIC.md) | README 是全仓总目录与性能主表；术语随查随回本表 |
-| 我要部署**现役 0.3.4re 形** | [runbook/runbook-034.md](runbook/runbook-034.md)（三命令；注：面向内部已固化集群，外部从零者先读其卷首与 README「当前断点声明」）→ [UPGRADE-0.3.4.md](../UPGRADE-0.3.4.md)（目标形态速查表；骨架）→ [DEPLOY-STEP-BY-STEP.md](DEPLOY-STEP-BY-STEP.md) §5/§6.6/§4.5 | 现役面入口：从零可用的增量=DEPLOY 三处（61 键 env/工具四件套/网关部署），其余待 UPGRADE-0.3.4 充实 |
+| 我要部署**现役 0.3.4re 形** | [runbook/runbook-034.md](runbook/runbook-034.md)（三命令；注：面向内部已固化集群，外部从零者先读其卷首与 README「当前断点声明」）→ [UPGRADE-0.3.4.md](../UPGRADE-0.3.4.md)（目标形态速查表；骨架）→ [DEPLOY-STEP-BY-STEP.md](DEPLOY-STEP-BY-STEP.md) §5/§6.6/§4.5 | 现役面入口：从零可用的增量=DEPLOY 三处（61 键 env/工具四件套/网关部署），其余待 UPGRADE-0.3.4 充实。**镜像身份注记（2026-10-31）**：随网盘包镜像=0.3.4-final；0.3.4re-20261030 批镜像仅内网 registry 且已判读回退——身份与回退口径见 [README「当前断点声明」](../README.md)、[0.3.4re-RELEASE-NOTE §〇.2/§一 注记](release/0.3.4re-RELEASE-NOTE.md) 与 [034-PERF-REPORT §七代际节](report/034-PERF-REPORT-20261029.md)（本页不复制裸数字） |
 | 我要部署（**交换机形**） | [DEPLOY-STEP-BY-STEP.md](DEPLOY-STEP-BY-STEP.md) → [DEPLOY-GUIDE.md](DEPLOY-GUIDE.md) → [deploy/README.md](../deploy/README.md) | 逐步操作（0.3.2 历史定版形主路径；0.3.4re 增量并入其 §4.5/§5/§6.6）→ 全景从零部署（硬件/依赖/落位映射/boot/验收门）→ deploy 目录导览 |
 | 我要部署（**环网形**） | [RING-DEPLOY.md](RING-DEPLOY.md) → [RING-0.3.2-COMPAT.md](RING-0.3.2-COMPAT.md) | 环网从零部署 → 环网形能拿哪些 0.3.2 件、哪些不能 |
 | 我要升级（0.3.1 → 0.3.2） | [UPGRADE-0.3.2.md](../UPGRADE-0.3.2.md) → [deploy/reconstruct/0.3.2/README.md](../deploy/reconstruct/0.3.2/README.md) | 逐步升级/验收/回退 → 0.3.2 增量件逐文件重建包；0.3.4 增量升级面另见 [UPGRADE-0.3.4.md](../UPGRADE-0.3.4.md) |

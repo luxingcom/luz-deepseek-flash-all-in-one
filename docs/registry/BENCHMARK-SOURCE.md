@@ -226,6 +226,36 @@
 | 归档原件 `conc_pr_driver.py` ×3 | `4c7f34d36ac86852fffff34c8f2bf412` | 零触留档（S-ENG-EXEC/S-C13-EXEC/S-C13PRE 三处归档，亲验同值） |
 | W1-A 副本 `conc_pr_driver.w1a.py` | `bca57cfb359fe6099f1901d272d2a8a1` | 窗档证据留档不删；功能已被正典参数化取代，**后续窗禁再用副本手法** |
 
+**公开树分叉注记（2026-10-31 追记；上行台账旧行零删，本段为公开树侧实测补充）**：
+
+- **制式**：上行锚值=「正典 md5 锚指内部原件/战役形，公开树同名件为脱敏拷贝或产品化形故 md5
+  天然不同」——分叉声明句=[0.3.4re-RELEASE-NOTE](../release/0.3.4re-RELEASE-NOTE.md) 卷首。
+  2026-10-31 md5sum/diff 实测四件：
+  - `tools/bench/sd_bench.py`：锚 `410f543d`=冻结原件（部署工作区）；公开树现值 `4234672e`=
+    EQ-11/DF-04 产品化形。冻结原件已并存回填 `tools/bench/frozen/sd_bench-410f543d.py`
+    （**不覆盖**公开现值——现值含 DF-04/EQ-11 产品化修复，覆盖=产品面回退）。
+  - `gsm8k_dsv41.py`：冻结形 `72f9197b` vs 公开现值 `b3a756cc`（EQ-11 `--nq 0` 契约化修复形）；
+    冻结形并存回填 `tools/bench/frozen/gsm8k_dsv41-72f9197b.py`（同上禁覆盖）。
+  - `tools/census_capture_w3.sh`：登记 `6e073acd`=战役形；公开现值 `f2f10cb6`=掩码拷贝形
+    （:232 路径掩码形）。战役形含内部路径、不入公开树，MANIFEST-034LOCK 段二
+    `census_capture_w3.sh` 行锚指战役形=本制式处理。
+  - `tools/needle_probe.py`：战役形 `1985dbfe` vs 公开现值 `644c54fd`=注释措辞差（diff 实核、
+    功能同形且已脱敏），**不重拷**、保留公开现值；对锚失配归本注记。
+- **公开树缺席清单（0.3.4 锁档时点登记；2026-10-31 缺件回填批部分收口）**：conc_pr_driver／
+  de_c48_bench／eqgate×2（eq_capture/eq_compare）／dcgm-collector／ppl_collect_native／
+  census_aggregate_v31／lit_driver／pr_ladder7_lit／de_c48_ladder／x5_mixed_ttft／corpus/s-eng-lit7——
+  锁档时点均未入公开树。2026-10-31 回填落位：`tools/conc_pr_driver.py`（333033ce）／
+  `tools/de_c48_bench.py`（a337f64e）／`tools/eqgate/eq_capture.py`（f8e3fa18）+`eq_compare.py`
+  （5e62291e）／`tools/lit_driver.py`（0fb5a0c4）／`tools/pr_ladder7_lit.sh`（6dcbee00）／
+  `tools/de_c48_ladder.sh`（5cc3578e）／`tools/census_aggregate_v31.py`（c8ed9b0f；旧名
+  census_aggregate.py 并存不删）／`logs/S-034-X5-RUN-20261027/tool/x5_mixed_ttft.py`（0b9a5200）／
+  `logs/S-034-RB033-20261028/phase3-payloads/dcgm/dcgm-collector.sh`（**$HOME 化改写形**，md5 与
+  锚 50460f66 必不同——锚指内部原件）。**仍缺席两件**：ppl_collect_native.py（:43 硬编码内部
+  路径=脱敏命中，须 $HOME 化改写+终审后另批）、corpus/s-eng-lit7（数据语料件，版权/来源未审）。
+- **定性**：「冻结量具未入树＋包装器（verify-034 等）按战役工作区布局设计」=公开树布局缺口
+  如实登记，**非「验收链损坏」**；对 2026-10-31 复测得 95± 读数的外部读者，先识字量具归属
+  （de_c48 口径 vs sd_bench 口径）与环境代（重启前/后）再判（见 034-PERF-REPORT §七代际节）。
+
 ### 5.2 selfcheck 权威计数口径
 
 - **通则：凡工具 selfcheck 末行输出 `n=` 的，以该 `n=`（实际执行断言数）为权威数**，不以
