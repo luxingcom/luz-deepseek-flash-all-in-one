@@ -116,9 +116,82 @@ md5sum ./sglang/srt/entrypoints/openai/serving_chat.py ./sglang/srt/layers/atten
 
 网盘发布包（镜像 tar+仓快照+网关配方+网络层材料，约 14G）：夸克网盘
 `https://pan.quark.cn/s/95fcb0efd1c4`（提取码 `QkfP`），下载后先按包内
-`CHECKSUMS.manifest` 逐件校验，再按包内 `README-DIST.md` 走。
+`CHECKSUMS.manifest` 逐件校验，再按包内 `README-DIST.md` 走。**取件口径
+（包内仓快照是哪个时点、镜像 tar 烘焙了多少 0.3.4 面、哪些件必须回仓取）见下
+§七。**
 
-## 七、红线（备查区使用纪律）
+## 七、网盘发布包取件口径（包快照时点、镜像面实测、包自足边界）
+
+> 2026-10-31 判读处置窗立此节，回答接收端三个问题：包内仓快照是哪个时点、
+> 镜像 tar 里实际烘焙了多少 0.3.4 面、起一套 0.3.4 栈哪些件必须从本仓取而
+> 包内取不到。包本体（`README-DIST.md`/`CHECKSUMS.manifest` 的文案口径）
+> 的修订属发布包刷新决策，不在仓侧改；本节是仓侧的权威对照说明。
+
+### 7.1 包内仓快照时点：fb9c200（早于写入本件的 85aa172 批）
+
+- 包内 `repo/luz-deepseek-flash-all-in-one-0.3.4re-snapshot.tar.gz` 打包于
+  2026-10-30，内容时点=**fb9c200**（git 历史上 85aa172 的直接前驱）；85aa172
+  备查同步窗（2026-10-31，即写入本件的批次，overlay 整面闭合+本件立档）
+  **不在包内**。快照不含 `.git`（打包排除，包内 `README-DIST.md` 第 12 行声
+  明），commit
+  号以内容证据锚定：快照 `deploy/overlay/o12c1-prod/` 的五件旧值与本件 §二
+  换血表「旧值（本批前）」列逐一吻合（backend `736fbde5`/model `fb87a7f0`/
+  layernorm `bd473946`/scheduler `3db3275e`/serving_chat `c506bab5`），且快照
+  自带 `deploy/prod/overlay-md5.txt` 为锁档形（自身 md5=`fd59c03b`，scheduler
+  行=`3db3275e`）。
+- **后果**：拿包内快照的 overlay 区跑 `md5sum -c` 不会全绿——用快照自带
+  `fd59c03b` 清单跑=红 4 行内容旧（backend/model/layernorm/serving_chat）+1 行
+  缺件（page_map_export，快照内无此本体），scheduler 行恰好同值通过；改用
+  现役 `6c98cf8c` 清单跑=红 5 行内容旧+1 行缺件。这是**时点差**（快照在
+  「清单先行、本体滞后」的中间态被打包），不是快照损坏，也不影响包内其余
+  内容。
+- **0.3.4 整面取件以 GitHub main ≥85aa172 为准**：取
+  `deploy/overlay/o12c1-prod/` 整目录 + `deploy/prod/overlay-md5.txt`，自验
+  命令见 §二（期望 29 行全绿）。快照内 overlay 区不要拿来当 0.3.4 面用。
+
+### 7.2 镜像 tar 烘焙面实测（2026-10-31 tar 直读核验）
+
+对包内 `images/dsv41-sglang-optimized-0.3.4-final-20261028.tar`（docker-save
+OCI 混合布局；image id=`sha256:80e4c957…8f7d0`，与锁档档案所称 x6bake 面同源）
+按 `overlay-map.tsv`（`efd7d89b`）29 条映射对全部 74 层核到最终态，读数如下：
+
+| 类别 | 件数 | 明细 |
+|---|---|---|
+| 已烘焙至 0.3.4 权威形 | **21/29** | 与 `6c98cf8c` 清单逐件 md5 相等（含由顶层覆盖修到的 `layernorm_mhc=982a0ad0`、`deepseek_v4_model=5b5ced03`） |
+| 旧形（在镜像、非权威值） | **3** | `serving_chat=b77a736c`（镜像 stock 形，=02-04 机 worker 面值，§二/§四）；`deepseek_v4_backend=07cd5129`（旧代镜像原件，§四）；`scheduler=85353fe3`（烘焙时点第三形：≠现役 `4a7822a6`，亦≠锁档 `3db3275e`，自烘焙层起未再更新） |
+| 路径不存在 | **5** | 四件零字节占位（`dsv4_visible_window`/`deepseek_v4_vit`/`deepseek_v4_vl`/`mm_processor_deepseek_v4_vl`，权威形本即 0 字节，§二）+ `page_map_export`（实体件 `c0dfe59a`，镜像内连路径都没有） |
+
+- **生产语义**：boot 时 `SGLANG_OVERLAY_DIR` 所指 overlay 目录**整面 29 件逐个
+  盖入**容器（`prod-profile.env:12 COUNT=29` 钉面）——镜像只是**部分预烘焙**
+  （21/29 预置到位，降低而非消除对 overlay 的依赖），整面 overlay 才是 0.3.4
+  运行面。
+- **「仅 load 镜像、不挂 overlay」不是受支持构型**：backend/scheduler 将以
+  旧代形运行（非 0.3.4 栈），serving_chat 以 stock 形运行（=02-04 worker 面
+  值，功能可用但非 01 机 head 面 0.3.4 形）。五件缺路径的行为面（2026-10-31
+  对全部 74 层 tar 直读实测：五个模块名与 `DSV41_PAGE_MAP_EXPORT` 在镜像内
+  全部 `.py` 与 sglang 两树**零引用**，阳性对照正常；镜像内烘焙
+  `scheduler.py`（`85353fe3`）压根没有 PME 接线）：`page_map_export` 属 env
+  门控件——挂 overlay 后由现役 `scheduler.py`（`4a7822a6`）提供接线，
+  `DSV41_PAGE_MAP_EXPORT` 未设/空→`_make_page_map_exporter()` 返回 None、
+  零导入零行为，开闸且缺件也只记 REFUSED 日志降级、不伤主流程；「仅镜像」
+  态则连开闸入口都不存在。四件占位权威形即 0 字节空文件、全域零引用——
+  镜像缺这四件路径与产线挂空占位在运行面无差。
+- **接收端注意**：包内 `README-DIST.md` 对镜像的校验止于 image-id 级
+  （load/tag/inspect），不含上述烘焙面读数，包内也无镜像内容级清单可供自行
+  发现——故本节把 21/3/5 读数钉在仓侧；接收后如需自核，按 §六 的提取法在
+  29 条映射路径上逐件 `md5sum` 对 `prod/overlay-md5.txt`。
+
+### 7.3 包自足边界（包外取件清单）
+
+全包任何位置都取不到完整 29 件 0.3.4 面（仓快照 23/29、镜像烘焙面 21/29）。
+起 0.3.4 栈的取件组合=**包内镜像 tar（先按包内 `CHECKSUMS.manifest` 校验）+
+本仓 main ≥85aa172 的 `deploy/overlay/o12c1-prod/` 整目录**；权重与 engram
+本就不在包内，另按 [GETTING-STARTED §5](../docs/GETTING-STARTED.md) 从官方
+渠道取。包内 `README-DIST.md` §四-4「overlay 本体未入公开树、`md5sum -c` 必红
+属已知缺口」的警告描述的是 fb9c200 时点；85aa172 起该缺口已在仓侧闭合，包体
+文案待发布包刷新窗同步（刷新后本节 7.1/7.3 的时点与缺口描述随之更新）。
+
+## 八、红线（备查区使用纪律）
 
 1. **旧形仍仅备查**：`reconstruct/0.3.2/` 全部内容=0.3.2 历史定版形，只用于
    0.3.2 整套重建（[DEPLOY-STEP-BY-STEP](../docs/DEPLOY-STEP-BY-STEP.md)）。
@@ -135,7 +208,7 @@ md5sum ./sglang/srt/entrypoints/openai/serving_chat.py ./sglang/srt/layers/atten
 4. **锁档档案不改值**：034-lock 系档案中的 md5 是时点快照，后代演进在本文注记，
    不回改档案。
 
-## 八、术语与编号速查
+## 九、术语与编号速查
 
 - **BL/CFG 系号**：`tools/gates-034.tsv`（基线门）与 `tools/config-034.tsv`
   （期望参数）的行标识，全仓多处引用。

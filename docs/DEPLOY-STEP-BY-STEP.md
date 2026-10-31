@@ -219,6 +219,14 @@ find . -type f -printf '%s\n' | awk '{s+=$1} END{print s}'
 # 期望：510311045870
 ```
 
+> 台账 84 件的**第 1 行是 `.gitattributes`**（HF/ModelScope 模型仓自带的 LFS
+> 规则件，运行时零作用、但在数）：缺它=首行 `FAILED open or read` 且 find 计数
+> 84→83，常见原因是 rsync/scp 没带点文件——缺它**不是权重损坏**，逐字节重建
+> 内容与处置见
+> [WEIGHTS.md §1.1](../deploy/reconstruct/0.3.2/weights/WEIGHTS.md)。计数门另须
+> 注意台账外多余件（中转机上的 `SHA256SUMS` 副本、`generation_config.json`、
+> `__pycache__` 残留会使 find 读出 84+，详同节附记）。
+
 ### 3.2 权重身份三件（对注册卡）
 
 换模型/换批次前必核三件，逐项对

@@ -173,8 +173,8 @@ TP4 四机张量并行
 
 | 大件 | 从哪来 | 怎么验身份 |
 |---|---|---|
-| 镜像（引擎容器） | **首选：网盘发布包**（夸克网盘链接与提取码见 [README](../README.md) 读者分流表「拿发布包」行；`docker load` 即得现役优化镜像 tar）；或内网 registry 拉取；或按重建包从上游 SGLang 基座镜像自行烘制（16 件全文+构建脚本在 reconstruct 包内） | `docker inspect` 读 RepoDigest 与发布 digest 对表；四机必须同值 |
-| 权重（模型本体） | 按模型发布渠道取得对应版次（现役参考形为 84 文件、约 476G；01/02 机本地、03/04 机走只读共享位） | 用仓内 SHA256SUMS 台账逐文件 `sha256sum -c`，84 行全过才算 |
+| 镜像（引擎容器） | **首选：网盘发布包**（夸克网盘链接与提取码见 [README](../README.md) 读者分流表「拿发布包」行；`docker load` 即得现役优化镜像 tar；**镜像为部分预烘焙面——实测 21/29 件已达 0.3.4 权威形，起 0.3.4 栈必须配 `deploy/overlay/o12c1-prod/` 整面 29 件 overlay 在 boot 时盖入，包内仓快照（fb9c200 时点）的 overlay 区不是 0.3.4 整面，取件口径与镜像面读数见 [deploy/README-说明.md §七](../deploy/README-说明.md)**）；或内网 registry 拉取；或按重建包从上游 SGLang 基座镜像自行烘制（16 件全文+构建脚本在 reconstruct 包内） | `docker inspect` 读 RepoDigest 与发布 digest 对表；四机必须同值 |
+| 权重（模型本体） | 按模型发布渠道取得对应版次（现役参考形为 84 文件、约 476G；01/02 机本地、03/04 机走只读共享位；台账第 1 行 `.gitattributes` 缺失≠权重损坏，重建见 [WEIGHTS.md §1.1](../deploy/reconstruct/0.3.2/weights/WEIGHTS.md)） | 用仓内 SHA256SUMS 台账逐文件 `sha256sum -c`，84 行全过才算 |
 | engram（预计算工件） | 宿主机上用仓内工具从权重现场生成（约 189G、耗时数小时），按秩分发到四机 | 对仓内 8 分片哈希台账逐件校验；缺件 boot 拒起 |
 
 **digest 豁免判据（一句话）**：自行烘制的镜像只有在与发布完全相同的基座层链上才会得到
