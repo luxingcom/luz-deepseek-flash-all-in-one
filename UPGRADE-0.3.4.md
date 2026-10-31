@@ -18,20 +18,24 @@
 | env | `deploy/env/CBX1A-CERTM-spec1.env`（**61 键**，口径=gates BL11 判据；本仓为脱敏拷贝） | 内部正典锚 md5 `4370aab9…`（VERSION-LOCK §二） |
 | guards | `deploy/kit/guard/guards.conf`（:161 envpin 钉 v41） | 内部正典锚 md5 `418414c3` |
 | profile | `deploy/prod/prod-profile.env`（W-f 重钉：:8 env=4370aab9 / :9 61 键 / :12 COUNT=29） | 内部正典锚 md5 `77d7fa67` |
-| overlay | 29 件面（map+md5 两锚件已入仓） | map `efd7d89b` · md5 清单 `fd59c03b`（本体整面同步窗见下注） |
+| overlay | 29 件面（**本体+map+md5 三件套已入仓**，2026-10-31 备查同步窗） | map `efd7d89b` · md5 清单 `6c98cf8c`（现役对表值；034-lock 时点值 `fd59c03b` 为锁档档案，见下注） |
 | IMAGE | `dsv41-sglang-optimized:0.3.4-x6bake-20261026` | RepoDigest `sha256:80e4c957…8f7d0` |
 
 > **公开拷贝 md5 注记**：上表「验收指纹」中的 md5 均为**内部正典锚**（内部四机在役原件的身份）；公开树内为脱敏拷贝，md5 天然不同（逐件公开实落值见 [CHANGELOG](CHANGELOG.md) 0.3.4 面公开移植批清单），采用者填入本站实测值后 md5 再变——站点自检一律用内容判据（键数/行值），不要拿内部锚硬套。
 
-> **overlay 缺口注记（如实）**：0.3.4 overlay 29 件本体尚未入公开树（工作树现
-> overlay 为 0.3.2 形）；本仓先行落地 `deploy/overlay/o12c1-prod/overlay-map.tsv`
-> 与 `deploy/prod/overlay-md5.txt` 两锚件——在 29 件本体同步落地前，按新清单
-> 跑 `md5sum -c` 必红，属已知布局缺口而非数据漂移。**过渡路径（二选一，勿混）**：
-> ①（推荐）**等待整面同步窗**——overlay 与镜像代际绑定，0.3.4 形栈在 29 件本体
-> 落地前**不可完整起栈**，不要抢跑；②如需先行验证 0.3.2 历史定版形，按
-> [DEPLOY-STEP-BY-STEP](docs/DEPLOY-STEP-BY-STEP.md) 全 0.3.2 面（r032c 镜像+56 键
-> env+87 件 adapter+0.3.2 overlay）整套起栈——**禁止**拿 0.3.2 overlay 增量件
-> （`deploy/reconstruct/0.3.2/overlay/`）拼 0.3.4 镜像（绑定律/混形禁忌，
+> **overlay 缺口注记（2026-10-31 备查同步窗后改写，如实）**：0.3.4 overlay 29 件
+> 本体**已入公开树** `deploy/overlay/o12c1-prod/`（29 个 `.py` 活件+`overlay-map.tsv`
+> 映射表共 30 件；三件身份正典全文另备查于 `deploy/reconstruct/0.3.4/overlay/`），
+> 对表清单=`deploy/prod/overlay-md5.txt`（该件自身 md5 `6c98cf8c…`，29 行）——
+> `cd deploy/overlay/o12c1-prod && md5sum -c ../../prod/overlay-md5.txt` 应 29 行
+> 全绿。清单沿革：034-lock 时点形为 `fd59c03b…`（scheduler 行=`3db3275e`），锁档后
+> df07 窗 scheduler 单件演进至 `4a7822a6`，现役清单随之重钉为 `6c98cf8c…`；锁档
+> 档案仍记旧值属时点快照而非漂移（逐件换血表与旧形取回口径=
+> [deploy/README-说明.md](deploy/README-说明.md)）。**绑定律不变**：overlay 与镜像
+> 代际绑定，本 29 件配 `0.3.4-x6bake-20261026` 镜像；如需先行验证 0.3.2 历史定版
+> 形，按 [DEPLOY-STEP-BY-STEP](docs/DEPLOY-STEP-BY-STEP.md) 全 0.3.2 面（r032c
+> 镜像+56 键 env+87 件 adapter+0.3.2 overlay）整套起栈——**禁止**拿 0.3.2 overlay
+> 增量件（`deploy/reconstruct/0.3.2/overlay/`）拼 0.3.4 镜像（绑定律/混形禁忌，
 > 0.3.4 镜像×0.3.2 overlay=无档混形）。
 
 ## 1. v41 三联（KV_LAYOUT 固化）

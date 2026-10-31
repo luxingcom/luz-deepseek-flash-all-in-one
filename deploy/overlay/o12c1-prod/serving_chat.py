@@ -4,6 +4,7 @@ import copy
 import json
 import logging
 import math
+import sys
 import time
 import uuid
 from collections import OrderedDict
@@ -46,6 +47,14 @@ from sglang.srt.entrypoints.openai import (
     encoding_dsv32,
     encoding_dsv41,
 )
+
+try:
+    if "/opt/dsv41/adapter" not in sys.path:
+        sys.path.insert(0, "/opt/dsv41/adapter")
+    import dsv41_recipe
+except Exception:  # pragma: no cover - optional overlay dependency
+    dsv41_recipe = None
+
 from sglang.srt.entrypoints.openai.protocol import (
     ChatCompletionMessageContentTextPart,
     ChatCompletionMessageContentVideoPart,
@@ -1902,6 +1911,9 @@ class OpenAIServingChat(OpenAIServingBase):
                     encoding_dsv41.attach_task_to_last_user_message(
                         messages, request.task
                     )
+                dsv41_reasoning_effort = self._resolve_dsv41_reasoning_effort(
+                    request.reasoning_effort
+                )
                 # T33-01A: conditional response_format injection (schema-only
                 # into first system; gated by SGLANG_DSV41_RF_INJECT; tools
                 # present -> tool-call constraint wins, no double constraint;
@@ -1911,9 +1923,7 @@ class OpenAIServingChat(OpenAIServingBase):
                 real_input, media = encoding_dsv41.encode_messages(
                     messages,
                     thinking_mode=thinking_mode,
-                    reasoning_effort=self._resolve_dsv41_reasoning_effort(
-                        request.reasoning_effort
-                    ),
+                    reasoning_effort=dsv41_reasoning_effort,
                     return_multi_modal_data=True,
                 )
                 if media["images"]:
@@ -1929,7 +1939,21 @@ class OpenAIServingChat(OpenAIServingBase):
                             self.tokenizer_manager.image_token_id
                         ),
                     )
-                prompt_ids = self.tokenizer_manager.tokenizer.encode(real_input)
+                # Recipe encodes structural spans with the added vocabulary and
+                # plain text without it; it returns None when its render is not
+                # byte-identical to the serving prompt (task tokens, images,
+                # namespaced or mid-conversation tool schemas).
+                prompt_ids = None
+                if dsv41_recipe is not None and not media["images"]:
+                    prompt_ids = dsv41_recipe.encode_prompt_ids(
+                        messages,
+                        real_input,
+                        thinking_mode,
+                        dsv41_reasoning_effort,
+                        self.tokenizer_manager.tokenizer,
+                    )
+                if prompt_ids is None:
+                    prompt_ids = self.tokenizer_manager.tokenizer.encode(real_input)
                 # T33-01A (K16): effort-based default injection (Max 131072 /
                 # others 65536, thinking-gated) + explicit-value resolution with
                 # input/original/clamped[/pinned=512k] log. Gated by

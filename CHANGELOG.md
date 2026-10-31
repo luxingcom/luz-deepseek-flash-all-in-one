@@ -3,6 +3,31 @@
 > 提炼自战役仓 git log（`luz-0.3.0-r1`（2026-10-05，32c6acd）之后 632 commits）
 > 与总卡/定稿报告。逐项档锚见 `docs/` 各分档。
 
+## 2026-10-31 备查同步批（0.3.4re：overlay 29 件本体 + 三件正典全文入公开树）
+
+> 闭合 0.3.4re 已知布局缺口「overlay 29 件本体未随批入公开树」。零引擎触碰、零
+> 工具触碰；逐件身份/血统/旧形取回总表=`deploy/README-说明.md`（本批新增）。
+
+- **overlay 29 件本体入仓**：`deploy/overlay/o12c1-prod/` 整面同步为 0.3.4 现役形
+  （目录 30 件=29 个 `.py`+`overlay-map.tsv`；相对旧树 5 件换血+1 件新增：
+  backend `736fbde5`→`73c80259`、model `fb87a7f0`→`5b5ced03`、mhc `bd473946`→
+  `982a0ad0`、serving_chat `c506bab5`→`9b60a463`、scheduler `3db3275e`→
+  `4a7822a6`、新增 `page_map_export.py` `c0dfe59a`；旧值换血表留档 README-说明
+  §二，旧文件本体可从本批之前的 git 历史取回）。
+- **对表清单重钉**：`deploy/prod/overlay-md5.txt` 自 034-lock 时点形（自身
+  `fd59c03b…`，scheduler=`3db3275e`）重钉为现役权威形（自身 `6c98cf8c…`，
+  scheduler=`4a7822a6`，与私有侧权威清单逐字节同）；公开树内 `md5sum -c` 实测
+  29/29 全绿。
+- **三件正典全文备查**：`deploy/reconstruct/0.3.4/overlay/` 新增
+  backend/serving_chat/page_map_export 三件+NOTES.md+MANIFEST.md5（补「只有锚值
+  没有本体」缺口）。
+- **文档面**：新增 `deploy/README-说明.md` 备查区对照总表（两区结构+四清单交叉
+  说明+旧形取回口径+红线）；README 断点声明、UPGRADE-0.3.4 §0 缺口注记改写为
+  「已闭合」并补两区入口链接；0.3.4-RELEASE-NOTE §表、0.3.4re-RELEASE-NOTE
+  §三.5、RUNTIME-PARAMETERS §表+§5.4 回退节代际注记、DEPLOY-GUIDE §5 表、GETTING-STARTED §1.3、
+  deploy/README.md 同步换值/补入口；锁档档案（034-VERSION-LOCK/MANIFEST-034LOCK/
+  gates-034/config-034/runbook-034）一律不改值（时点快照口径）。
+
 ## 2026-10-30 发布面文档修订批（可读性+完整性评审意见落实）
 
 > 来源：0.3.4re 发布面两份评审意见（可读性 13 条+完整性 10 条）。本批纯文档+登记面

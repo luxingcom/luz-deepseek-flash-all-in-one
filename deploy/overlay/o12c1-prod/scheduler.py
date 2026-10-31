@@ -987,6 +987,60 @@ def _make_roce_i14c_sampler():
     return sampler.observe
 
 
+# A.2 页映射导出 idle 快照时间下限（秒）：idle 循环高频轮转，防开闸后 JSONL 刷屏。
+# 值=制备期保守缺省，激活窗呈批可调（A2-DESIGN §二「调用点=激活窗定」）。
+PME_IDLE_MIN_INTERVAL_S = 60.0
+
+
+def _make_page_map_exporter():
+    """A.2 页映射导出调用点接线（DF-07；制备不激活）。
+
+    法源：T34-05-X6-BAKE-WINDOW §五（A.2 搭车件设计）；X6 bake R1 制备件
+    page_map_export.py（第 29 源，md5 c0dfe59a，CFG-22 钉值不得改件）；
+    A2-DESIGN §二调用点建议形=「flush/settle 后的 idle 窗或量具触发 RPC，
+    激活窗定」——本接线取 idle 窗形，量具触发 RPC 形候激活窗呈批另裁。
+
+    门控：DSV41_PAGE_MAP_EXPORT（制备件契约键，缺省未设/空）→ None=零 import
+    零行为（I14-C/_make_roce_i14c_sampler 同款制式；D20 测量旗永不入产线缺省态）。
+    开闸→惰性导入 sglang.srt.mem_cache.page_map_export（第 29 源 overlay 影子
+    挂载位；缺面=REFUSED 降级 None，观测面不伤主流程），返回 idle 快照 tick。
+
+    快照语义（本形）：idle 窗=全分配面导出（active_rows=None，由池 free_slots
+    反推全部已分配行，含 radix 缓存页）——F6-A 判 #8 满池召回对拍的池态正对面；
+    在役请求行集精化（busy 点按 running_batch 行集传入）属激活窗呈批位形态。
+    """
+
+    if not os.environ.get("DSV41_PAGE_MAP_EXPORT", "").strip():
+        return None
+    try:
+        from sglang.srt.mem_cache import page_map_export as _pme_mod
+    except Exception:
+        logger.info(
+            "PAGE_MAP_EXPORT REFUSED overlay face "
+            "sglang.srt.mem_cache.page_map_export missing (export disabled)"
+        )
+        return None
+
+    def _tick(scheduler) -> None:
+        now = time.monotonic()
+        if now - scheduler._pme_last_ts < PME_IDLE_MIN_INTERVAL_S:
+            return
+        scheduler._pme_last_ts = now
+        try:
+            _pme_mod.snapshot(
+                scheduler.req_to_token_pool,
+                rank=int(get_parallel().tp_rank),
+                tag="idle",
+                page_size=int(getattr(scheduler, "page_size", 1) or 1),
+                kv_allocator=scheduler.token_to_kv_pool_allocator,
+                active_rows=None,
+            )
+        except Exception as e:
+            logger.warning("PAGE_MAP_EXPORT snapshot failed: %s", e)
+
+    return _tick
+
+
 STEP_MAX_US = 2_000_000
 
 # Min wall-clock between load publishes on the stalled no-batch path, which
@@ -2022,6 +2076,9 @@ class Scheduler(
         )
         self._sched_stats = self._init_sched_stats()
         self._roce_i14c = _make_roce_i14c_sampler()
+        # A.2 页映射导出（DF-07 接线）：env 缺省关→None（idle 路径单分支检查）。
+        self._pme = _make_page_map_exporter()
+        self._pme_last_ts = 0.0
 
     def _init_sched_stats(self):
         """SCHED_STATS_V1 只读账本（env 默认关 → None，热路径单分支检查）。"""
@@ -5674,6 +5731,11 @@ class Scheduler(
                 self.token_to_kv_pool_allocator.flush_opportunistic()
             except Exception:
                 pass
+
+        # A.2 页映射导出（DF-07 接线制备；env 缺省关=零行为）：flush/settle 后
+        # 的 idle 窗快照（A2-DESIGN §二建议形；激活窗呈批定形态与节奏）。
+        if self._pme is not None:
+            self._pme(self)
 
         # memory leak check (skipped for hisparse — pool counters intentionally
         # diverge during host-backup, see _get_swa_token_info clamp).

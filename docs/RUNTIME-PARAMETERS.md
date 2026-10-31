@@ -52,7 +52,7 @@ hairpin，51 键）、0.3.2 交换机形（双 rail 2 口，56 键）、0.3.4 �
 | tp4/guards | `.env.tp4` `:87` v41 + `guards.conf` `:161` envpin v41 | `e225c391` · `418414c3`（锁档 §二） |
 | serve 参 | SPEC6 八参（第 9 参退役=禁参，UP43050） | 归一指纹 `6b12a445`（§2） |
 | 镜像 | `0.3.4-x6bake-20261026`（74 层=r033d 73+1） | RepoDigest `sha256:80e4c957…8f7d0` |
-| profile/overlay | `prod-profile.env`（W-f 重钉 `:8/:9/:12`）· overlay 29 件 | `77d7fa67` · map `efd7d89b`+清单 `fd59c03b` |
+| profile/overlay | `prod-profile.env`（W-f 重钉 `:8/:9/:12`）· overlay 29 件（本体已入 `deploy/overlay/o12c1-prod/`） | `77d7fa67` · map `efd7d89b`+清单 `6c98cf8c`（现役；锁档时点值 `fd59c03b`） |
 
 **键面演进链（env 件键行数口径）**：〔0.3.1〕51 →〔0.3.2 CBX1A〕56（md5
 `0729e18d`，件在
@@ -616,7 +616,11 @@ boot 件 `IMAGE=` 单行回指旧 tag（r032c → r032b 在库 → 0.3.1 基座 
 ## 5.4 overlay 与 b12x：整目录备份回拷
 
 - overlay：29 件（0.3.1 基底 [`deploy/overlay/o12c1-prod/`](../deploy/overlay/o12c1-prod/)
-  原样回拷；0.3.2 只覆盖了 `deepseek_v4_backend.py`，回拷该件原版即回退）。
+  原样回拷；0.3.2 只覆盖了 `deepseek_v4_backend.py`，回拷该件原版即回退。
+  **代际注记 2026-10-31**：该目录已整面同步为 **0.3.4 现役形**（备查同步窗），
+  不再可直接当 0.3.1 基底回拷源——0.3.1/0.3.2 期历史形自本批之前 git 历史取回，
+  或按 `tools/packages/cfgmgmt/payload/out/overlay-MANIFEST.md5`（0.3.2 期账）核对；
+  逐件换血表与旧形取回口径=[deploy/README-说明.md](../deploy/README-说明.md)）。
   换引擎版本时 overlay 影子件与镜像/adapter **三步一起换**（PITFALLS P2-2）。
 - b12x：3 件 RoCE 源码回拷 0.3.1 基底件；`_roce_proxy.c` 按源码 sha256 缓存在
   `~/.cache/b12x/roce/` 编译，回拷后**清编译缓存**再复靴（否则旧编译产物继续生效）。

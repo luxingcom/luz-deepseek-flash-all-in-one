@@ -61,6 +61,11 @@
 不懂它会踩什么坑：影子目录是旧版时会**把新引擎盖回旧的**——栈照常运行，你以为在测
 新版本，实际跑的还是被覆盖的旧代码（见
 [PITFALLS-AND-FAQ.md](PITFALLS-AND-FAQ.md) 启动面 P2-2）。
+仓内入口：29 件本体快照=[deploy/overlay/o12c1-prod/](../deploy/overlay/o12c1-prod/)
+（自验 `cd` 进去后 `md5sum -c ../../prod/overlay-md5.txt`），平铺名→容器路径映射=
+[overlay-map.tsv](../deploy/overlay/o12c1-prod/overlay-map.tsv)，对表清单=
+[overlay-md5.txt](../deploy/prod/overlay-md5.txt)；每件的身份/md5/代际血统/旧形
+去哪取，查备查区总表 [deploy/README-说明.md](../deploy/README-说明.md)。
 
 ### 1.4 engram
 

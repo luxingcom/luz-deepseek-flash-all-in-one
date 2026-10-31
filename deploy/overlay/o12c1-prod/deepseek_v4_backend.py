@@ -30,8 +30,67 @@ from sglang.kernels.ops.attention.dsv4.dequant_k_cache import (
     q8kv8_padded_num_heads,
 )
 from sglang.kernels.ops.attention.dsv4.kv_layout import KVLayout
+from sglang.kernels.ops.gemm.bf16_fp32 import token_padded
 from sglang.kernels.ops.attention.dsv4.metadata_kernel import (
     fill_all_compressed_indices,
+)
+
+# A2/D41 (FI-LAND 0.7.2 face; S-FIS0-RESULT-20261018 SS2-A2 + DECISIONS D41 /
+#   CODE-QUALITY-REVIEW-20261025 SS5-3): probe once, then bind the 0.7.2-only
+#   symbols to module globals so the store/read hot paths carry no per-step
+#   import machinery (~3-5 us/call eager face; graph replay unaffected).
+#   _FI072_PA/_FI072_WRITER stay None on any non-0.7.2 face (fail-closed);
+#   both wired sites gate on _dsv41_fi072_native_available() before use.
+_DSV41_FI072_NATIVE = None
+_FI072_PA = None
+_FI072_WRITER = None
+
+
+def _dsv41_fi072_native_available() -> bool:
+    global _DSV41_FI072_NATIVE, _FI072_PA, _FI072_WRITER
+    if _DSV41_FI072_NATIVE is None:
+        try:
+            from flashinfer.mla._sparse_mla_sm120 import (  # noqa: F401
+                _DECODE_DSV4_1_DISPATCH,
+                _sparse_mla_sm120_paged_attention,
+                dsv41_fp8_quantize_append_sparse_mla_cache,
+            )
+
+            _FI072_PA = _sparse_mla_sm120_paged_attention
+            _FI072_WRITER = dsv41_fp8_quantize_append_sparse_mla_cache
+            _DSV41_FI072_NATIVE = True
+        except Exception:
+            _DSV41_FI072_NATIVE = False
+    return _DSV41_FI072_NATIVE
+
+
+def _dsv41_fi072_decode_scratch_shapes(
+    num_tokens: int, num_heads: int, topk: int, extra_topk: int, d_v: int
+):
+    """D46: split-K decode scratch geometry derived from kernel semantics.
+
+    Sources (flashinfer 0.7.2, logs/S-FIS0-STAGING-20261018 fi072-unpacked):
+    scratch head capacity = 8 for num_heads == 8, else ceil16(num_heads)
+    (attention_plan.h:98 decode_scratch_heads); the allocated split stride is
+    chunk_capacity = ceil(topk / 64) + ceil(extra_topk / 64) with the
+    DeepSeek-family 64-candidate tile (attention_resolve.cu:144-151;
+    _api.py _decode_dsv4_num_splits; d_v per _expected_d_v). The pbs64 error
+    instance [64, 32, 16, 512] bf16 / [64, 32, 16] fp32 is one instantiation
+    of this rule, not a constant to hardcode. Returns (mid_out_shape,
+    mid_lse_shape) for caller-supplied scratch.
+    """
+    scratch_heads = 8 if num_heads == 8 else (num_heads + 15) // 16 * 16
+    num_splits = (topk + 63) // 64 + (extra_topk + 63) // 64
+    mid_out_shape = (num_tokens, scratch_heads, num_splits, d_v)
+    return mid_out_shape, mid_out_shape[:3]
+
+
+# D41 (SS5-3): decode token bound hoisted to module level (same source as the
+# stock SM120 branch's in-function import). Bound under an alias because that
+# stock import binds a same-name local for the whole _forward_attention
+# scope, which would shadow this global before it executes.
+from sglang.kernels.ops.attention.flash_mla_sm120 import (  # noqa: E402
+    SM120_DECODE_MAX_TOKENS as _SM120_DECODE_MAX_TOKENS,
 )
 from sglang.kernels.ops.attention.dsv4.metadata_kernel import (
     init_compression_metadata as _init_compression_metadata_triton,
@@ -82,7 +141,6 @@ from sglang.srt.layers.attention.dsv4.v41_indexer import (
     CapturedPrefillInputs,
     DecodeInputs,
     PrefillInputs,
-    Selection,
     has_dense_fp4_indexer,
     is_sm100_or_newer,
     make_candidate_indexer,
@@ -122,6 +180,7 @@ from sglang.srt.speculative.ragged_verify import (
     resolve_ragged_verify_layout,
 )
 from sglang.srt.utils import ceil_align, is_cuda, is_xpu
+from sglang.srt.utils.common import async_h2d
 
 if TYPE_CHECKING:
     from sgl_kernel.flash_mla import FlashMLASchedMeta
@@ -939,6 +998,8 @@ class DSV4Metadata:
     # Per-step scratch for TP-padded query heads, zeroed by the first user.
     # Later layers overwrite real heads and preserve the zero padding.
     q_pad_buffer: Optional[torch.Tensor] = None
+    # Set once a CUDA graph captures q_pad_buffer; it may not grow after that.
+    q_pad_captured: bool = False
 
     # What the candidate-source layer published for the index-source layers after
     # it, in the implementation's own type; never copied from the host.
@@ -2719,6 +2780,12 @@ class DeepseekV4AttnBackend(
         meta = self.forward_metadata
         hoisted_req = getattr(meta, "low_ratio_req_indices", None)
         hoisted_pos = getattr(meta, "low_ratio_pos_i64", None)
+        if hoisted_pos is not None and hoisted_pos.shape[0] < positions.shape[0]:
+            # DP attention pads an eager extend past the rows extend_seq_lens cover.
+            num_real = hoisted_pos.shape[0]
+            x, positions = x[:num_real], positions[:num_real]
+            if q_lora is not None:
+                q_lora = q_lora[:num_real]
         if (
             hoisted_req is not None
             and hoisted_pos is not None
@@ -2895,8 +2962,11 @@ class DeepseekV4AttnBackend(
 
         if layer.compress_ratio == 1:
             # At ratio 1, c1_out_loc equals the int64 raw_out_loc supplied by the scheduler.
+            # sf4c3 lt-ws-fix: wkv is a plain nn.Linear returning a Tensor; this
+            # direct call (verify/decode fused path) bypassed project()'s pad and
+            # baked Lt TST splitK workspace VAs into the verify graphs (FIX2).
             latent = c1_decode_norm_rope_store(
-                compressor.wkv(x),
+                token_padded(x, compressor.wkv.weight, compressor.wkv),
                 compressor.norm.weight.data,
                 pos,
                 core.raw_out_loc,
@@ -3084,7 +3154,6 @@ class DeepseekV4AttnBackend(
         is_source = layer.indexer.is_candidate_source
         is_consumer = layer.indexer.uses_candidates
         ratio = layer.compress_ratio
-        out = self._get_low_ratio_selection(ratio)
         published = self.forward_metadata.candidate_metadata
         mode = forward_batch.forward_mode
         if mode.is_decode() or mode.is_target_verify():
@@ -3102,27 +3171,28 @@ class DeepseekV4AttnBackend(
                 layer, x, q_lora, req, pos, mode
             )
             if is_source:
-                published = self.decode_candidates.publish_decode(inputs, out)
+                published = self.decode_candidates.publish_decode(inputs)
                 self._publish_candidate_metadata(published)
             elif is_consumer:
-                self.decode_candidates.consume_decode(inputs, published, out)
+                self.decode_candidates.consume_decode(inputs, published)
             else:
-                self.full_topk_indexer.topk_decode(inputs, out)
+                self.full_topk_indexer.topk_decode(inputs)
         else:
             inputs = self._make_low_ratio_prefill_indexer_inputs(
                 layer, x, q_lora, req, pos, forward_batch, rows_per_request
             )
             if is_source:
-                published = self.prefill_candidates.publish_prefill(inputs, out)
+                published = self.prefill_candidates.publish_prefill(inputs)
                 self._publish_candidate_metadata(published)
             elif is_consumer:
-                self.prefill_candidates.consume_prefill(inputs, published, out)
+                self.prefill_candidates.consume_prefill(inputs, published)
             else:
-                self.full_topk_indexer.topk_prefill(inputs, out)
+                self.full_topk_indexer.topk_prefill(inputs)
 
     def _low_ratio_index_topk_captured(self, layer, projected_q, projected_w) -> None:
         ratio = layer.compress_ratio
         indexer = layer.indexer
+        core = self.forward_metadata.core_metadata
         metadata = (
             self.forward_metadata.c1_indexer_metadata
             if ratio == 1
@@ -3141,16 +3211,10 @@ class DeepseekV4AttnBackend(
             q=projected_q,
             weights=projected_w,
             paged_metadata=metadata,
+            out_page_indices=core.sparse_page_indices(ratio),
+            out_raw_indices=core.sparse_raw_indices(ratio),
         )
-        out = self._get_low_ratio_selection(ratio)
-        self.full_topk_indexer.topk_prefill_captured(inputs, out)
-
-    def _get_low_ratio_selection(self, compress_ratio: int) -> Selection:
-        core = self.forward_metadata.core_metadata
-        return Selection(
-            page_indices=core.sparse_page_indices(compress_ratio),
-            raw_indices=core.sparse_raw_indices(compress_ratio),
-        )
+        self.full_topk_indexer.topk_prefill_captured(inputs)
 
     def _make_low_ratio_decode_indexer_inputs(self, layer, x, q_lora, req, pos, mode):
         ratio = layer.compress_ratio
@@ -3171,6 +3235,9 @@ class DeepseekV4AttnBackend(
             req_rows=req,
             paged_metadata=metadata,
             is_verify=mode.is_target_verify(),
+            out_page_indices=self.forward_metadata.core_metadata.sparse_page_indices(
+                ratio
+            ),
         )
 
     def _make_low_ratio_prefill_indexer_inputs(
@@ -3183,9 +3250,10 @@ class DeepseekV4AttnBackend(
         forward_batch,
         rows_per_request,
     ) -> PrefillInputs:
+        core = self.forward_metadata.core_metadata
         tail = self.forward_metadata.late_layer_tail
         if rows_per_request is not None:
-            rows_per_request_device = torch.tensor(
+            rows_per_request_device = async_h2d(
                 rows_per_request, dtype=torch.int32, device=x.device
             )
         elif tail is not None:
@@ -3204,10 +3272,29 @@ class DeepseekV4AttnBackend(
             positions=pos,
             req_rows=req,
             req_pool_indices=forward_batch.req_pool_indices,
-            kv_page_table=self.forward_metadata.core_metadata.page_table,
+            kv_page_table=core.page_table,
             seq_lens_cpu=_as_int_list(forward_batch.seq_lens_cpu),
             rows_per_request=rows_per_request,
             rows_per_request_device=rows_per_request_device,
+            out_raw_indices=core.sparse_raw_indices(layer.compress_ratio),
+            out_page_indices=(
+                core.sparse_page_indices(layer.compress_ratio)
+                if self._low_ratio_prefill_reads_page_indices(forward_batch)
+                else None
+            ),
+        )
+
+    def _low_ratio_prefill_reads_page_indices(self, forward_batch: ForwardBatch):
+        # The negation of the sparse-prefill gate in forward(), which reads only
+        # raw_indices; the query-count clause is dropped, so this errs to True.
+        return (
+            self.trtllm_attn
+            or not forward_batch.forward_mode.is_extend_without_speculative()
+            or get_platform().is_sm120
+            or self.tail_forward_metadata is not None
+            or self.forward_metadata.late_layer_tail is not None
+            or self.token_to_kv_pool.request_window is not None
+            or not envs.SGLANG_OPT_FLASHMLA_SPARSE_PREFILL.get()
         )
 
     def _publish_candidate_metadata(self, published: Optional[CandidateMetadata]):
@@ -3225,25 +3312,29 @@ class DeepseekV4AttnBackend(
         )
 
     def get_swa_out_cache_loc(self, forward_batch: ForwardBatch) -> torch.Tensor:
-        """Idle always re-translates at store time: its metadata may be stale, and
-        translating the zero-padded out_cache_loc writes to the dummy slot."""
+        """Idle never trusts its metadata, which may be stale or unset: it writes
+        the request window's idle layout, or translates the zero-padded
+        out_cache_loc to the dummy slot."""
+        out_cache_loc = forward_batch.out_cache_loc
+        window = self.token_to_kv_pool.request_window
+        if forward_batch.forward_mode.is_idle():
+            if window is not None:
+                return window.activate_idle(out_cache_loc.shape[0])
+            return self.token_to_kv_pool.translate_loc_from_full_to_swa(
+                out_cache_loc
+            ).to(torch.int32)
         metadata = self.forward_metadata
-        if self.token_to_kv_pool.request_window is not None:
+        if window is not None:
             layout = metadata.core_attn_metadata.request_window_layout
-            self.token_to_kv_pool.request_window.activate(layout)
+            window.activate(layout)
             return layout.write_loc
         if isinstance(metadata, DSV4Metadata) and metadata.late_layer_tail is not None:
             # The tail's q rows are a subset of the extend, so the full
             # out_cache_loc below would be the wrong length; the tail owns its own.
             return metadata.late_layer_tail.swa_out_cache_loc
-        out_cache_loc = forward_batch.out_cache_loc
         core = getattr(self.forward_metadata, "core_attn_metadata", None)
         cached = core.swa_out_cache_loc if core is not None else None
-        if (
-            cached is not None
-            and not forward_batch.forward_mode.is_idle()
-            and cached.shape[0] == out_cache_loc.shape[0]
-        ):
+        if cached is not None and cached.shape[0] == out_cache_loc.shape[0]:
             return cached
         return self.token_to_kv_pool.translate_loc_from_full_to_swa(out_cache_loc).to(
             torch.int32
@@ -3253,7 +3344,28 @@ class DeepseekV4AttnBackend(
         self, layer_id: int, swa_k: torch.Tensor, forward_batch: ForwardBatch
     ) -> None:
         swa_loc = self.get_swa_out_cache_loc(forward_batch)
-        self.token_to_kv_pool.set_swa_key_buffer_radix_fused(
+        pool = self.token_to_kv_pool
+        if pool.kv_layout is KVLayout.V41 and _dsv41_fi072_native_available():
+            # A2 (FI-LAND, S-FIS0-RESULT-20261018 SS2-A2): the main (SWA)
+            # 528B DSV4_1 cache is written through the 0.7.2 device writer
+            # (per-32 UE8M0 groups -- the quantizer family the G-k band was
+            # derived from), wired at the store-path position isomorphic to
+            # the existing set_extra_key_buffer_fused V41_FP4 branch
+            # (:3058-3073). The stock fused-store fallback below is kept for
+            # non-0.7.2 stacks (probe-gated; both faces write the same 528B
+            # DSV4_1 ABI). D41: the writer is the module-global binding made
+            # by the probe above -- no per-store import on this hot path.
+            raw = pool.get_swa_raw_buffer(layer_id)
+            assert raw.dim() == 2, (
+                "A2 writer wiring expects the 2D paged raw SWA buffer"
+            )
+            dest = (raw if raw.dtype == torch.uint8 else raw.view(torch.uint8))[
+                :,
+                : pool.swa_kv_pool.page_size * pool.get_swa_key_bytes_per_token(),
+            ]
+            _FI072_WRITER(swa_k, swa_loc, dest)
+            return
+        pool.set_swa_key_buffer_radix_fused(
             layer_id=layer_id,
             swa_loc=swa_loc,
             cache_k=swa_k,
@@ -3442,6 +3554,130 @@ class DeepseekV4AttnBackend(
                 )
 
             if get_platform().is_sm120:
+                if (
+                    token_to_kv_pool.kv_layout is KVLayout.V41
+                    and _dsv41_fi072_native_available()
+                ):
+                    # A2 (FI-LAND, S-FIS0-RESULT-20261018 SS2-A2 / INV-06
+                    # SS6.1 F3 row): the DSV4_1 formats are reachable only
+                    # explicitly -- 0.7.2 never infers ue8m0_g32 from widths
+                    # -- and the stock flash_mla_with_kvcache_sm120 drops
+                    # unknown kwargs (its pbs256->64 split constants are V4
+                    # geometry), so the V41 face calls the 0.7.2 entry
+                    # directly with the F1 leg-B-proven native dispatch form:
+                    # pbs256 528B FP8 main + pbs256 288B FP4 extra views
+                    # passed natively, kv_scale_format="ue8m0_g32" explicit
+                    # (no inference path). D41: the entry point and the decode
+                    # token bound are module-level bindings -- no per-step
+                    # import on this hot path.
+                    real_heads = layer.tp_q_head_num
+                    if q.shape[0] > _SM120_DECODE_MAX_TOKENS:
+                        # The 64-head pad only serves the decode kernel's h_q
+                        # specialization; the prefill kernel takes any h_q.
+                        if q.shape[-2] > real_heads:
+                            q = q[..., :real_heads, :].contiguous()
+                        if attn_sink is not None and attn_sink.shape[0] > real_heads:
+                            attn_sink = attn_sink[:real_heads]
+
+                    q2 = q.squeeze(1) if q.ndim == 4 else q
+                    swa_idx = (
+                        swa_page_indices.squeeze(1)
+                        if swa_page_indices.dim() == 3
+                        else swa_page_indices
+                    )
+                    extra_idx = (
+                        extra_indices.squeeze(1)
+                        if extra_indices is not None and extra_indices.dim() == 3
+                        else extra_indices
+                    )
+                    swa_u8 = (
+                        swa_k_cache
+                        if swa_k_cache.dtype == torch.uint8
+                        else swa_k_cache.view(torch.uint8)
+                    )
+                    extra_u8 = (
+                        extra_k_cache
+                        if extra_k_cache is None or extra_k_cache.dtype == torch.uint8
+                        else extra_k_cache.view(torch.uint8)
+                    )
+                    native_out = q2.new_empty(
+                        (q2.shape[0], q2.shape[1], self.head_dim_v),
+                        dtype=torch.bfloat16,
+                    )
+                    native_lse = torch.empty(
+                        (q2.shape[0], q2.shape[1]),
+                        dtype=torch.float32,
+                        device=q2.device,
+                    )
+                    # D46 (DECISIONS-RESOLVED-20261024 D46; a2-live-v2.json
+                    # read_face): SM120 sparse-MLA decode hard-requires
+                    # caller-supplied mid_out/mid_lse split-K scratch, and the
+                    # pair must be passed together or not at all
+                    # (attention_validation.h:175). Shapes derive from runtime
+                    # quantities per kernel semantics (helper above); nothing
+                    # is hardcoded from the error text's pbs64 instance.
+                    # extra_fp4 describes the extra cache: True exactly when
+                    # the dual (V41_FP4 288B) extra view is supplied; a
+                    # main-only layer (compress_ratio == 0) must pass False --
+                    # the resolver rejects extra_fp4 without a dual cache
+                    # (attention_resolve.cu:119) -- while kv_scale_format
+                    # still pins the main cache to DSV4_1 explicitly.
+                    # Split-K scratch is consumed within the call, so buffers
+                    # are pinned per exact shape and reused across steps and
+                    # layers (single-stream sequential decode; the 0.7.2
+                    # wrapper pins captured-shape scratch the same way, and
+                    # graph warmup precedes capture so capture reuses these
+                    # buffers). Bounded: decode form is only offered for
+                    # num_tokens <= 64 (_policy.py:64-66); larger calls take
+                    # prefill, which ignores scratch metadata (None pair).
+                    if q2.shape[0] <= _SM120_DECODE_MAX_TOKENS:
+                        mid_out_shape, mid_lse_shape = _dsv41_fi072_decode_scratch_shapes(
+                            q2.shape[0],
+                            q2.shape[1],
+                            swa_idx.shape[-1],
+                            0 if extra_idx is None else extra_idx.shape[-1],
+                            self.head_dim_v,
+                        )
+                        scratch_pool = getattr(
+                            self, "_dsv41_fi072_mid_scratch", None
+                        )
+                        if scratch_pool is None:
+                            scratch_pool = self._dsv41_fi072_mid_scratch = {}
+                        pinned = scratch_pool.get(mid_out_shape)
+                        if pinned is None:
+                            pinned = scratch_pool[mid_out_shape] = (
+                                torch.empty(
+                                    mid_out_shape,
+                                    dtype=torch.bfloat16,
+                                    device=q2.device,
+                                ),
+                                torch.empty(
+                                    mid_lse_shape,
+                                    dtype=torch.float32,
+                                    device=q2.device,
+                                ),
+                            )
+                        mid_out, mid_lse = pinned
+                    else:
+                        mid_out = mid_lse = None
+                    _FI072_PA(
+                        q2,
+                        swa_u8,
+                        swa_idx,
+                        native_out,
+                        native_lse,
+                        self.softmax_scale,
+                        topk_length=swa_topk_lengths,
+                        attn_sink=attn_sink,
+                        extra_kv_cache=extra_u8,
+                        extra_indices=extra_idx,
+                        extra_topk_length=extra_topk_lengths,
+                        kv_scale_format="ue8m0_g32",
+                        extra_fp4=extra_u8 is not None,
+                        mid_out=mid_out,
+                        mid_lse=mid_lse,
+                    )
+                    return native_out
                 from sglang.kernels.ops.attention.flash_mla_sm120 import (
                     SM120_DECODE_MAX_TOKENS,
                     flash_mla_with_kvcache_sm120,

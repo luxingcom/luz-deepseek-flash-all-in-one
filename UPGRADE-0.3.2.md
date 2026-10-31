@@ -55,7 +55,7 @@
 | `deploy/env/CBX1A-CERTM-spec1.env` | 0.3.2 现役 env（56 键） | 直接落位；与 kit 内同名件逐字节相同 |
 | `deploy/reconstruct/0.3.2/env/` | FB54→E16B1→E16B2→CBX1A 逐级链 + 键差 | 升级/回退的单文件链 |
 | `deploy/reconstruct/0.3.2/` | r032c 16 件、overlay、b12x、权重/engram 台账、boot 参面 | 0.3.2 的全部增量 |
-| `deploy/overlay/o12c1-prod/` | 29 件 overlay（0.3.1 基底） | 覆盖 backend 后即 0.3.2 |
+| `deploy/overlay/o12c1-prod/` | 29 件 overlay（0.3.1 基底）〔**代际注记 2026-10-31**：该目录已整面同步为 **0.3.4 现役形**（备查同步窗），不再可直接当 0.3.2 基底用——0.3.2 基底取法=本批之前 git 历史的同路径目录，或按 `tools/packages/cfgmgmt/payload/out/overlay-MANIFEST.md5`（0.3.2 期账）核对；总表=`deploy/README-说明.md`〕 | 覆盖 backend 后即 0.3.2 |
 | `deploy/b12x/` | b12x 计算树（0.3.1 基底） | 覆盖 3 件 RoCE 源码 |
 
 装配后的 adapter 目录=**87 个运行时件**；生产记录是 89 件（多 2 个宿主
@@ -347,7 +347,7 @@ C1=3757.7、C2=2849.8、C4=1571.0（C4/C1=0.418）。这是定标读数，不是
 | 镜像 | `deploy/bin/r3-boot-arm.sh` 第 20 行 `IMAGE=` 单行回指 `main-79cafec0`（或 r032b）；复靴 |
 | env | `ARM_ENV_FILE` 回指 E16B2→E16B1→FB54→0.3.1 51 键；单文件整替，不手改 |
 | adapter | `rsync -a --delete <home>/migrate-assets/dsv41/adapter-bak-pre-032-<ts>/ <home>/migrate-assets/dsv41/adapter/`；复靴 |
-| overlay/b12x | 回拷 0.3.1 基底件（`deploy/overlay/o12c1-prod/` 原 backend；`deploy/b12x/` 原三件）；清 b12x 编译缓存 |
+| overlay/b12x | 回拷 0.3.1 基底件（`deploy/overlay/o12c1-prod/` 原 backend〔**2026-10-31 起该目录为 0.3.4 形**，0.3.1 原 backend `736fbde5` 自本批前 git 历史取〕；`deploy/b12x/` 原三件）；清 b12x 编译缓存 |
 | boot 参 | A8/A9 的旧 boot 件回拷（若有 `.bak`）。**勿回拷带 `--sleep-on-idle` 的旧件**——该参 2026-10-30 起为禁参（上游 #43050 idle-wake hang；三面硬门拦截） |
 
 回退后同样跑 boot 四查+接线闸门；旧形 A8/A9 未接线时闸门应红——这是预期判别，

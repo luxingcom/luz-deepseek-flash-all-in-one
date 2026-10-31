@@ -105,12 +105,18 @@ boot 规程（点火前缀/沉降 600s 律/warm 64k×2 第一动作/warm 门 450
 | `VL41N-K6CG.env` | bd5d62d8 | L3 级 k6+CG bs16=生产全量形（参数面与产线逐字等价动态预证） |
 | `VL40EXP-R2-C24T.env` | —（脱敏收录） | V4.0exp R2 认证形 19 键+`SGLANG_OVERLAY_DIR` 复原树指针（用户名掩码位=部署时替换，见 DEPLOY-GUIDE §5 脱敏注记） |
 
-## overlay/ — v4vl-79cafec0/（VL 专用复原树 28 件）
+## overlay/ — o12c1-prod/（产线 overlay 快照，0.3.4 形）+ v4vl-79cafec0/（VL 复原树 28 件）
 
-V4.0exp 臂供给面（bind mount 面，非镜像内容）：源=宿主
+**o12c1-prod/＝0.3.4 形现役快照（2026-10-31 备查同步窗整面入仓）**：目录 30 件=
+29 个 `.py` 活件+`overlay-map.tsv` 映射表；对表清单=
+[`prod/overlay-md5.txt`](prod/overlay-md5.txt)（`md5sum -c` 应 29 行全绿）。三件
+身份正典全文备查于 [`reconstruct/0.3.4/overlay/`](reconstruct/0.3.4/overlay/NOTES.md)；
+逐件身份/md5/血统/换血表/旧形取回总表=**[`README-说明.md`](README-说明.md)**。
+
+**v4vl-79cafec0/**＝V4.0exp 臂供给面（bind mount 面，非镜像内容）：源=宿主
 `~/migrate-assets/vl-native/sglang-overlay.v4vl-79cafec0/`（四机同路径纪律），
 内容指纹 cbf986df×4 机全等；平铺键→容器 sglang 路径映射=`boot_mvl40exp_r2.sh`
-内嵌 OV_MAP（28 件 fail-closed 计数断言）。与 `o12c1-prod/`（产线 29 件）零交叠。
+内嵌 OV_MAP（28 件 fail-closed 计数断言）。与 `o12c1-prod/`（产线 30 件）零交叠。
 详=DEPLOY-GUIDE §5/§9.2+`docs/research/VL-NATIVE-RESULT-20261013.md` §三。
 
 ## 内网值说明（2026-10-30 更新）
